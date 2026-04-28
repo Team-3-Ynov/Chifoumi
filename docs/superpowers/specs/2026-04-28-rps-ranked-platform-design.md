@@ -39,7 +39,7 @@ Doit être **strictement couvert** :
 - Sécurité (SQLi, XSS, accès par rôles)
 - `docker-compose` fonctionnel + script init BDD au premier lancement
 - CI + déploiement continu (selon le cas)
-- Linter + formatter (validé : Biome au lieu d'ESLint+Prettier, autorisation orale du prof)
+- Linter + formatter : **Biome** (substitution officiellement validée par le prof, choix figé pour le projet)
 - Conventional commits, deux branches `main` + `develop`, PR uniquement sur `main`
 
 ---
@@ -335,9 +335,9 @@ Cible : **~70% global**, **~95% sur `packages/elo` et la state machine commit-re
 
 ### 9.1 Linter & formatter
 
-**Biome** (substitution validée à l'oral par le prof, à mentionner dans README + soutenance).
+**Biome** — choix officiellement validé pour le projet en remplacement d'ESLint+Prettier. À expliciter dans le README et en soutenance comme parti pris assumé (un seul outil pour lint + format, performance native Rust, configuration unifiée).
 - Package `packages/biome/` exposant un `biome.json` de base, étendu par chaque app via `extends`.
-- Règles équivalentes activées : `unicorn`, `sonarjs`, `perfectionist`, `react`, `react-hooks` (Biome a des règles natives inspirées de ces sources).
+- Règles équivalentes aux modules du brief activées : `unicorn`, `sonarjs`, `perfectionist`, `react`, `react-hooks` (Biome a des règles natives inspirées de ces sources). Tableau d'équivalence à publier dans `packages/biome/README.md` pour répondre aux questions du jury.
 - Hook pre-commit via `lefthook` : `biome check --write` + tests rapides.
 - CI : `biome ci` qui fail le pipeline en cas de non-conformité.
 
