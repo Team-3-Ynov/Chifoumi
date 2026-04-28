@@ -1,0 +1,29 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .: {}
+
+  apps/api: {}
+
+  apps/front: {}
+
+  apps/game-service: {}
+
+  apps/job-runner: {}
+
+  packages/biome: {}
+
+  packages/db: {}
+
+  packages/elo: {}
+
+  packages/proto: {}
+
+  packages/schemas: {}
+
+  packages/tsconfig: {}
