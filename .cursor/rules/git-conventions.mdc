@@ -1,0 +1,133 @@
+---
+description: Conventions Git du projet Chifoumi Ranked (branches, commits, PR). Toujours appliquer.
+alwaysApply: true
+---
+
+# Conventions Git — Chifoumi Ranked
+
+> Règles **strictes** imposées par le brief YNOV : tout commit non conforme est **retiré de la codebase finale**. La traçabilité individuelle pèse ×4 dans la note.
+
+---
+
+## 1. Branches
+
+| Branche | Rôle | Règles |
+|---|---|---|
+| `main` | Branche d'évaluation | **Aucun commit direct.** Merges depuis `develop` uniquement, en **non-fast-forward** (`--no-ff`), via PR review obligatoire. |
+| `develop` | Intégration continue | **Aucun commit direct.** Merges depuis branches de travail uniquement, via PR. |
+| `feature/<scope>-<short-desc>` | Nouvelle fonctionnalité | Ex : `feature/api-auth-refresh-token` |
+| `fix/<scope>-<short-desc>` | Correction de bug | Ex : `fix/game-service-reveal-timeout` |
+| `chore/<scope>-<short-desc>` | Tâches techniques (deps, config, CI) | Ex : `chore/ci-add-coverage-threshold` |
+| `docs/<short-desc>` | Documentation pure | Ex : `docs/update-readme-onboarding` |
+| `refactor/<scope>-<short-desc>` | Refacto sans changement de comportement | Ex : `refactor/elo-extract-k-factor` |
+
+**Règles complémentaires :**
+
+- Nom **en kebab-case**, en **anglais**, **sans accent**, **sans majuscule**.
+- Une branche = **un ticket** (US ou tâche). Référencer le ticket dans la PR.
+- Supprimer la branche après merge.
+
+---
+
+## 2. Conventional Commits (format obligatoire)
+
+```text
+<type>(<scope>): <description courte> (#<issue>)
+
+[corps optionnel]
+
+[footer optionnel : BREAKING CHANGE, Closes #X, Co-authored-by]
+```
+
+### Types autorisés
+
+| Type | Quand l'utiliser |
+|---|---|
+| `feat` | Nouvelle fonctionnalité visible utilisateur ou API publique |
+| `fix` | Correction de bug |
+| `refactor` | Modification interne sans changement de comportement |
+| `perf` | Amélioration de performance |
+| `test` | Ajout ou modification de tests uniquement |
+| `docs` | Documentation pure (README, ADRs, JSDoc, Swagger) |
+| `chore` | Tâches techniques (deps, config, CI/CD, scripts) |
+| `style` | Formatage uniquement (sans impact logique) — rare avec Biome |
+| `build` | Modifications du système de build (Dockerfile, scripts pnpm) |
+| `ci` | Modifications GitHub Actions, hooks lefthook |
+
+### Scopes recommandés
+
+`api`, `game-service`, `job-runner`, `front`, `db`, `elo`, `proto`, `schemas`, `biome`, `tsconfig`, `infra`, `docker`, `ci`, `docs`, `auth`, `matchmaking`, `tournaments`, `wallet`.
+
+### Règles de rédaction
+
+- Description **en anglais**, **impératif présent**, **sans point final**, **≤ 72 caractères**.
+- Référence d'issue **toujours** entre parenthèses à la fin : `(#123)`.
+- Corps optionnel pour expliquer le **pourquoi**, pas le **quoi**.
+- `BREAKING CHANGE:` en footer pour tout changement de contrat public (API, gRPC, WebSocket events).
+
+### Exemples valides
+
+```text
+feat(api): add refresh token rotation endpoint (#42)
+fix(game-service): forfeit player on invalid commit hash (#87)
+refactor(elo): extract k-factor logic into pure function (#101)
+test(elo): cover edge case for first match rating (#115)
+chore(ci): bump pnpm to 9.7.0 in GitHub Actions (#120)
+docs(api): document Bearer auth in Swagger setup (#9)
+```
+
+### Exemples INVALIDES
+
+```text
+update auth                          # pas de type, pas de scope, pas d'issue
+feat: stuff                          # description vide, pas de scope
+Feat(API): Added new endpoint.       # majuscules, passé, point final
+fix(api): fix bug                    # description vague, pas d'issue
+WIP                                  # interdit, jamais sur develop/main
+```
+
+---
+
+## 3. Granularité des commits
+
+- **Un commit = un changement logique cohérent.**
+- Préférer **plusieurs petits commits** à un gros commit fourre-tout (le brief le demande explicitement).
+- Ne **jamais** mélanger refacto + feature + fix dans le même commit.
+- Les commits intermédiaires `wip`, `oops`, `fix typo` doivent être **rebasés/squashés localement** avant la PR.
+
+---
+
+## 4. Pull Requests
+
+- **Cible** : `develop` (jamais `main` directement, sauf release officielle `develop` → `main`).
+- **Titre** : même format que les commits (`feat(api): ...`).
+- **Description** doit contenir :
+  - Lien vers le ticket (`Closes #42`)
+  - Résumé du **pourquoi** + résumé du **quoi**
+  - Captures d'écran si UI impactée
+  - Checklist DoD (cf. `CLAUDE.md` §9)
+  - Notes de migration si breaking change
+- **Review obligatoire** par au moins un autre membre avant merge.
+- **CI verte** obligatoire avant merge (lint, typecheck, tests, build).
+- **Merge** : non-fast-forward (`--no-ff`), pas de squash sur `main`. Sur `develop`, le squash est toléré pour les très petites PRs si l'historique reste lisible.
+
+---
+
+## 5. Avant de pousser : checklist locale
+
+```bash
+pnpm biome check                  # lint + format
+pnpm -r typecheck                 # types
+pnpm -r test --coverage           # tests + seuils de couverture
+git log --oneline origin/develop..HEAD  # vérifier que chaque message respecte le format
+```
+
+Le hook `lefthook` exécute automatiquement `biome check --write` + typecheck sur les fichiers modifiés au pre-commit. **Ne pas le bypasser** (`--no-verify` interdit sauf urgence justifiée en PR).
+
+---
+
+## 6. Cas particuliers
+
+- **Hotfix prod** : `fix/<desc>` branché sur `main`, PR vers `main` **et** rebase sur `develop` ensuite.
+- **Revert** : `git revert <sha>` ; le message commence par `revert: <message original>`.
+- **Co-authoring** (pair programming, contribution IA) : ajouter `Co-authored-by: Nom <email>` en footer pour préserver la traçabilité individuelle (critique pour la note Suivi ×4).
