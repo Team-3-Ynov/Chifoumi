@@ -1,0 +1,10 @@
+{
+  "name": "@chifoumi/root",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": ["apps/*", "packages/*"]
+}
