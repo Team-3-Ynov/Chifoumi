@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://lefthook.dev/schemas/lefthook.json
+
+pre-commit:
+  parallel: false
+  commands:
+    biome:
+      glob: "{apps,packages}/**/*.{js,jsx,ts,tsx,json,jsonc,css,wasm,mjs,mts,cjs,cts}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+    typecheck:
+      run: pnpm -r typecheck
