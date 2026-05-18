@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: bitnami/postgresql:16
+    container_name: chifoumi-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRESQL_PASSWORD: postgres_dev
+    volumes:
+      - pg_data:/bitnami/postgresql
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1 -p 5432"]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: bitnami/redis:7
+    container_name: chifoumi-redis
+    ports:
+      - "6379:6379"
+    environment:
+      ALLOW_EMPTY_PASSWORD: yes
+    volumes:
+      - redis_data:/bitnami/redis/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: chifoumi-mailhog
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8025 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  redis_data:
