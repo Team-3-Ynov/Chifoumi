@@ -67,10 +67,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Test with coverage
-        run: pnpm -r test -- --coverage
+        run: pnpm -r run --if-present test -- --coverage
 
       - name: Upload coverage artifact
-        if: success() || failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
@@ -97,4 +97,4 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm -r build
+        run: pnpm -r run --if-present build
