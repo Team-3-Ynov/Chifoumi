@@ -7,8 +7,5 @@
   },
   "devDependencies": {
     "typescript": "~5.7.3"
-  },
-  "peerDependencies": {
-    "@biomejs/biome": "*"
   }
 }
