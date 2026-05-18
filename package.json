@@ -10,10 +10,12 @@
     "biome": "biome",
     "biome:check": "biome check .",
     "biome:ci": "biome ci .",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "prepare": "lefthook install"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "lefthook": "1.10.10",
     "typescript": "~5.7.3"
   }
 }

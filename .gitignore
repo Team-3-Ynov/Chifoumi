@@ -24,6 +24,7 @@ logs/
 # OS / editors
 .DS_Store
 Thumbs.db
+.worktrees/
 .vscode/
 !.vscode/settings.json
 !.vscode/extensions.json
