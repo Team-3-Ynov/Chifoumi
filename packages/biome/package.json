@@ -2,6 +2,12 @@
   "name": "@chifoumi/biome",
   "version": "0.0.0",
   "private": true,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.7.3"
+  },
   "peerDependencies": {
     "@biomejs/biome": "*"
   }

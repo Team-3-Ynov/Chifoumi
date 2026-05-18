@@ -18,25 +18,75 @@ importers:
         specifier: ~5.7.3
         version: 5.7.3
 
-  apps/api: {}
+  apps/api:
+    devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
-  apps/front: {}
+  apps/front:
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.18
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.5
+        version: 18.3.7(@types/react@18.3.28)
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
-  apps/game-service: {}
+  apps/game-service:
+    devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
-  apps/job-runner: {}
+  apps/job-runner:
+    devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
-  packages/biome: {}
+  packages/biome:
+    dependencies:
+      '@biomejs/biome':
+        specifier: '*'
+        version: 2.3.15
+    devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
-  packages/db: {}
+  packages/db:
+    devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
-  packages/elo: {}
+  packages/elo:
+    devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
-  packages/proto: {}
+  packages/proto:
+    devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
-  packages/schemas: {}
+  packages/schemas:
+    devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
-  packages/tsconfig: {}
+  packages/tsconfig:
+    devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
 
 packages:
 
@@ -92,6 +142,20 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
+
+  '@types/prop-types@15.7.15':
+    resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
+
+  '@types/react-dom@18.3.7':
+    resolution: {integrity: sha512-MEe3UeoENYVFXzoXEWsvcpg6ZvlrFNlOQ7EOsvhI3CfAXwzPfO8Qwuxd40nepsYKqyyVQnTdEfv68q91yLcKrQ==}
+    peerDependencies:
+      '@types/react': ^18.0.0
+
+  '@types/react@18.3.28':
+    resolution: {integrity: sha512-z9VXpC7MWrhfWipitjNdgCauoMLRdIILQsAEV+ZesIzBq/oUlxk0m3ApZuMFCXdnS4U7KrI+l3WRUEGQ8K1QKw==}
+
+  csstype@3.2.3:
+    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
   lefthook-darwin-arm64@1.10.11:
     resolution: {integrity: sha512-yFsuEKjO5FP1svuv7m+epGsKmec8hHWxYIAnL2sDMiVR+rbSrd4zKWCGis7hdu/H0ltR/3NbHWzM3NFcxmDalg==}
@@ -188,6 +252,19 @@ snapshots:
 
   '@biomejs/cli-win32-x64@2.3.15':
     optional: true
+
+  '@types/prop-types@15.7.15': {}
+
+  '@types/react-dom@18.3.7(@types/react@18.3.28)':
+    dependencies:
+      '@types/react': 18.3.28
+
+  '@types/react@18.3.28':
+    dependencies:
+      '@types/prop-types': 15.7.15
+      csstype: 3.2.3
+
+  csstype@3.2.3: {}
 
   lefthook-darwin-arm64@1.10.11:
     optional: true
