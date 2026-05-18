@@ -1,0 +1,62 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignore": ["node_modules", "dist", "build", "coverage", ".turbo", "**/generated/**"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "organizeImports": {
+    "enabled": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "noForEach": "warn",
+        "useSimplifiedLogicExpression": "warn"
+      },
+      "correctness": {
+        "noUnusedVariables": "warn",
+        "useExhaustiveDependencies": "warn"
+      },
+      "style": {
+        "noNegationElse": "warn",
+        "useBlockStatements": "error",
+        "useConst": "error",
+        "useImportType": "error",
+        "useNodejsImportProtocol": "warn",
+        "useNumberNamespace": "warn",
+        "useSelfClosingElements": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noArrayIndexKey": "warn",
+        "noAssignInExpressions": "warn",
+        "noConfusingVoidType": "warn",
+        "noDoubleEquals": "error",
+        "noEmptyInterface": "warn"
+      },
+      "nursery": {
+        "noDuplicateElseIf": "warn",
+        "useSortedClasses": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  }
+}
