@@ -1,3 +1,8 @@
 {
-  "extends": "//"
+  "extends": "//",
+  "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  }
 }
