@@ -4,7 +4,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "module": "NodeNext",
-    "moduleResolution": "NodeNext"
+    "moduleResolution": "NodeNext",
+    "paths": {
+      "@chifoumi/db": ["../../packages/db/dist/index.d.ts"]
+    }
   },
   "include": ["src/**/*.ts"]
 }
