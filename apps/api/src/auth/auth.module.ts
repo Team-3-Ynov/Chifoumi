@@ -5,7 +5,9 @@ import { JWT_CONFIG, type JwtConfig } from "../config/jwt.config.js";
 import { UsersModule } from "../users/users.module.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthService } from "./auth.service.js";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard.js";
 import { PasswordService } from "./password.service.js";
+import { JwtStrategy } from "./strategies/jwt.strategy.js";
 import { TokenService } from "./token.service.js";
 
 @Module({
@@ -22,7 +24,7 @@ import { TokenService } from "./token.service.js";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService, TokenService],
-  exports: [AuthService],
+  providers: [AuthService, PasswordService, TokenService, JwtStrategy, JwtAuthGuard],
+  exports: [AuthService, JwtAuthGuard],
 })
 export class AuthModule {}
