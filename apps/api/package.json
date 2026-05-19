@@ -1,11 +1,24 @@
 {
   "name": "@chifoumi/api",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
+    "start": "tsx src/test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
+  "dependencies": {
+    "@chifoumi/db": "workspace:*",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^17.2.3",
+    "pg": "^8.16.3"
+  },
   "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.5",
+    "prisma": "^7.8.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.7.3"
   }
 }
