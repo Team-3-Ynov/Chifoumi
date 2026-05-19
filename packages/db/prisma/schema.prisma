@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  player
+  admin
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  displayName  String     @unique @map("display_name")
+  passwordHash String     @map("password_hash")
+  role         UserRole   @default(player)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  eloRating    EloRating?
+
+  @@map("users")
+}
+
+model EloRating {
+  userId      String   @id @map("user_id") @db.Uuid
+  rating      Int      @default(1000)
+  gamesPlayed Int      @default(0) @map("games_played")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([rating(sort: Desc)])
+  @@map("elo_ratings")
+}
