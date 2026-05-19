@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [develop, main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: pr-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -12,19 +15,49 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.9
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-node-pnpm
 
       - name: Biome (CI mode)
         run: pnpm exec biome ci .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Test with coverage
+        run: pnpm -r run --if-present test -- --coverage
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-reports
+          path: |
+            **/coverage/**
+            !**/coverage/**/node_modules/**
+          if-no-files-found: warn
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build
+        run: pnpm -r run --if-present build
