@@ -4,6 +4,7 @@ module.exports = {
   extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
+    "^@chifoumi/db$": "<rootDir>/src/testing/chifoumi-db.mock.ts",
   },
   testEnvironment: "node",
   roots: ["<rootDir>/src"],

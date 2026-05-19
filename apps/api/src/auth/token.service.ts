@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import type { JwtService } from "@nestjs/jwt";
+import { JwtService } from "@nestjs/jwt";
 import { v4 as uuidv4 } from "uuid";
 import { JWT_CONFIG, type JwtConfig } from "../config/jwt.config.js";
 
