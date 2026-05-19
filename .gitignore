@@ -35,3 +35,6 @@ Thumbs.db
 
 # Docker volumes
 .volumes/
+
+# JWT dev private key — never commit
+infra/keys/jwt-private.pem
