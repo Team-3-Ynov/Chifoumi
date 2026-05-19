@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Deliver a root `docker-compose.yml` stack (Postgres Bitnami 16, Redis Bitnami 7, MailHog) with healthchecks, first-boot SQL init for database `chifoumi` / user `app`, and `.env.example` so `docker compose up -d` yields a healthy local infra in under 30 seconds.
+**Goal:** Deliver a root `docker-compose.yml` stack (Postgres Bitnami legacy 16, Redis Bitnami legacy 7.4, MailHog) with healthchecks, first-boot SQL init for database `chifoumi` / user `app`, and `.env.example` so `docker compose up -d` yields a healthy local infra in under 30 seconds.
 
 **Architecture:** Infra-only compose file at repo root; apps run on the host via PNPM. Postgres bootstrap uses `infra/postgres/init.sql` mounted into Bitnami’s `/docker-entrypoint-initdb.d/` (no `POSTGRESQL_DATABASE` / `POSTGRESQL_USERNAME` env vars). Redis has no password in dev (`ALLOW_EMPTY_PASSWORD=yes`).
 
-**Tech stack:** Docker Compose v2, `bitnami/postgresql:16`, `bitnami/redis:7`, `mailhog/mailhog:v1.0.1`.
+**Tech stack:** Docker Compose v2, `bitnamilegacy/postgresql:16`, `bitnamilegacy/redis:7.4`, `mailhog/mailhog:v1.0.1`.
 
 **Authoritative spec:** `docs/superpowers/specs/2026-05-18-us-004-docker-compose-dev-design.md`
 
@@ -123,7 +123,7 @@ Create `docker-compose.yml` with exactly:
 ```yaml
 services:
   postgres:
-    image: bitnami/postgresql:16
+    image: bitnamilegacy/postgresql:16
     container_name: chifoumi-postgres
     ports:
       - "5432:5432"
@@ -141,12 +141,12 @@ services:
     restart: unless-stopped
 
   redis:
-    image: bitnami/redis:7
+    image: bitnamilegacy/redis:7.4
     container_name: chifoumi-redis
     ports:
       - "6379:6379"
     environment:
-      ALLOW_EMPTY_PASSWORD: yes
+      ALLOW_EMPTY_PASSWORD: "yes"
     volumes:
       - redis_data:/bitnami/redis/data
     healthcheck:
@@ -163,7 +163,7 @@ services:
       - "8025:8025"
       - "1025:1025"
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 8025 || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8025/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -211,7 +211,7 @@ If `mailhog` stays `unhealthy`, inspect:
 docker compose logs mailhog
 ```
 
-Fix healthcheck only if `nc` is missing from the image (try `wget -q --spider http://127.0.0.1:8025` in `CMD-SHELL`, or document the working probe in the PR). Do not change the MailHog image tag without noting it in the PR.
+If `mailhog` stays `unhealthy`, keep the HTTP probe aligned with `docker-compose.yml` and inspect whether `wget` is available in the image before trying another documented probe. Do not change the MailHog image tag without noting it in the PR.
 
 - [ ] **Step 4: Commit**
 
@@ -367,7 +367,7 @@ US-004 does not require Docker in CI. Ensure existing `pr.yml` (biome, typecheck
 | Spec requirement | Task |
 |------------------|------|
 | `docker-compose.yml` with postgres, redis, mailhog | Task 2 |
-| Bitnami postgres 16, redis 7 | Task 2 |
+| Bitnami legacy postgres 16, redis 7.4 | Task 2 |
 | Healthchecks all services | Task 2, 4 |
 | Volumes `pg_data`, `redis_data` | Task 2 |
 | `infra/postgres/init.sql` → initdb.d | Task 1, 2 |

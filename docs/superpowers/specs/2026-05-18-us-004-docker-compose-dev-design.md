@@ -19,6 +19,7 @@ A new contributor with Docker installed runs `docker compose up -d` and gets a *
 | Host ports | Standard `5432`, `6379`, `8025` (SMTP `1025`) |
 | Redis auth | None in dev (`ALLOW_EMPTY_PASSWORD=yes`, `redis://localhost:6379`) |
 | Bootstrap approach | **init.sql only** (no `POSTGRESQL_DATABASE` / `POSTGRESQL_USERNAME` in compose — avoids duplicate creation with Bitnami env) |
+| Image namespace | Use `bitnamilegacy/*` images for local dev to keep the Docker Hub pull workflow working with the current Bitnami image availability. |
 
 ## Scope
 
@@ -43,8 +44,8 @@ A new contributor with Docker installed runs `docker compose up -d` and gets a *
 ```text
 Host (PNPM apps)                    Docker network (default)
 ─────────────────                   ─────────────────────────
-api / game-service / job-runner  →  localhost:5432  postgres (Bitnami 16)
-                                    localhost:6379  redis (Bitnami 7)
+api / game-service / job-runner  →  localhost:5432  postgres (Bitnami legacy 16)
+                                    localhost:6379  redis (Bitnami legacy 7.4)
                                     localhost:1025  mailhog SMTP
                                     localhost:8025  mailhog UI
 ```
@@ -57,7 +58,7 @@ No `depends_on` between infra services for US-004. Apps connect via `localhost` 
 
 | Setting | Value |
 |---------|--------|
-| Image | `bitnami/postgresql:16` (pin major tag, not `latest`) |
+| Image | `bitnamilegacy/postgresql:16` (pin major tag, not `latest`) |
 | Ports | `5432:5432` |
 | Volume | `pg_data:/bitnami/postgresql` |
 | Init mount | `./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro` |
@@ -79,7 +80,7 @@ start_period: 10s
 
 | Setting | Value |
 |---------|--------|
-| Image | `bitnami/redis:7` |
+| Image | `bitnamilegacy/redis:7.4` |
 | Ports | `6379:6379` |
 | Volume | `redis_data:/bitnami/redis/data` |
 | Env | `ALLOW_EMPTY_PASSWORD=yes` |
@@ -97,11 +98,19 @@ retries: 5
 
 | Setting | Value |
 |---------|--------|
-| Image | `mailhog/mailhog` |
+| Image | `mailhog/mailhog:v1.0.1` |
 | Ports | `8025:8025` (UI), `1025:1025` (SMTP) |
 | Volume | none (ephemeral dev mail) |
 
-**Healthcheck:** HTTP probe on port 8025. If `mailhog/mailhog` lacks `wget`, use an equivalent documented in the PR (e.g. `CMD-SHELL` with tool available in the image).
+**Healthcheck:** HTTP probe on port 8025 with `wget`:
+
+```yaml
+test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8025/ || exit 1"]
+interval: 10s
+timeout: 5s
+retries: 5
+start_period: 5s
+```
 
 ## `infra/postgres/init.sql`
 
