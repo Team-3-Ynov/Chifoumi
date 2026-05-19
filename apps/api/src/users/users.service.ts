@@ -1,6 +1,6 @@
 import { Prisma, type User, UserRole } from "@chifoumi/db";
 import { Injectable } from "@nestjs/common";
-import type { PrismaService } from "../prisma/prisma.service.js";
+import { PrismaService } from "../prisma/prisma.service.js";
 
 export type SafeUser = {
   id: string;
