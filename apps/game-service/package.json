@@ -2,10 +2,26 @@
   "name": "@chifoumi/game-service",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@types/node": "^24.12.4",
+    "tsx": "^4.22.2",
     "typescript": "~5.7.3"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.21",
+    "@nestjs/core": "^11.1.21",
+    "@nestjs/platform-express": "^11.1.21",
+    "@nestjs/platform-socket.io": "^11.1.21",
+    "@nestjs/websockets": "^11.1.21",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "socket.io": "^4.8.3"
   }
 }

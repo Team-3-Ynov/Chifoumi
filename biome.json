@@ -9,6 +9,7 @@
       "!!**/dist",
       "!!**/coverage",
       "!!**/.pnpm-store",
+      "!!**/.worktrees",
       "!!pnpm-lock.yaml"
     ]
   },
