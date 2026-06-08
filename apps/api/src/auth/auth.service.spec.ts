@@ -10,13 +10,16 @@ import { TokenService } from "./token.service.js";
 
 describe("AuthService", () => {
   const prisma = {
+    $transaction: jest.fn<PrismaService["$transaction"]>(),
     refreshToken: {
       create: jest.fn<PrismaService["refreshToken"]["create"]>(),
+      findUnique: jest.fn<PrismaService["refreshToken"]["findUnique"]>(),
       updateMany: jest.fn<PrismaService["refreshToken"]["updateMany"]>(),
     },
   };
   const usersService = {
     findByEmail: jest.fn<UsersService["findByEmail"]>(),
+    findById: jest.fn<UsersService["findById"]>(),
     createUser: jest.fn<UsersService["createUser"]>(),
     toSafeUser: jest.fn<UsersService["toSafeUser"]>(),
     isUniqueConstraintError: jest.fn<UsersService["isUniqueConstraintError"]>(),
@@ -28,15 +31,33 @@ describe("AuthService", () => {
   const tokenService = {
     issueAccessToken: jest.fn<TokenService["issueAccessToken"]>(),
     issueRefreshToken: jest.fn<TokenService["issueRefreshToken"]>(),
+    hashRefreshToken: jest.fn<TokenService["hashRefreshToken"]>(),
     getRefreshExpiresAt: jest.fn<TokenService["getRefreshExpiresAt"]>(),
   };
   const redisService = {
     revokeAccessToken: jest.fn<RedisService["revokeAccessToken"]>(),
+    get: jest.fn<RedisService["get"]>(),
+    setex: jest.fn<RedisService["setex"]>(),
+    setnx: jest.fn<RedisService["setnx"]>(),
+    del: jest.fn<RedisService["del"]>(),
   };
   let authService: AuthService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    redisService.get.mockResolvedValue(null);
+    redisService.setex.mockResolvedValue();
+    redisService.setnx.mockResolvedValue(true);
+    redisService.del.mockResolvedValue();
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) =>
+      (callback as (tx: never) => Promise<unknown>)({
+        refreshToken: {
+          updateMany: prisma.refreshToken.updateMany,
+          create: prisma.refreshToken.create,
+        },
+      } as never),
+    );
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -124,6 +145,172 @@ describe("AuthService", () => {
     await expect(authService.login({ email: "a@b.com", password: "wrong" })).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+
+  it("refresh rotates tokens for a valid refresh token", async () => {
+    tokenService.hashRefreshToken.mockReturnValue("hashrefresh");
+    prisma.refreshToken.findUnique.mockResolvedValue({
+      id: "rt1",
+      userId: "u1",
+      tokenHash: "hashrefresh",
+      expiresAt: new Date("2030-01-01"),
+      revokedAt: null,
+    } as Awaited<ReturnType<PrismaService["refreshToken"]["findUnique"]>>);
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+    usersService.findById.mockResolvedValue({
+      id: "u1",
+      email: "a@b.com",
+      displayName: "alice",
+      role: "player",
+    } as Awaited<ReturnType<UsersService["findById"]>>);
+    usersService.toSafeUser.mockReturnValue({
+      id: "u1",
+      email: "a@b.com",
+      displayName: "alice",
+      role: "player",
+    });
+    tokenService.issueAccessToken.mockResolvedValue({ accessToken: "new-access" });
+    tokenService.issueRefreshToken.mockReturnValue({
+      refreshToken: "new-refresh",
+      refreshTokenHash: "new-hash",
+    });
+    tokenService.getRefreshExpiresAt.mockReturnValue(new Date("2030-01-02"));
+    prisma.refreshToken.create.mockResolvedValue(
+      {} as Awaited<ReturnType<PrismaService["refreshToken"]["create"]>>,
+    );
+
+    const result = await authService.refresh("old-refresh-token");
+
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "rt1",
+        revokedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(prisma.refreshToken.create).toHaveBeenCalledWith({
+      data: {
+        userId: "u1",
+        tokenHash: "new-hash",
+        expiresAt: new Date("2030-01-02"),
+      },
+    });
+    expect(result.tokens).toEqual({ access: "new-access", refresh: "new-refresh" });
+    expect(redisService.setnx).toHaveBeenCalledWith("refresh:lock:hashrefresh", 10);
+    expect(redisService.del).toHaveBeenCalledWith("refresh:lock:hashrefresh");
+  });
+
+  it("refresh returns cached tokens for duplicate concurrent requests", async () => {
+    tokenService.hashRefreshToken.mockReturnValue("hashrefresh");
+    redisService.setnx.mockResolvedValue(false);
+    redisService.get.mockResolvedValue(
+      JSON.stringify({ access: "cached-access", refresh: "cached-refresh" }),
+    );
+    prisma.refreshToken.findUnique.mockResolvedValue({
+      id: "rt1",
+      userId: "u1",
+      tokenHash: "hashrefresh",
+      expiresAt: new Date("2030-01-01"),
+      revokedAt: null,
+    } as Awaited<ReturnType<PrismaService["refreshToken"]["findUnique"]>>);
+    usersService.findById.mockResolvedValue({
+      id: "u1",
+      email: "a@b.com",
+      displayName: "alice",
+      role: "player",
+    } as Awaited<ReturnType<UsersService["findById"]>>);
+
+    const result = await authService.refresh("old-refresh-token");
+
+    expect(result.tokens).toEqual({ access: "cached-access", refresh: "cached-refresh" });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("refresh throws UnauthorizedException for unknown token", async () => {
+    tokenService.hashRefreshToken.mockReturnValue("missing");
+    prisma.refreshToken.findUnique.mockResolvedValue(null);
+
+    await expect(authService.refresh("unknown-token")).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it("refresh throws UnauthorizedException for expired token", async () => {
+    tokenService.hashRefreshToken.mockReturnValue("hashrefresh");
+    prisma.refreshToken.findUnique.mockResolvedValue({
+      id: "rt1",
+      userId: "u1",
+      tokenHash: "hashrefresh",
+      expiresAt: new Date("2020-01-01"),
+      revokedAt: null,
+    } as Awaited<ReturnType<PrismaService["refreshToken"]["findUnique"]>>);
+
+    await expect(authService.refresh("expired-token")).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it("refresh throws UnauthorizedException when user no longer exists", async () => {
+    tokenService.hashRefreshToken.mockReturnValue("hashrefresh");
+    prisma.refreshToken.findUnique.mockResolvedValue({
+      id: "rt1",
+      userId: "u1",
+      tokenHash: "hashrefresh",
+      expiresAt: new Date("2030-01-01"),
+      revokedAt: null,
+    } as Awaited<ReturnType<PrismaService["refreshToken"]["findUnique"]>>);
+    usersService.findById.mockResolvedValue(null);
+
+    await expect(authService.refresh("valid-token")).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("refresh revokes all user tokens on reuse of a revoked token", async () => {
+    tokenService.hashRefreshToken.mockReturnValue("hashrefresh");
+    prisma.refreshToken.findUnique.mockResolvedValue({
+      id: "rt1",
+      userId: "u1",
+      tokenHash: "hashrefresh",
+      expiresAt: new Date("2030-01-01"),
+      revokedAt: new Date("2029-01-01"),
+    } as Awaited<ReturnType<PrismaService["refreshToken"]["findUnique"]>>);
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+
+    await expect(authService.refresh("reused-token")).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { userId: "u1", revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+  });
+
+  it("refresh returns cached tokens when rotation loses a race", async () => {
+    tokenService.hashRefreshToken.mockReturnValue("hashrefresh");
+    redisService.get
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        JSON.stringify({ access: "cached-access", refresh: "cached-refresh" }),
+      );
+    prisma.refreshToken.findUnique.mockResolvedValue({
+      id: "rt1",
+      userId: "u1",
+      tokenHash: "hashrefresh",
+      expiresAt: new Date("2030-01-01"),
+      revokedAt: null,
+    } as Awaited<ReturnType<PrismaService["refreshToken"]["findUnique"]>>);
+    usersService.findById.mockResolvedValue({
+      id: "u1",
+      email: "a@b.com",
+      displayName: "alice",
+      role: "player",
+    } as Awaited<ReturnType<UsersService["findById"]>>);
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await authService.refresh("concurrent-token");
+
+    expect(result.tokens).toEqual({ access: "cached-access", refresh: "cached-refresh" });
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it("logout blacklists access token and revokes active refresh tokens", async () => {

@@ -10,9 +10,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Health"
-        ]
+        "tags": ["Health"]
       }
     },
     "/users/{id}/profile": {
@@ -75,9 +73,7 @@
           }
         ],
         "summary": "Get another player's public profile",
-        "tags": [
-          "users"
-        ]
+        "tags": ["users"]
       }
     },
     "/auth/register": {
@@ -123,9 +119,7 @@
                 "schema": {
                   "example": {
                     "statusCode": 400,
-                    "message": [
-                      "email must be an email"
-                    ],
+                    "message": ["email must be an email"],
                     "error": "Bad Request"
                   }
                 }
@@ -148,9 +142,7 @@
           }
         },
         "summary": "Register a new player account",
-        "tags": [
-          "auth"
-        ]
+        "tags": ["auth"]
       }
     },
     "/auth/login": {
@@ -195,9 +187,7 @@
                 "schema": {
                   "example": {
                     "statusCode": 400,
-                    "message": [
-                      "email must be an email"
-                    ],
+                    "message": ["email must be an email"],
                     "error": "Bad Request"
                   }
                 }
@@ -219,9 +209,43 @@
           }
         },
         "summary": "Login with email and password",
-        "tags": [
-          "auth"
-        ]
+        "tags": ["auth"]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Invalid, expired, revoked or unknown refresh token"
+          }
+        },
+        "summary": "Rotate refresh token and issue a new access token",
+        "tags": ["auth"]
       }
     },
     "/auth/logout": {
@@ -253,9 +277,7 @@
           }
         ],
         "summary": "Logout and revoke the current access token",
-        "tags": [
-          "auth"
-        ]
+        "tags": ["auth"]
       }
     },
     "/me": {
@@ -294,9 +316,7 @@
           }
         ],
         "summary": "Get authenticated user profile",
-        "tags": [
-          "me"
-        ]
+        "tags": ["me"]
       }
     },
     "/me/history": {
@@ -345,9 +365,7 @@
                 "schema": {
                   "example": {
                     "statusCode": 400,
-                    "message": [
-                      "limit must be ≤ 100"
-                    ],
+                    "message": ["limit must be ≤ 100"],
                     "error": "Bad Request"
                   }
                 }
@@ -374,9 +392,7 @@
           }
         ],
         "summary": "Paginated match history for the authenticated user",
-        "tags": [
-          "me"
-        ]
+        "tags": ["me"]
       }
     },
     "/leaderboard": {
@@ -405,10 +421,7 @@
                 "description": "Cache status returned by the API: HIT when Redis served the response, MISS otherwise.",
                 "schema": {
                   "type": "string",
-                  "enum": [
-                    "HIT",
-                    "MISS"
-                  ]
+                  "enum": ["HIT", "MISS"]
                 }
               }
             },
@@ -427,9 +440,7 @@
                 "schema": {
                   "example": {
                     "statusCode": 400,
-                    "message": [
-                      "limit must be ≤ 100"
-                    ],
+                    "message": ["limit must be ≤ 100"],
                     "error": "Bad Request"
                   }
                 }
@@ -438,9 +449,7 @@
           }
         },
         "summary": "Get global top players by rating",
-        "tags": [
-          "leaderboard"
-        ]
+        "tags": ["leaderboard"]
       }
     },
     "/.well-known/jwks.json": {
@@ -452,9 +461,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Jwks"
-        ]
+        "tags": ["Jwks"]
       }
     }
   },
@@ -507,14 +514,7 @@
             "example": "2026-06-08T12:00:00.000Z"
           }
         },
-        "required": [
-          "id",
-          "displayName",
-          "rating",
-          "gamesPlayed",
-          "winRate",
-          "createdAt"
-        ]
+        "required": ["id", "displayName", "rating", "gamesPlayed", "winRate", "createdAt"]
       },
       "RegisterDto": {
         "type": "object",
@@ -538,11 +538,7 @@
             "example": "player1"
           }
         },
-        "required": [
-          "email",
-          "password",
-          "displayName"
-        ]
+        "required": ["email", "password", "displayName"]
       },
       "SafeUserDto": {
         "type": "object",
@@ -563,19 +559,11 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "player",
-              "admin"
-            ],
+            "enum": ["player", "admin"],
             "example": "player"
           }
         },
-        "required": [
-          "id",
-          "email",
-          "displayName",
-          "role"
-        ]
+        "required": ["id", "email", "displayName", "role"]
       },
       "TokensDto": {
         "type": "object",
@@ -591,10 +579,7 @@
             "example": "vJ6E3j6bU5Wc3cS8mQf9Rk5H2q3T4p1N"
           }
         },
-        "required": [
-          "access",
-          "refresh"
-        ]
+        "required": ["access", "refresh"]
       },
       "AuthResponseDto": {
         "type": "object",
@@ -606,10 +591,7 @@
             "$ref": "#/components/schemas/TokensDto"
           }
         },
-        "required": [
-          "user",
-          "tokens"
-        ]
+        "required": ["user", "tokens"]
       },
       "LoginDto": {
         "type": "object",
@@ -626,10 +608,28 @@
             "example": "password1234"
           }
         },
-        "required": [
-          "email",
-          "password"
-        ]
+        "required": ["email", "password"]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque refresh token issued at login or a prior refresh",
+            "minLength": 20,
+            "example": "dGhpcyBpcyBhbiBvcGFxdWUgcmVmcmVzaCB0b2tlbg"
+          }
+        },
+        "required": ["refreshToken"]
+      },
+      "RefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "tokens": {
+            "$ref": "#/components/schemas/TokensDto"
+          }
+        },
+        "required": ["tokens"]
       },
       "MeProfileDto": {
         "type": "object",
@@ -650,10 +650,7 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "player",
-              "admin"
-            ],
+            "enum": ["player", "admin"],
             "example": "player"
           },
           "rating": {
@@ -670,15 +667,7 @@
             "example": "2026-06-08T12:00:00.000Z"
           }
         },
-        "required": [
-          "id",
-          "email",
-          "displayName",
-          "role",
-          "rating",
-          "gamesPlayed",
-          "createdAt"
-        ]
+        "required": ["id", "email", "displayName", "role", "rating", "gamesPlayed", "createdAt"]
       },
       "MeHistoryOpponentDto": {
         "type": "object",
@@ -693,10 +682,7 @@
             "example": 1040
           }
         },
-        "required": [
-          "displayName",
-          "ratingAtMatch"
-        ]
+        "required": ["displayName", "ratingAtMatch"]
       },
       "MeHistoryItemDto": {
         "type": "object",
@@ -731,15 +717,7 @@
             "example": "2026-06-08T12:00:00.000Z"
           }
         },
-        "required": [
-          "matchId",
-          "opponent",
-          "scoreA",
-          "scoreB",
-          "isWinner",
-          "eloDelta",
-          "endedAt"
-        ]
+        "required": ["matchId", "opponent", "scoreA", "scoreB", "isWinner", "eloDelta", "endedAt"]
       },
       "MeHistoryResponseDto": {
         "type": "object",
@@ -756,9 +734,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "items"
-        ]
+        "required": ["items"]
       },
       "LeaderboardEntryDto": {
         "type": "object",
@@ -785,13 +761,7 @@
             "example": 42
           }
         },
-        "required": [
-          "rank",
-          "userId",
-          "displayName",
-          "rating",
-          "gamesPlayed"
-        ]
+        "required": ["rank", "userId", "displayName", "rating", "gamesPlayed"]
       },
       "LeaderboardResponseDto": {
         "type": "object",
@@ -803,9 +773,7 @@
             }
           }
         },
-        "required": [
-          "items"
-        ]
+        "required": ["items"]
       }
     }
   }
