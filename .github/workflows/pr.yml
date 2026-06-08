@@ -47,7 +47,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Test with coverage
-        run: pnpm -r run --if-present test -- --coverage
+        run: pnpm -r run --if-present test
 
       - name: Upload coverage artifact
         if: always()
