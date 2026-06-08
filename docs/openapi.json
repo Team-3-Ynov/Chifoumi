@@ -10,7 +10,9 @@
             "description": ""
           }
         },
-        "tags": ["Health"]
+        "tags": [
+          "Health"
+        ]
       }
     },
     "/users/{id}/profile": {
@@ -50,7 +52,9 @@
           }
         ],
         "summary": "Get another player's public profile",
-        "tags": ["users"]
+        "tags": [
+          "users"
+        ]
       }
     },
     "/auth/register": {
@@ -86,7 +90,9 @@
           }
         },
         "summary": "Register a new player account",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/auth/login": {
@@ -122,7 +128,9 @@
           }
         },
         "summary": "Login with email and password",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/me": {
@@ -143,7 +151,9 @@
           }
         ],
         "summary": "Get authenticated user profile",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
       }
     },
     "/me/history": {
@@ -192,7 +202,43 @@
           }
         ],
         "summary": "Paginated match history for the authenticated user",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/leaderboard": {
+      "get": {
+        "operationId": "LeaderboardController_getLeaderboard",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leaderboard page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters"
+          }
+        },
+        "summary": "Get global top players by rating",
+        "tags": [
+          "leaderboard"
+        ]
       }
     },
     "/.well-known/jwks.json": {
@@ -204,7 +250,9 @@
             "description": ""
           }
         },
-        "tags": ["Jwks"]
+        "tags": [
+          "Jwks"
+        ]
       }
     }
   },
@@ -254,7 +302,14 @@
             "type": "string"
           }
         },
-        "required": ["id", "displayName", "rating", "gamesPlayed", "winRate", "createdAt"]
+        "required": [
+          "id",
+          "displayName",
+          "rating",
+          "gamesPlayed",
+          "winRate",
+          "createdAt"
+        ]
       },
       "RegisterDto": {
         "type": "object",
@@ -278,7 +333,11 @@
             "example": "player1"
           }
         },
-        "required": ["email", "password", "displayName"]
+        "required": [
+          "email",
+          "password",
+          "displayName"
+        ]
       },
       "SafeUserDto": {
         "type": "object",
@@ -296,10 +355,18 @@
           },
           "role": {
             "type": "string",
-            "enum": ["player", "admin"]
+            "enum": [
+              "player",
+              "admin"
+            ]
           }
         },
-        "required": ["id", "email", "displayName", "role"]
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "role"
+        ]
       },
       "TokensDto": {
         "type": "object",
@@ -313,7 +380,10 @@
             "description": "Opaque refresh token (7 day TTL)"
           }
         },
-        "required": ["access", "refresh"]
+        "required": [
+          "access",
+          "refresh"
+        ]
       },
       "AuthResponseDto": {
         "type": "object",
@@ -325,7 +395,10 @@
             "$ref": "#/components/schemas/TokensDto"
           }
         },
-        "required": ["user", "tokens"]
+        "required": [
+          "user",
+          "tokens"
+        ]
       },
       "LoginDto": {
         "type": "object",
@@ -342,7 +415,10 @@
             "example": "password1234"
           }
         },
-        "required": ["email", "password"]
+        "required": [
+          "email",
+          "password"
+        ]
       },
       "Object": {
         "type": "object",
@@ -359,7 +435,10 @@
             "description": "Opponent rating at match time"
           }
         },
-        "required": ["displayName", "ratingAtMatch"]
+        "required": [
+          "displayName",
+          "ratingAtMatch"
+        ]
       },
       "MeHistoryItemDto": {
         "type": "object",
@@ -388,7 +467,15 @@
             "type": "string"
           }
         },
-        "required": ["matchId", "opponent", "scoreA", "scoreB", "isWinner", "eloDelta", "endedAt"]
+        "required": [
+          "matchId",
+          "opponent",
+          "scoreA",
+          "scoreB",
+          "isWinner",
+          "eloDelta",
+          "endedAt"
+        ]
       },
       "MeHistoryResponseDto": {
         "type": "object",
@@ -405,7 +492,51 @@
             "nullable": true
           }
         },
-        "required": ["items"]
+        "required": [
+          "items"
+        ]
+      },
+      "LeaderboardEntryDto": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "number"
+          },
+          "gamesPlayed": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "rank",
+          "userId",
+          "displayName",
+          "rating",
+          "gamesPlayed"
+        ]
+      },
+      "LeaderboardResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardEntryDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
       }
     }
   }

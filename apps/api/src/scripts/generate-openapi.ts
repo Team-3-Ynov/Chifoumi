@@ -19,7 +19,9 @@ const { privateKey, publicKey } = generateKeyPairSync("rsa", {
 process.env.JWT_PRIVATE_KEY = privateKey;
 process.env.JWT_PUBLIC_KEY = publicKey;
 process.env.DATABASE_URL ??= "postgresql://app:chifoumi_dev@localhost:5432/chifoumi";
+process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.SKIP_DB_CONNECT = "true";
+process.env.SKIP_REDIS_CONNECT = "true";
 
 async function generateOpenApi(): Promise<void> {
   const app = await NestFactory.create(AppModule, { logger: false });
