@@ -7,6 +7,7 @@ module.exports = {
     "^@chifoumi/db$": "@prisma/client",
   },
   testEnvironment: "node",
+  maxWorkers: 1,
   rootDir: ".",
   testRegex: "test/.*\\.e2e-spec\\.ts$",
   transform: {

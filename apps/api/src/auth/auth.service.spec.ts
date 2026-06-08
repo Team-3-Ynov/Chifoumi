@@ -2,13 +2,19 @@ import { jest } from "@jest/globals";
 import { ConflictException, UnauthorizedException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { RedisService } from "../redis/redis.service.js";
 import { UsersService } from "../users/users.service.js";
 import { AuthService } from "./auth.service.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
 
 describe("AuthService", () => {
-  const prisma = { refreshToken: { create: jest.fn<PrismaService["refreshToken"]["create"]>() } };
+  const prisma = {
+    refreshToken: {
+      create: jest.fn<PrismaService["refreshToken"]["create"]>(),
+      updateMany: jest.fn<PrismaService["refreshToken"]["updateMany"]>(),
+    },
+  };
   const usersService = {
     findByEmail: jest.fn<UsersService["findByEmail"]>(),
     createUser: jest.fn<UsersService["createUser"]>(),
@@ -24,6 +30,9 @@ describe("AuthService", () => {
     issueRefreshToken: jest.fn<TokenService["issueRefreshToken"]>(),
     getRefreshExpiresAt: jest.fn<TokenService["getRefreshExpiresAt"]>(),
   };
+  const redisService = {
+    revokeAccessToken: jest.fn<RedisService["revokeAccessToken"]>(),
+  };
   let authService: AuthService;
 
   beforeEach(async () => {
@@ -36,6 +45,7 @@ describe("AuthService", () => {
         { provide: UsersService, useValue: usersService },
         { provide: PasswordService, useValue: passwordService },
         { provide: TokenService, useValue: tokenService },
+        { provide: RedisService, useValue: redisService },
       ],
     }).compile();
     authService = moduleRef.get(AuthService);
@@ -114,5 +124,42 @@ describe("AuthService", () => {
     await expect(authService.login({ email: "a@b.com", password: "wrong" })).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+
+  it("logout blacklists access token and revokes active refresh tokens", async () => {
+    redisService.revokeAccessToken.mockResolvedValue();
+    prisma.refreshToken.updateMany.mockResolvedValue({
+      count: 1,
+    } as Awaited<ReturnType<PrismaService["refreshToken"]["updateMany"]>>);
+
+    await authService.logout({
+      userId: "u1",
+      jti: "jti-1",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    expect(redisService.revokeAccessToken).toHaveBeenCalledWith("jti-1", expect.any(Number));
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: "u1",
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it("logout rejects already expired access tokens", async () => {
+    await expect(
+      authService.logout({
+        userId: "u1",
+        jti: "jti-1",
+        expiresAt: new Date(Date.now() - 1_000),
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(redisService.revokeAccessToken).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 });

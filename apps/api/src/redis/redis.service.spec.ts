@@ -23,4 +23,11 @@ describe("RedisService", () => {
     expect(await client.get(`${LEADERBOARD_CACHE_KEY_PREFIX}20`)).toBeNull();
     expect(await client.get("other:key")).toBe("keep-me");
   });
+
+  it("blacklists and checks access tokens by jti", async () => {
+    await service.revokeAccessToken("jti-1", 60);
+
+    expect(await service.isAccessTokenRevoked("jti-1")).toBe(true);
+    expect(await service.isAccessTokenRevoked("jti-2")).toBe(false);
+  });
 });
