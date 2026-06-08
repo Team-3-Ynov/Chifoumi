@@ -100,10 +100,9 @@ export class AuthService {
     }
 
     const safeUser = this.usersService.toSafeUser(user);
-    let newRefreshToken: string;
 
     try {
-      await this.prisma.$transaction(async (tx) => {
+      const newRefreshToken = await this.prisma.$transaction(async (tx) => {
         const revoked = await tx.refreshToken.updateMany({
           where: {
             id: stored.id,
@@ -118,7 +117,6 @@ export class AuthService {
         }
 
         const issued = this.tokenService.issueRefreshToken();
-        newRefreshToken = issued.refreshToken;
         await tx.refreshToken.create({
           data: {
             userId: stored.userId,
@@ -126,13 +124,14 @@ export class AuthService {
             expiresAt: this.tokenService.getRefreshExpiresAt(),
           },
         });
+        return issued.refreshToken;
       });
 
       const { accessToken } = await this.tokenService.issueAccessToken({
         userId: stored.userId,
         role: safeUser.role,
       });
-      const tokens = { access: accessToken, refresh: newRefreshToken! };
+      const tokens = { access: accessToken, refresh: newRefreshToken };
       await this.cacheRotation(cacheKey, tokens);
       return { tokens };
     } catch (error) {
