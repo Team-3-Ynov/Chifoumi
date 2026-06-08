@@ -15,6 +15,7 @@
     "biome:check": "biome check .",
     "biome:fix": "biome check --write .",
     "typecheck": "pnpm -r typecheck",
+    "docs:openapi": "pnpm --filter @chifoumi/api docs:openapi",
     "lefthook:install": "lefthook install"
   },
   "devDependencies": {
