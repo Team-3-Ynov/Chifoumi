@@ -1,10 +1,24 @@
-import "dotenv/config";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { config as dotenvConfig } from "dotenv";
 import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module.js";
 import { resolveCorsOrigins } from "./cors.js";
+
+const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
+dotenvConfig({ path: resolve(repoRoot, ".env") });
+
+process.env.JWT_PRIVATE_KEY_PATH = resolve(
+  repoRoot,
+  process.env.JWT_PRIVATE_KEY_PATH ?? "infra/keys/jwt-private.pem",
+);
+process.env.JWT_PUBLIC_KEY_PATH = resolve(
+  repoRoot,
+  process.env.JWT_PUBLIC_KEY_PATH ?? "infra/keys/jwt-public.pem",
+);
 
 const DEFAULT_PORT = 3000;
 
