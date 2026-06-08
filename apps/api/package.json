@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm --filter @chifoumi/db build",
+    "pretypecheck": "pnpm --filter @chifoumi/db typecheck",
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
