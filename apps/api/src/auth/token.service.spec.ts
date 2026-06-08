@@ -1,16 +1,18 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { generateKeyPairSync } from "node:crypto";
 import { JwtModule } from "@nestjs/jwt";
 import { Test } from "@nestjs/testing";
 import { JWT_CONFIG, type JwtConfig } from "../config/jwt.config.js";
 import { TokenService } from "./token.service.js";
 
-const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../../../");
+const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+  publicKeyEncoding: { type: "spki", format: "pem" },
+  privateKeyEncoding: { type: "pkcs8", format: "pem" },
+});
 
 const jwtConfig: JwtConfig = {
-  privateKey: readFileSync(resolve(repoRoot, "infra/keys/jwt-private.pem"), "utf8"),
-  publicKey: readFileSync(resolve(repoRoot, "infra/keys/jwt-public.pem"), "utf8"),
+  privateKey,
+  publicKey,
   accessTtlSeconds: 900,
   refreshTtlSeconds: 604800,
 };
