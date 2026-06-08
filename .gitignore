@@ -37,4 +37,5 @@ Thumbs.db
 .volumes/
 
 # JWT dev private key — never commit
-infra/keys/jwt-private.pem
+infra/keys/*
+!infra/keys/README.md
