@@ -10,18 +10,24 @@
             "description": ""
           }
         },
-        "tags": ["Health"]
+        "tags": [
+          "Health"
+        ]
       }
     },
     "/users/{id}/profile": {
       "get": {
+        "description": "Returns public player information only. Private fields such as email are intentionally omitted.",
         "operationId": "UsersController_getPublicProfile",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "User id",
             "schema": {
+              "format": "uuid",
+              "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1",
               "type": "string"
             }
           }
@@ -38,10 +44,29 @@
             }
           },
           "401": {
-            "description": "Missing or invalid access token"
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
           },
           "404": {
-            "description": "USER_NOT_FOUND"
+            "description": "USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "error": "USER_NOT_FOUND"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -50,11 +75,14 @@
           }
         ],
         "summary": "Get another player's public profile",
-        "tags": ["users"]
+        "tags": [
+          "users"
+        ]
       }
     },
     "/auth/register": {
       "post": {
+        "description": "Creates a player account, initializes its default ELO rating and returns tokens.",
         "operationId": "AuthController_register",
         "parameters": [],
         "requestBody": {
@@ -63,6 +91,16 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RegisterDto"
+              },
+              "examples": {
+                "player": {
+                  "summary": "New player",
+                  "value": {
+                    "email": "player@example.com",
+                    "password": "password1234",
+                    "displayName": "player1"
+                  }
+                }
               }
             }
           }
@@ -79,18 +117,45 @@
             }
           },
           "400": {
-            "description": "Validation error"
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": [
+                      "email must be an email"
+                    ],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
           },
           "409": {
-            "description": "Unable to complete registration"
+            "description": "Unable to complete registration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 409,
+                    "message": "Unable to complete registration",
+                    "error": "Conflict"
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Register a new player account",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/auth/login": {
       "post": {
+        "description": "Authenticates an existing player and returns a JWT access token plus refresh token.",
         "operationId": "AuthController_login",
         "parameters": [],
         "requestBody": {
@@ -99,6 +164,15 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LoginDto"
+              },
+              "examples": {
+                "player": {
+                  "summary": "Player credentials",
+                  "value": {
+                    "email": "player@example.com",
+                    "password": "password1234"
+                  }
+                }
               }
             }
           }
@@ -115,18 +189,44 @@
             }
           },
           "400": {
-            "description": "Validation error"
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": [
+                      "email must be an email"
+                    ],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
           },
           "401": {
-            "description": "Invalid credentials"
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Login with email and password",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/auth/logout": {
       "post": {
+        "description": "Adds the current JWT jti to the Redis blacklist until token expiry and revokes active refresh tokens for the user.",
         "operationId": "AuthController_logout",
         "parameters": [],
         "responses": {
@@ -134,7 +234,17 @@
             "description": "Access token blacklisted and refresh tokens revoked"
           },
           "401": {
-            "description": "Missing, invalid, expired or revoked access token"
+            "description": "Missing, invalid, expired or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -143,19 +253,39 @@
           }
         ],
         "summary": "Logout and revoke the current access token",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/me": {
       "get": {
+        "description": "Returns private profile data for the current player, including email and ELO stats.",
         "operationId": "MeController_getMe",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Current user"
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeProfileDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Missing or invalid JWT"
+            "description": "Missing, invalid or revoked JWT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -164,11 +294,14 @@
           }
         ],
         "summary": "Get authenticated user profile",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
       }
     },
     "/me/history": {
       "get": {
+        "description": "Returns ended matches sorted by `endedAt DESC` using an opaque cursor.",
         "operationId": "MeController_getHistory",
         "parameters": [
           {
@@ -176,15 +309,20 @@
             "required": false,
             "in": "query",
             "schema": {
-              "$ref": "#/components/schemas/Object"
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
             }
           },
           {
             "name": "cursor",
             "required": false,
             "in": "query",
-            "description": "Opaque cursor from a previous page",
+            "description": "Opaque cursor returned by a previous page",
             "schema": {
+              "example": "eyJ0cyI6IjIwMjYtMDEtMDFUMDA6MDA6MzEuMDAwWiIsImlkIjoiIn0",
               "type": "string"
             }
           }
@@ -201,10 +339,33 @@
             }
           },
           "400": {
-            "description": "Invalid query parameters"
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": [
+                      "limit must be ≤ 100"
+                    ],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
           },
           "401": {
-            "description": "Missing or invalid JWT"
+            "description": "Missing, invalid or revoked JWT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -213,11 +374,14 @@
           }
         ],
         "summary": "Paginated match history for the authenticated user",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
       }
     },
     "/leaderboard": {
       "get": {
+        "description": "Public leaderboard sorted by `rating DESC, gamesPlayed DESC`. Results are cached in Redis for 30 seconds.",
         "operationId": "LeaderboardController_getLeaderboard",
         "parameters": [
           {
@@ -225,13 +389,29 @@
             "required": false,
             "in": "query",
             "schema": {
-              "$ref": "#/components/schemas/Object"
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "example": 50,
+              "type": "number"
             }
           }
         ],
         "responses": {
           "200": {
             "description": "Leaderboard page",
+            "headers": {
+              "X-Cache": {
+                "description": "Cache status returned by the API: HIT when Redis served the response, MISS otherwise.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "HIT",
+                    "MISS"
+                  ]
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -241,11 +421,26 @@
             }
           },
           "400": {
-            "description": "Invalid query parameters"
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": [
+                      "limit must be ≤ 100"
+                    ],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Get global top players by rating",
-        "tags": ["leaderboard"]
+        "tags": [
+          "leaderboard"
+        ]
       }
     },
     "/.well-known/jwks.json": {
@@ -257,14 +452,16 @@
             "description": ""
           }
         },
-        "tags": ["Jwks"]
+        "tags": [
+          "Jwks"
+        ]
       }
     }
   },
   "info": {
     "title": "Chifoumi API",
-    "description": "",
-    "version": "0.1.0",
+    "description": "API REST Chifoumi Ranked pour l'authentification, le profil joueur, l'historique de matchs et le leaderboard.",
+    "version": "1.0.0",
     "contact": {}
   },
   "tags": [],
@@ -275,7 +472,7 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "type": "http",
-        "description": "RS256 access token from register/login"
+        "description": "RS256 access token returned by register/login. Paste only the token value."
       }
     },
     "schemas": {
@@ -284,10 +481,12 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1"
           },
           "displayName": {
-            "type": "string"
+            "type": "string",
+            "example": "player1"
           },
           "rating": {
             "type": "number",
@@ -304,10 +503,18 @@
           },
           "createdAt": {
             "format": "date-time",
-            "type": "string"
+            "type": "string",
+            "example": "2026-06-08T12:00:00.000Z"
           }
         },
-        "required": ["id", "displayName", "rating", "gamesPlayed", "winRate", "createdAt"]
+        "required": [
+          "id",
+          "displayName",
+          "rating",
+          "gamesPlayed",
+          "winRate",
+          "createdAt"
+        ]
       },
       "RegisterDto": {
         "type": "object",
@@ -331,42 +538,63 @@
             "example": "player1"
           }
         },
-        "required": ["email", "password", "displayName"]
+        "required": [
+          "email",
+          "password",
+          "displayName"
+        ]
       },
       "SafeUserDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1"
           },
           "email": {
             "type": "string",
-            "format": "email"
+            "format": "email",
+            "example": "player@example.com"
           },
           "displayName": {
-            "type": "string"
+            "type": "string",
+            "example": "player1"
           },
           "role": {
             "type": "string",
-            "enum": ["player", "admin"]
+            "enum": [
+              "player",
+              "admin"
+            ],
+            "example": "player"
           }
         },
-        "required": ["id", "email", "displayName", "role"]
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "role"
+        ]
       },
       "TokensDto": {
         "type": "object",
         "properties": {
           "access": {
             "type": "string",
-            "description": "RS256 JWT access token (15 min TTL)"
+            "description": "RS256 JWT access token (15 min TTL)",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
           },
           "refresh": {
             "type": "string",
-            "description": "Opaque refresh token (7 day TTL)"
+            "description": "Opaque refresh token (7 day TTL)",
+            "example": "vJ6E3j6bU5Wc3cS8mQf9Rk5H2q3T4p1N"
           }
         },
-        "required": ["access", "refresh"]
+        "required": [
+          "access",
+          "refresh"
+        ]
       },
       "AuthResponseDto": {
         "type": "object",
@@ -378,7 +606,10 @@
             "$ref": "#/components/schemas/TokensDto"
           }
         },
-        "required": ["user", "tokens"]
+        "required": [
+          "user",
+          "tokens"
+        ]
       },
       "LoginDto": {
         "type": "object",
@@ -395,53 +626,120 @@
             "example": "password1234"
           }
         },
-        "required": ["email", "password"]
+        "required": [
+          "email",
+          "password"
+        ]
       },
-      "Object": {
+      "MeProfileDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "player@example.com"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "player1"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "player",
+              "admin"
+            ],
+            "example": "player"
+          },
+          "rating": {
+            "type": "number",
+            "example": 1000
+          },
+          "gamesPlayed": {
+            "type": "number",
+            "example": 0
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-08T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "role",
+          "rating",
+          "gamesPlayed",
+          "createdAt"
+        ]
       },
       "MeHistoryOpponentDto": {
         "type": "object",
         "properties": {
           "displayName": {
-            "type": "string"
+            "type": "string",
+            "example": "opponent42"
           },
           "ratingAtMatch": {
             "type": "number",
-            "description": "Opponent rating at match time"
+            "description": "Opponent rating at match time",
+            "example": 1040
           }
         },
-        "required": ["displayName", "ratingAtMatch"]
+        "required": [
+          "displayName",
+          "ratingAtMatch"
+        ]
       },
       "MeHistoryItemDto": {
         "type": "object",
         "properties": {
           "matchId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "example": "499abac5-30b8-4a28-bf95-4ef0b3df6098"
           },
           "opponent": {
             "$ref": "#/components/schemas/MeHistoryOpponentDto"
           },
           "scoreA": {
-            "type": "number"
+            "type": "number",
+            "example": 2
           },
           "scoreB": {
-            "type": "number"
+            "type": "number",
+            "example": 1
           },
           "isWinner": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "eloDelta": {
-            "type": "number"
+            "type": "number",
+            "example": 16
           },
           "endedAt": {
             "format": "date-time",
-            "type": "string"
+            "type": "string",
+            "example": "2026-06-08T12:00:00.000Z"
           }
         },
-        "required": ["matchId", "opponent", "scoreA", "scoreB", "isWinner", "eloDelta", "endedAt"]
+        "required": [
+          "matchId",
+          "opponent",
+          "scoreA",
+          "scoreB",
+          "isWinner",
+          "eloDelta",
+          "endedAt"
+        ]
       },
       "MeHistoryResponseDto": {
         "type": "object",
@@ -458,29 +756,42 @@
             "nullable": true
           }
         },
-        "required": ["items"]
+        "required": [
+          "items"
+        ]
       },
       "LeaderboardEntryDto": {
         "type": "object",
         "properties": {
           "rank": {
-            "type": "number"
+            "type": "number",
+            "example": 1
           },
           "userId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1"
           },
           "displayName": {
-            "type": "string"
+            "type": "string",
+            "example": "player1"
           },
           "rating": {
-            "type": "number"
+            "type": "number",
+            "example": 1600
           },
           "gamesPlayed": {
-            "type": "number"
+            "type": "number",
+            "example": 42
           }
         },
-        "required": ["rank", "userId", "displayName", "rating", "gamesPlayed"]
+        "required": [
+          "rank",
+          "userId",
+          "displayName",
+          "rating",
+          "gamesPlayed"
+        ]
       },
       "LeaderboardResponseDto": {
         "type": "object",
@@ -492,7 +803,9 @@
             }
           }
         },
-        "required": ["items"]
+        "required": [
+          "items"
+        ]
       }
     }
   }

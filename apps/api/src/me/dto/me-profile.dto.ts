@@ -1,7 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { TokensDto } from "./tokens.dto.js";
 
-export class SafeUserDto {
+export class MeProfileDto {
   @ApiProperty({ format: "uuid", example: "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1" })
   id!: string;
 
@@ -13,12 +12,13 @@ export class SafeUserDto {
 
   @ApiProperty({ enum: ["player", "admin"], example: "player" })
   role!: "player" | "admin";
-}
 
-export class AuthResponseDto {
-  @ApiProperty({ type: SafeUserDto })
-  user!: SafeUserDto;
+  @ApiProperty({ example: 1000 })
+  rating!: number;
 
-  @ApiProperty({ type: TokensDto })
-  tokens!: TokensDto;
+  @ApiProperty({ example: 0 })
+  gamesPlayed!: number;
+
+  @ApiProperty({ format: "date-time", example: "2026-06-08T12:00:00.000Z" })
+  createdAt!: Date;
 }
