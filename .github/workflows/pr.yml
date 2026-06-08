@@ -33,11 +33,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build database package
-        run: pnpm --filter @chifoumi/db build
-
       - name: Typecheck
-        run: pnpm -r typecheck
+        run: pnpm typecheck
 
   test:
     runs-on: ubuntu-latest

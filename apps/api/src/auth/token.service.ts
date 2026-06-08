@@ -13,7 +13,7 @@ export type AccessTokenPayload = {
 @Injectable()
 export class TokenService {
   constructor(
-    private readonly jwtService: JwtService,
+    @Inject(JwtService) private readonly jwtService: JwtService,
     @Inject(JWT_CONFIG) private readonly jwtConfig: JwtConfig,
   ) {}
 
