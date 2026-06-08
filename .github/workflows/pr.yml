@@ -33,8 +33,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Generate Prisma Client
-        run: pnpm --filter @chifoumi/db generate
+      - name: Build database package
+        run: pnpm --filter @chifoumi/db build
 
       - name: Typecheck
         run: pnpm -r typecheck
