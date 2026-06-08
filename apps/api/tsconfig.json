@@ -6,7 +6,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "paths": {
-      "@chifoumi/db": ["../../packages/db/dist/index.d.ts"]
+      "@chifoumi/db": ["../../packages/db/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"]
