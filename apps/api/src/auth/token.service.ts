@@ -32,10 +32,13 @@ export class TokenService {
     return { accessToken };
   }
 
+  hashRefreshToken(refreshToken: string): string {
+    return createHash("sha256").update(refreshToken).digest("hex");
+  }
+
   issueRefreshToken(): { refreshToken: string; refreshTokenHash: string } {
     const refreshToken = randomBytes(32).toString("base64url");
-    const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
-    return { refreshToken, refreshTokenHash };
+    return { refreshToken, refreshTokenHash: this.hashRefreshToken(refreshToken) };
   }
 
   getRefreshExpiresAt(): Date {

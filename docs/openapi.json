@@ -125,6 +125,42 @@
         "tags": ["auth"]
       }
     },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Invalid, expired, revoked or unknown refresh token"
+          }
+        },
+        "summary": "Rotate refresh token and issue a new access token",
+        "tags": ["auth"]
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -396,6 +432,27 @@
           }
         },
         "required": ["email", "password"]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque refresh token issued at login or a prior refresh",
+            "minLength": 20,
+            "example": "dGhpcyBpcyBhbiBvcGFxdWUgcmVmcmVzaCB0b2tlbg"
+          }
+        },
+        "required": ["refreshToken"]
+      },
+      "RefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "tokens": {
+            "$ref": "#/components/schemas/TokensDto"
+          }
+        },
+        "required": ["tokens"]
       },
       "Object": {
         "type": "object",
