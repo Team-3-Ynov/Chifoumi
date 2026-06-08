@@ -1,0 +1,221 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Health"]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "409": {
+            "description": "Unable to complete registration"
+          }
+        },
+        "summary": "Register a new player account",
+        "tags": ["auth"]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        },
+        "summary": "Login with email and password",
+        "tags": ["auth"]
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "MeController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Me"]
+      }
+    },
+    "/.well-known/jwks.json": {
+      "get": {
+        "operationId": "JwksController_getJwks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Jwks"]
+      }
+    }
+  },
+  "info": {
+    "title": "Chifoumi API",
+    "description": "",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "JWT-auth": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "description": "RS256 access token from register/login"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "player@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 128,
+            "example": "password1234"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 30,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "example": "player1"
+          }
+        },
+        "required": ["email", "password", "displayName"]
+      },
+      "SafeUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["player", "admin"]
+          }
+        },
+        "required": ["id", "email", "displayName", "role"]
+      },
+      "TokensDto": {
+        "type": "object",
+        "properties": {
+          "access": {
+            "type": "string",
+            "description": "RS256 JWT access token (15 min TTL)"
+          },
+          "refresh": {
+            "type": "string",
+            "description": "Opaque refresh token (7 day TTL)"
+          }
+        },
+        "required": ["access", "refresh"]
+      },
+      "AuthResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/SafeUserDto"
+          },
+          "tokens": {
+            "$ref": "#/components/schemas/TokensDto"
+          }
+        },
+        "required": ["user", "tokens"]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "player@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "example": "password1234"
+          }
+        },
+        "required": ["email", "password"]
+      }
+    }
+  }
+}

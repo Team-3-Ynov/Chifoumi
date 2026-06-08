@@ -33,21 +33,25 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Generate Prisma Client
-        run: pnpm --filter @chifoumi/db generate
-
       - name: Typecheck
-        run: pnpm -r typecheck
+        run: pnpm typecheck
 
   test:
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql://app:chifoumi_dev@localhost:5432/chifoumi
+
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - uses: ./.github/actions/setup-node-pnpm
 
+      - name: Build database package
+        run: pnpm --filter @chifoumi/db build
+
       - name: Test with coverage
-        run: pnpm -r run --if-present test -- --coverage
+        run: pnpm -r run --if-present test
 
       - name: Upload coverage artifact
         if: always()

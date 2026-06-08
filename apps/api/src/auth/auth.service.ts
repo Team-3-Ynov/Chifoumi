@@ -21,7 +21,8 @@ export class AuthService {
     password: string;
     displayName: string;
   }): Promise<AuthResult> {
-    const existing = await this.usersService.findByEmail(input.email);
+    const email = input.email.toLowerCase();
+    const existing = await this.usersService.findByEmail(email);
     if (existing) {
       throw new ConflictException("Unable to complete registration");
     }
@@ -30,7 +31,7 @@ export class AuthService {
 
     try {
       const user = await this.usersService.createUser({
-        email: input.email.toLowerCase(),
+        email,
         passwordHash,
         displayName: input.displayName,
       });

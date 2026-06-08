@@ -14,7 +14,8 @@
     "dev": "pnpm --parallel --filter @chifoumi/api --filter @chifoumi/game-service --filter @chifoumi/job-runner --filter @chifoumi/front dev",
     "biome:check": "biome check .",
     "biome:fix": "biome check --write .",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter @chifoumi/db typecheck && pnpm -r typecheck",
+    "docs:openapi": "pnpm --filter @chifoumi/api docs:openapi",
     "lefthook:install": "lefthook install"
   },
   "devDependencies": {

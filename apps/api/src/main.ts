@@ -7,6 +7,7 @@ import { NestFactory } from "@nestjs/core";
 import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module.js";
 import { resolveCorsOrigins } from "./cors.js";
+import { setupSwagger } from "./swagger.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 dotenvConfig({ path: resolve(repoRoot, ".env") });
@@ -37,6 +38,7 @@ async function bootstrap() {
   app.enableCors({
     origin: resolveCorsOrigins(),
   });
+  setupSwagger(app);
 
   const port = Number(process.env.API_PORT ?? DEFAULT_PORT);
   await app.listen(port);
