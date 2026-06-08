@@ -11,6 +11,24 @@ enum UserRole {
   admin
 }
 
+enum MatchStatus {
+  in_progress
+  ended
+  aborted
+}
+
+enum Move {
+  rock
+  paper
+  scissors
+}
+
+enum RoundWinner {
+  a
+  b
+  draw
+}
+
 model User {
   id           String     @id @default(uuid()) @db.Uuid
   email        String     @unique
@@ -20,8 +38,12 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  eloRating      EloRating?
-  refreshTokens  RefreshToken[]
+  eloRating       EloRating?
+  refreshTokens   RefreshToken[]
+  matchesAsPlayerA Match[]      @relation("PlayerA")
+  matchesAsPlayerB Match[]      @relation("PlayerB")
+  matchesWon       Match[]      @relation("Winner")
+  eloHistory       EloHistory[]
 
   @@map("users")
 }
@@ -46,8 +68,65 @@ model EloRating {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([rating(sort: Desc)])
   @@map("elo_ratings")
+}
+
+model Match {
+  id         String      @id @default(uuid()) @db.Uuid
+  playerAId  String      @map("player_a_id") @db.Uuid
+  playerBId  String      @map("player_b_id") @db.Uuid
+  winnerId   String?     @map("winner_id") @db.Uuid
+  scoreA     Int         @map("score_a")
+  scoreB     Int         @map("score_b")
+  startedAt  DateTime    @map("started_at")
+  endedAt    DateTime?   @map("ended_at")
+  status     MatchStatus @default(in_progress)
+
+  playerA    User         @relation("PlayerA", fields: [playerAId], references: [id])
+  playerB    User         @relation("PlayerB", fields: [playerBId], references: [id])
+  winner     User?        @relation("Winner", fields: [winnerId], references: [id])
+  rounds     Round[]
+  eloHistory EloHistory[]
+
+  @@index([playerAId, endedAt(sort: Desc)])
+  @@index([playerBId, endedAt(sort: Desc)])
+  @@map("matches")
+}
+
+model Round {
+  id          String      @id @default(uuid()) @db.Uuid
+  matchId     String      @map("match_id") @db.Uuid
+  roundNumber Int         @map("round_number")
+  moveA       Move?       @map("move_a")
+  moveB       Move?       @map("move_b")
+  commitA     String?     @map("commit_a")
+  commitB     String?     @map("commit_b")
+  nonceA      String?     @map("nonce_a")
+  nonceB      String?     @map("nonce_b")
+  winner      RoundWinner
+  resolvedAt  DateTime    @map("resolved_at")
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, roundNumber])
+  @@map("rounds")
+}
+
+model EloHistory {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  matchId      String   @map("match_id") @db.Uuid
+  ratingBefore Int      @map("rating_before")
+  ratingAfter  Int      @map("rating_after")
+  delta        Int
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("elo_history")
 }

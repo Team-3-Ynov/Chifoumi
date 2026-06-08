@@ -91,10 +91,68 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Current user"
+          },
+          "401": {
+            "description": "Missing or invalid JWT"
           }
         },
-        "tags": ["Me"]
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get authenticated user profile",
+        "tags": ["me"]
+      }
+    },
+    "/me/history": {
+      "get": {
+        "operationId": "MeController_getHistory",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from a previous page",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Match history page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeHistoryResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters"
+          },
+          "401": {
+            "description": "Missing or invalid JWT"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Paginated match history for the authenticated user",
+        "tags": ["me"]
       }
     },
     "/.well-known/jwks.json": {
@@ -215,6 +273,69 @@
           }
         },
         "required": ["email", "password"]
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "MeHistoryOpponentDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "ratingAtMatch": {
+            "type": "number",
+            "description": "Opponent rating at match time"
+          }
+        },
+        "required": ["displayName", "ratingAtMatch"]
+      },
+      "MeHistoryItemDto": {
+        "type": "object",
+        "properties": {
+          "matchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "opponent": {
+            "$ref": "#/components/schemas/MeHistoryOpponentDto"
+          },
+          "scoreA": {
+            "type": "number"
+          },
+          "scoreB": {
+            "type": "number"
+          },
+          "isWinner": {
+            "type": "boolean"
+          },
+          "eloDelta": {
+            "type": "number"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": ["matchId", "opponent", "scoreA", "scoreB", "isWinner", "eloDelta", "endedAt"]
+      },
+      "MeHistoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MeHistoryItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "object",
+            "description": "Cursor for the next page; omitted on the last page",
+            "nullable": true
+          }
+        },
+        "required": ["items"]
       }
     }
   }
