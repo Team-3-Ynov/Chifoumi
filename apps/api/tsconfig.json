@@ -3,10 +3,11 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
+    "baseUrl": ".",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "paths": {
-      "@chifoumi/db": ["../../packages/db/src/index.ts"]
+      "@chifoumi/db": ["../../node_modules/@prisma/client"]
     }
   },
   "include": ["src/**/*.ts"]
