@@ -1,13 +1,13 @@
 import "reflect-metadata";
 import { generateKeyPairSync } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "../app.module.js";
 import { buildSwaggerDocument } from "../swagger.js";
 
-const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../../..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const outputPath = resolve(repoRoot, "docs/openapi.json");
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
