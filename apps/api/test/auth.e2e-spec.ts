@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { generateKeyPairSync } from "node:crypto";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
@@ -7,9 +8,18 @@ import request from "supertest";
 import { AppModule } from "../src/app.module.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
 
-const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 config({ path: resolve(repoRoot, ".env") });
 
+const jwtKeys = generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+  privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  publicKeyEncoding: { type: "spki", format: "pem" },
+});
+
+process.env.JWT_PRIVATE_KEY = jwtKeys.privateKey;
+process.env.JWT_PUBLIC_KEY = jwtKeys.publicKey;
+process.env.DATABASE_URL ??= "postgresql://app:chifoumi_dev@localhost:5432/chifoumi";
 process.env.JWT_PRIVATE_KEY_PATH = resolve(
   repoRoot,
   process.env.JWT_PRIVATE_KEY_PATH ?? "infra/keys/jwt-private.pem",
@@ -77,10 +87,20 @@ describe("Auth (e2e)", () => {
 
     await request(app.getHttpServer()).get("/me").expect(401);
 
-    await request(app.getHttpServer())
+    const meRes = await request(app.getHttpServer())
       .get("/me")
       .set("Authorization", `Bearer ${access}`)
       .expect(200);
+
+    expect(meRes.body).toEqual({
+      id: expect.any(String),
+      email,
+      displayName: "player1",
+      role: "player",
+      rating: 1000,
+      gamesPlayed: 0,
+      createdAt: expect.any(String),
+    });
   });
 
   it("duplicate register → 409 with generic message", async () => {

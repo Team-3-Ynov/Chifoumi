@@ -4,7 +4,7 @@ module.exports = {
   extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
-    "^@chifoumi/db$": "<rootDir>/../../packages/db/src/index.ts",
+    "^@chifoumi/db$": "@prisma/client",
   },
   testEnvironment: "node",
   rootDir: ".",
@@ -14,7 +14,7 @@ module.exports = {
       "ts-jest",
       {
         useESM: true,
-        tsconfig: "tsconfig.json",
+        tsconfig: "tsconfig.e2e.json",
       },
     ],
   },

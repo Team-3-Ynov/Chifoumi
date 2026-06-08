@@ -12,6 +12,7 @@ import { SWAGGER_BEARER_AUTH } from "../swagger.js";
 import type { SafeUser } from "../users/users.service.js";
 import { MeHistoryQueryDto } from "./dto/me-history-query.dto.js";
 import { MeHistoryResponseDto } from "./dto/me-history-response.dto.js";
+import { type MeProfile, MeService } from "./me.service.js";
 import { MeHistoryService } from "./me-history.service.js";
 
 type AuthenticatedRequest = { user: SafeUser };
@@ -20,15 +21,18 @@ type AuthenticatedRequest = { user: SafeUser };
 @ApiBearerAuth(SWAGGER_BEARER_AUTH)
 @Controller("me")
 export class MeController {
-  constructor(private readonly meHistoryService: MeHistoryService) {}
+  constructor(
+    private readonly meService: MeService,
+    private readonly meHistoryService: MeHistoryService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
   @ApiOperation({ summary: "Get authenticated user profile" })
   @ApiOkResponse({ description: "Current user" })
   @ApiUnauthorizedResponse({ description: "Missing or invalid JWT" })
-  getMe(@Req() req: AuthenticatedRequest): { user: SafeUser } {
-    return { user: req.user };
+  getMe(@Req() req: AuthenticatedRequest): Promise<MeProfile> {
+    return this.meService.getProfile(req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)
