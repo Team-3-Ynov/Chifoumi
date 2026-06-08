@@ -20,6 +20,7 @@ const jwtKeys = generateKeyPairSync("rsa", {
 process.env.JWT_PRIVATE_KEY = jwtKeys.privateKey;
 process.env.JWT_PUBLIC_KEY = jwtKeys.publicKey;
 process.env.DATABASE_URL ??= "postgresql://app:chifoumi_dev@localhost:5432/chifoumi";
+process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.JWT_PRIVATE_KEY_PATH = resolve(
   repoRoot,
   process.env.JWT_PRIVATE_KEY_PATH ?? "infra/keys/jwt-private.pem",
@@ -48,6 +49,9 @@ describe("Auth (e2e)", () => {
     );
     await app.init();
     prisma = app.get(PrismaService);
+    await prisma.eloHistory.deleteMany();
+    await prisma.round.deleteMany();
+    await prisma.match.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.eloRating.deleteMany();
     await prisma.user.deleteMany();
@@ -127,6 +131,29 @@ describe("Auth (e2e)", () => {
       .expect(404);
 
     expect(missingProfileRes.body).toEqual({ error: "USER_NOT_FOUND" });
+
+    await request(app.getHttpServer())
+      .post("/auth/logout")
+      .set("Authorization", `Bearer ${access}`)
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .post("/auth/logout")
+      .set("Authorization", `Bearer ${access}`)
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .get("/me")
+      .set("Authorization", `Bearer ${access}`)
+      .expect(401);
+
+    const activeRefreshTokens = await prisma.refreshToken.count({
+      where: {
+        userId: registerRes.body.user.id,
+        revokedAt: null,
+      },
+    });
+    expect(activeRefreshTokens).toBe(0);
   });
 
   it("duplicate register → 409 with generic message", async () => {

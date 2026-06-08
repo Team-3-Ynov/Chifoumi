@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { RedisService } from "../redis/redis.service.js";
 import { type SafeUser, UsersService } from "../users/users.service.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
@@ -14,6 +15,7 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
     private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
   ) {}
 
   async register(input: {
@@ -54,6 +56,24 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     }
     return this.issueTokensForUser(user.id, user);
+  }
+
+  async logout(input: { userId: string; jti: string; expiresAt: Date }): Promise<void> {
+    const ttlSeconds = Math.ceil((input.expiresAt.getTime() - Date.now()) / 1000);
+    if (ttlSeconds <= 0) {
+      throw new UnauthorizedException();
+    }
+
+    await this.redisService.revokeAccessToken(input.jti, ttlSeconds);
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        userId: input.userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
   }
 
   private async issueTokensForUser(
