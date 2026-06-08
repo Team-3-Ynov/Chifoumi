@@ -1,2 +1,16 @@
-export type { EloRating, RefreshToken, User } from "@prisma/client";
-export { Prisma, PrismaClient, UserRole } from "@prisma/client";
+export type {
+  EloHistory,
+  EloRating,
+  Match,
+  RefreshToken,
+  Round,
+  User,
+} from "@prisma/client";
+export {
+  MatchStatus,
+  Move,
+  Prisma,
+  PrismaClient,
+  RoundWinner,
+  UserRole,
+} from "@prisma/client";
