@@ -11,6 +11,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "pnpm --parallel --filter @chifoumi/api --filter @chifoumi/game-service --filter @chifoumi/job-runner --filter @chifoumi/front dev",
     "biome:check": "biome check .",
     "biome:fix": "biome check --write .",
     "typecheck": "pnpm -r typecheck",
