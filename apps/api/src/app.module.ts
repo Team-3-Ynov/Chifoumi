@@ -6,8 +6,10 @@ import { AuthModule } from "./auth/auth.module.js";
 import { AppConfigModule } from "./config/config.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { JwksModule } from "./jwks/jwks.module.js";
+import { LeaderboardModule } from "./leaderboard/leaderboard.module.js";
 import { MeModule } from "./me/me.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
+import { RedisModule } from "./redis/redis.module.js";
 import { UsersModule } from "./users/users.module.js";
 
 @Module({
@@ -26,10 +28,12 @@ import { UsersModule } from "./users/users.module.js";
     ]),
     AppConfigModule,
     PrismaModule,
+    RedisModule,
     HealthModule,
     UsersModule,
     AuthModule,
     MeModule,
+    LeaderboardModule,
     JwksModule,
   ],
   providers: [

@@ -195,6 +195,38 @@
         "tags": ["me"]
       }
     },
+    "/leaderboard": {
+      "get": {
+        "operationId": "LeaderboardController_getLeaderboard",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leaderboard page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters"
+          }
+        },
+        "summary": "Get global top players by rating",
+        "tags": ["leaderboard"]
+      }
+    },
     "/.well-known/jwks.json": {
       "get": {
         "operationId": "JwksController_getJwks",
@@ -403,6 +435,40 @@
             "type": "object",
             "description": "Cursor for the next page; omitted on the last page",
             "nullable": true
+          }
+        },
+        "required": ["items"]
+      },
+      "LeaderboardEntryDto": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "number"
+          },
+          "gamesPlayed": {
+            "type": "number"
+          }
+        },
+        "required": ["rank", "userId", "displayName", "rating", "gamesPlayed"]
+      },
+      "LeaderboardResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardEntryDto"
+            }
           }
         },
         "required": ["items"]
