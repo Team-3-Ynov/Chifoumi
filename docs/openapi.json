@@ -13,6 +13,46 @@
         "tags": ["Health"]
       }
     },
+    "/users/{id}/profile": {
+      "get": {
+        "operationId": "UsersController_getPublicProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "404": {
+            "description": "USER_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get another player's public profile",
+        "tags": ["users"]
+      }
+    },
     "/auth/register": {
       "post": {
         "operationId": "AuthController_register",
@@ -128,6 +168,36 @@
       }
     },
     "schemas": {
+      "PublicProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "number",
+            "example": 1000
+          },
+          "gamesPlayed": {
+            "type": "number",
+            "example": 0
+          },
+          "winRate": {
+            "type": "number",
+            "example": 0,
+            "description": "Wins divided by games played, rounded to 2 decimals."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": ["id", "displayName", "rating", "gamesPlayed", "winRate", "createdAt"]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {

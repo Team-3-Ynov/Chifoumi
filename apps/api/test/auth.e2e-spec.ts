@@ -101,6 +101,32 @@ describe("Auth (e2e)", () => {
       gamesPlayed: 0,
       createdAt: expect.any(String),
     });
+
+    const publicProfileRes = await request(app.getHttpServer())
+      .get(`/users/${registerRes.body.user.id}/profile`)
+      .set("Authorization", `Bearer ${access}`)
+      .expect(200);
+
+    expect(publicProfileRes.body).toEqual({
+      id: registerRes.body.user.id,
+      displayName: "player1",
+      rating: 1000,
+      gamesPlayed: 0,
+      winRate: 0,
+      createdAt: expect.any(String),
+    });
+    expect(publicProfileRes.body.email).toBeUndefined();
+
+    await request(app.getHttpServer())
+      .get(`/users/${registerRes.body.user.id}/profile`)
+      .expect(401);
+
+    const missingProfileRes = await request(app.getHttpServer())
+      .get("/users/00000000-0000-4000-8000-000000000000/profile")
+      .set("Authorization", `Bearer ${access}`)
+      .expect(404);
+
+    expect(missingProfileRes.body).toEqual({ error: "USER_NOT_FOUND" });
   });
 
   it("duplicate register → 409 with generic message", async () => {
