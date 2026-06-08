@@ -12,6 +12,8 @@ import { Throttle } from "@nestjs/throttler";
 import { AuthService } from "./auth.service.js";
 import { AuthResponseDto } from "./dto/auth-response.dto.js";
 import { LoginDto } from "./dto/login.dto.js";
+import { RefreshDto } from "./dto/refresh.dto.js";
+import { RefreshResponseDto } from "./dto/refresh-response.dto.js";
 import { RegisterDto } from "./dto/register.dto.js";
 
 @ApiTags("auth")
@@ -38,5 +40,17 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: "Invalid credentials" })
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post("refresh")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Rotate refresh token and issue a new access token" })
+  @ApiOkResponse({ description: "New token pair issued", type: RefreshResponseDto })
+  @ApiBadRequestResponse({ description: "Validation error" })
+  @ApiUnauthorizedResponse({
+    description: "Invalid, expired, revoked or unknown refresh token",
+  })
+  async refresh(@Body() dto: RefreshDto) {
+    return this.authService.refresh(dto.refreshToken);
   }
 }

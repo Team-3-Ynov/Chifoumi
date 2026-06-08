@@ -62,5 +62,6 @@ describe("TokenService", () => {
     expect(refreshToken.length).toBeGreaterThan(20);
     expect(refreshToken).not.toBe(refreshTokenHash);
     expect(refreshTokenHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(tokenService.hashRefreshToken(refreshToken)).toBe(refreshTokenHash);
   });
 });

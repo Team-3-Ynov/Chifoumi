@@ -56,6 +56,51 @@ export class AuthService {
     return this.issueTokensForUser(user.id, user);
   }
 
+  async refresh(refreshToken: string): Promise<{ tokens: AuthTokens }> {
+    const tokenHash = this.tokenService.hashRefreshToken(refreshToken);
+    const stored = await this.prisma.refreshToken.findFirst({
+      where: { tokenHash },
+    });
+
+    if (!stored) {
+      throw new UnauthorizedException();
+    }
+
+    if (stored.revokedAt !== null) {
+      await this.revokeAllRefreshTokens(stored.userId);
+      throw new UnauthorizedException();
+    }
+
+    if (stored.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException();
+    }
+
+    await this.prisma.refreshToken.update({
+      where: { id: stored.id },
+      data: { revokedAt: new Date() },
+    });
+
+    const user = await this.usersService.findById(stored.userId);
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    const { tokens } = await this.issueTokensForUser(user.id, user);
+    return { tokens };
+  }
+
+  private async revokeAllRefreshTokens(userId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
+
   private async issueTokensForUser(
     userId: string,
     user: Parameters<UsersService["toSafeUser"]>[0],
