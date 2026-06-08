@@ -40,6 +40,24 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.requireClient().setex(key, ttlSeconds, value);
   }
 
+  async setnx(key: string, ttlSeconds: number): Promise<boolean> {
+    const result = await this.requireClient().set(key, "1", "EX", ttlSeconds, "NX");
+    return result === "OK";
+  }
+
+  async del(key: string): Promise<void> {
+    await this.requireClient().del(key);
+  }
+
+  async revokeAccessToken(jti: string, ttlSeconds: number): Promise<void> {
+    await this.requireClient().set(`blacklist:jwt:${jti}`, "1", "EX", ttlSeconds);
+  }
+
+  async isAccessTokenRevoked(jti: string): Promise<boolean> {
+    const value = await this.requireClient().get(`blacklist:jwt:${jti}`);
+    return value === "1";
+  }
+
   async invalidateLeaderboardCache(): Promise<void> {
     const client = this.requireClient();
     const keys = await client.keys(`${LEADERBOARD_CACHE_KEY_PREFIX}*`);

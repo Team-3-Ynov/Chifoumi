@@ -161,6 +161,27 @@
         "tags": ["auth"]
       }
     },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Access token blacklisted and refresh tokens revoked"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked access token"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Logout and revoke the current access token",
+        "tags": ["auth"]
+      }
+    },
     "/me": {
       "get": {
         "operationId": "MeController_getMe",

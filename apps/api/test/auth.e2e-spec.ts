@@ -20,6 +20,7 @@ const jwtKeys = generateKeyPairSync("rsa", {
 process.env.JWT_PRIVATE_KEY = jwtKeys.privateKey;
 process.env.JWT_PUBLIC_KEY = jwtKeys.publicKey;
 process.env.DATABASE_URL ??= "postgresql://app:chifoumi_dev@localhost:5432/chifoumi";
+process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.JWT_PRIVATE_KEY_PATH = resolve(
   repoRoot,
   process.env.JWT_PRIVATE_KEY_PATH ?? "infra/keys/jwt-private.pem",
@@ -48,6 +49,9 @@ describe("Auth (e2e)", () => {
     );
     await app.init();
     prisma = app.get(PrismaService);
+    await prisma.eloHistory.deleteMany();
+    await prisma.round.deleteMany();
+    await prisma.match.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.eloRating.deleteMany();
     await prisma.user.deleteMany();
@@ -127,57 +131,29 @@ describe("Auth (e2e)", () => {
       .expect(404);
 
     expect(missingProfileRes.body).toEqual({ error: "USER_NOT_FOUND" });
-  });
 
-  it("duplicate register → 409 with generic message", async () => {
-    const email = `dup-${Date.now()}@example.com`;
     await request(app.getHttpServer())
-      .post("/auth/register")
-      .send({ email, password: "password1234", displayName: "dupuser" })
-      .expect(201);
+      .post("/auth/logout")
+      .set("Authorization", `Bearer ${access}`)
+      .expect(204);
 
-    const res = await request(app.getHttpServer())
-      .post("/auth/register")
-      .send({ email, password: "password1234", displayName: "dupuser2" })
-      .expect(409);
-
-    expect(res.body.message).toBe("Unable to complete registration");
-  });
-
-  it("POST /auth/refresh rotates tokens and rejects reuse", async () => {
-    const email = `refresh-${Date.now()}@example.com`;
-    const registerRes = await request(app.getHttpServer())
-      .post("/auth/register")
-      .send({ email, password: "password1234", displayName: "refresh-user" })
-      .expect(201);
-
-    const initialRefresh = registerRes.body.tokens.refresh as string;
-
-    const refreshRes = await request(app.getHttpServer())
-      .post("/auth/refresh")
-      .send({ refreshToken: initialRefresh })
-      .expect(200);
-
-    expect(refreshRes.body.tokens.access).toBeDefined();
-    expect(refreshRes.body.tokens.refresh).toBeDefined();
-    expect(refreshRes.body.tokens.refresh).not.toBe(initialRefresh);
+    await request(app.getHttpServer())
+      .post("/auth/logout")
+      .set("Authorization", `Bearer ${access}`)
+      .expect(401);
 
     await request(app.getHttpServer())
       .get("/me")
-      .set("Authorization", `Bearer ${refreshRes.body.tokens.access}`)
-      .expect(200);
-
-    const rotatedRefresh = refreshRes.body.tokens.refresh as string;
-
-    await request(app.getHttpServer())
-      .post("/auth/refresh")
-      .send({ refreshToken: initialRefresh })
+      .set("Authorization", `Bearer ${access}`)
       .expect(401);
 
-    await request(app.getHttpServer())
-      .post("/auth/refresh")
-      .send({ refreshToken: rotatedRefresh })
-      .expect(401);
+    const activeRefreshTokens = await prisma.refreshToken.count({
+      where: {
+        userId: registerRes.body.user.id,
+        revokedAt: null,
+      },
+    });
+    expect(activeRefreshTokens).toBe(0);
   });
 
   it("POST /auth/refresh → 401 for unknown and expired tokens", async () => {
@@ -209,5 +185,62 @@ describe("Auth (e2e)", () => {
     });
 
     await request(app.getHttpServer()).post("/auth/refresh").send({ refreshToken }).expect(401);
+  });
+
+  it("duplicate register → 409 with generic message", async () => {
+    const email = `dup-${Date.now()}@example.com`;
+    await request(app.getHttpServer())
+      .post("/auth/register")
+      .send({ email, password: "password1234", displayName: "dupuser" })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .post("/auth/register")
+      .send({ email, password: "password1234", displayName: "dupuser2" })
+      .expect(409);
+
+    expect(res.body.message).toBe("Unable to complete registration");
+  });
+
+  it("POST /auth/refresh rotates tokens, handles concurrent requests, and rejects reuse", async () => {
+    const email = `refresh-${Date.now()}@example.com`;
+    const registerRes = await request(app.getHttpServer())
+      .post("/auth/register")
+      .send({ email, password: "password1234", displayName: "refresh-user" })
+      .expect(201);
+
+    const initialRefresh = registerRes.body.tokens.refresh as string;
+
+    const [firstRes, secondRes] = await Promise.all([
+      request(app.getHttpServer()).post("/auth/refresh").send({ refreshToken: initialRefresh }),
+      request(app.getHttpServer()).post("/auth/refresh").send({ refreshToken: initialRefresh }),
+    ]);
+
+    const statuses = [firstRes.status, secondRes.status].sort((a, b) => a - b);
+    expect(statuses).toEqual([200, 401]);
+
+    const refreshRes = firstRes.status === 200 ? firstRes : secondRes;
+
+    expect(refreshRes.body.tokens.access).toBeDefined();
+    expect(refreshRes.body.tokens.refresh).toBeDefined();
+    expect(refreshRes.body.tokens.refresh).not.toBe(initialRefresh);
+
+    await request(app.getHttpServer())
+      .get("/me")
+      .set("Authorization", `Bearer ${refreshRes.body.tokens.access}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post("/auth/refresh")
+      .send({ refreshToken: initialRefresh })
+      .expect(401);
+
+    const activeRefreshTokens = await prisma.refreshToken.count({
+      where: {
+        userId: registerRes.body.user.id,
+        revokedAt: null,
+      },
+    });
+    expect(activeRefreshTokens).toBe(0);
   });
 });

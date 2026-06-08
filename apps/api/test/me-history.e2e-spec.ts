@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { generateKeyPairSync, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, URL } from "node:url";
 import { MatchStatus } from "@chifoumi/db";
 import { type INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
@@ -12,6 +12,16 @@ import { PrismaService } from "../src/prisma/prisma.service.js";
 const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
 config({ path: resolve(repoRoot, ".env") });
 
+const jwtKeys = generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+  privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  publicKeyEncoding: { type: "spki", format: "pem" },
+});
+
+process.env.JWT_PRIVATE_KEY = jwtKeys.privateKey;
+process.env.JWT_PUBLIC_KEY = jwtKeys.publicKey;
+process.env.DATABASE_URL ??= "postgresql://app:chifoumi_dev@localhost:5432/chifoumi";
+process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.JWT_PRIVATE_KEY_PATH = resolve(
   repoRoot,
   process.env.JWT_PRIVATE_KEY_PATH ?? "infra/keys/jwt-private.pem",
@@ -25,7 +35,7 @@ describe("GET /me/history (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -40,9 +50,7 @@ describe("GET /me/history (e2e)", () => {
     );
     await app.init();
     prisma = app.get(PrismaService);
-  });
 
-  beforeEach(async () => {
     await prisma.eloHistory.deleteMany();
     await prisma.round.deleteMany();
     await prisma.match.deleteMany();
@@ -51,7 +59,7 @@ describe("GET /me/history (e2e)", () => {
     await prisma.user.deleteMany();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     if (app) {
       await app.close();
     }
@@ -117,6 +125,10 @@ describe("GET /me/history (e2e)", () => {
     return matchId;
   }
 
+  it("requires authentication", async () => {
+    await request(app.getHttpServer()).get("/me/history").expect(401);
+  });
+
   it("returns empty history for a user without matches", async () => {
     const { access } = await registerAndLogin("solo");
 
@@ -126,6 +138,17 @@ describe("GET /me/history (e2e)", () => {
       .expect(200);
 
     expect(res.body).toEqual({ items: [], nextCursor: null });
+  });
+
+  it("rejects limit above 100", async () => {
+    const { access } = await registerAndLogin("limit");
+
+    const res = await request(app.getHttpServer())
+      .get("/me/history?limit=101")
+      .set("Authorization", `Bearer ${access}`)
+      .expect(400);
+
+    expect(res.body.message).toContain("limit must be ≤ 100");
   });
 
   it("paginates 50 matches with stable cursor pages", async () => {
@@ -185,20 +208,5 @@ describe("GET /me/history (e2e)", () => {
 
     expect(thirdPage.body.items).toHaveLength(10);
     expect(thirdPage.body.nextCursor).toBeNull();
-  });
-
-  it("rejects limit above 100", async () => {
-    const { access } = await registerAndLogin("limit");
-
-    const res = await request(app.getHttpServer())
-      .get("/me/history?limit=101")
-      .set("Authorization", `Bearer ${access}`)
-      .expect(400);
-
-    expect(res.body.message).toContain("limit must be ≤ 100");
-  });
-
-  it("requires authentication", async () => {
-    await request(app.getHttpServer()).get("/me/history").expect(401);
   });
 });
