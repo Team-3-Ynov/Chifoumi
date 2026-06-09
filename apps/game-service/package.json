@@ -8,13 +8,18 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./jest-e2e.config.cjs"
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",
+    "@nestjs/testing": "11.1.21",
+    "@types/ioredis-mock": "^8.2.7",
     "@types/jest": "29.5.14",
     "@types/node": "^24.12.4",
+    "ioredis-mock": "^8.13.1",
     "jest": "29.7.0",
+    "socket.io-client": "^4.8.3",
     "ts-jest": "29.2.5",
     "tsx": "^4.22.2",
     "typescript": "~5.7.3"
@@ -22,10 +27,14 @@
   "dependencies": {
     "@nestjs/common": "^11.1.21",
     "@nestjs/core": "^11.1.21",
+    "@nestjs/jwt": "11.0.0",
     "@nestjs/platform-express": "^11.1.21",
     "@nestjs/platform-socket.io": "^11.1.21",
     "@nestjs/websockets": "^11.1.21",
+    "dotenv": "^17.2.3",
     "ioredis": "^5.11.1",
+    "nestjs-pino": "4.2.0",
+    "pino-http": "10.4.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.3",

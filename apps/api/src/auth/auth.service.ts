@@ -130,6 +130,7 @@ export class AuthService {
       const { accessToken } = await this.tokenService.issueAccessToken({
         userId: stored.userId,
         role: safeUser.role,
+        displayName: safeUser.displayName,
       });
       const tokens = { access: accessToken, refresh: newRefreshToken };
       await this.cacheRotation(cacheKey, tokens);
@@ -208,6 +209,7 @@ export class AuthService {
     const { accessToken } = await this.tokenService.issueAccessToken({
       userId,
       role: safeUser.role,
+      displayName: safeUser.displayName,
     });
     const { refreshToken, refreshTokenHash } = this.tokenService.issueRefreshToken();
     await this.prisma.refreshToken.create({

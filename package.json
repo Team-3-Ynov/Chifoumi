@@ -12,8 +12,8 @@
   ],
   "scripts": {
     "dev": "pnpm --parallel --filter @chifoumi/api --filter @chifoumi/game-service --filter @chifoumi/job-runner --filter @chifoumi/front dev",
-    "biome:check": "biome check .",
-    "biome:fix": "biome check --write .",
+    "biome:check": "biome check apps packages .github biome.json lefthook.yml",
+    "biome:fix": "biome check --write apps packages .github biome.json lefthook.yml",
     "typecheck": "pnpm --filter @chifoumi/db typecheck && pnpm -r typecheck",
     "docs:openapi": "pnpm --filter @chifoumi/api docs:openapi",
     "lefthook:install": "lefthook install"

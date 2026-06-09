@@ -1,10 +1,28 @@
 import {
   type OnGatewayConnection,
   type OnGatewayDisconnect,
+  type OnGatewayInit,
   WebSocketGateway,
+  WebSocketServer,
 } from "@nestjs/websockets";
-import type { Socket } from "socket.io";
+import { Logger } from "nestjs-pino";
+import type { Server, Socket } from "socket.io";
+import { WS_AUTH_INVALID_TOKEN_CODE, WsAuthError } from "./auth/ws-auth.error.js";
+import { WsAuthService } from "./auth/ws-auth.service.js";
 import { resolveCorsOrigins } from "./cors.js";
+import { scrubTokenFromUrl } from "./logging/scrub-token.js";
+import { RedisService } from "./redis/redis.service.js";
+
+function extractToken(socket: Socket): string | undefined {
+  const queryToken = socket.handshake.query.token;
+  if (typeof queryToken === "string") {
+    return queryToken;
+  }
+  if (Array.isArray(queryToken) && queryToken[0]) {
+    return queryToken[0];
+  }
+  return undefined;
+}
 
 @WebSocketGateway({
   namespace: "/game",
@@ -12,12 +30,56 @@ import { resolveCorsOrigins } from "./cors.js";
     origin: resolveCorsOrigins(),
   },
 })
-export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  handleConnection(client: Socket) {
-    console.log(`[game-service] socket connected ${client.id}`);
+export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer()
+  server!: Server;
+
+  constructor(
+    private readonly wsAuthService: WsAuthService,
+    private readonly redisService: RedisService,
+    private readonly logger: Logger,
+  ) {}
+
+  afterInit(server: Server): void {
+    server.use(async (socket, next) => {
+      try {
+        const auth = await this.wsAuthService.verifyToken(extractToken(socket));
+        socket.data.userId = auth.userId;
+        socket.data.displayName = auth.displayName;
+        socket.data.jti = auth.jti;
+        next();
+      } catch (error) {
+        if (error instanceof WsAuthError) {
+          const err = new Error(error.message) as Error & { data: { code: number } };
+          err.data = { code: error.code };
+          return next(err);
+        }
+
+        const err = new Error("INVALID_TOKEN") as Error & { data: { code: number } };
+        err.data = { code: WS_AUTH_INVALID_TOKEN_CODE };
+        next(err);
+      }
+    });
   }
 
-  handleDisconnect(client: Socket) {
-    console.log(`[game-service] socket disconnected ${client.id}`);
+  async handleConnection(client: Socket): Promise<void> {
+    const userId = client.data.userId as string;
+    const displayName = client.data.displayName as string;
+
+    await this.redisService.setUserSocket(userId, client.id);
+    client.emit("connected", { userId, displayName });
+
+    const requestUrl = client.request.url ?? "";
+    this.logger.log(
+      { userId, socketId: client.id, url: scrubTokenFromUrl(requestUrl) },
+      "game socket connected",
+    );
+  }
+
+  async handleDisconnect(client: Socket): Promise<void> {
+    const userId = client.data.userId as string | undefined;
+    if (userId) {
+      await this.redisService.removeUserSocket(userId, client.id);
+    }
   }
 }

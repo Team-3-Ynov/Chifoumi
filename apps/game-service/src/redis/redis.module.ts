@@ -1,15 +1,9 @@
-import { Module } from "@nestjs/common";
-import { loadRedisConfig, REDIS_CONFIG } from "../config/redis.config.js";
+import { Global, Module } from "@nestjs/common";
 import { RedisService } from "./redis.service.js";
 
+@Global()
 @Module({
-  providers: [
-    {
-      provide: REDIS_CONFIG,
-      useFactory: () => loadRedisConfig(),
-    },
-    RedisService,
-  ],
+  providers: [RedisService],
   exports: [RedisService],
 })
 export class RedisModule {}

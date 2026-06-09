@@ -39,6 +39,7 @@ describe("TokenService", () => {
     const { accessToken } = await tokenService.issueAccessToken({
       userId: "11111111-1111-1111-1111-111111111111",
       role: "player",
+      displayName: "player1",
     });
     const parts = accessToken.split(".");
     expect(parts).toHaveLength(3);
@@ -46,11 +47,13 @@ describe("TokenService", () => {
       sub: string;
       role: string;
       jti: string;
+      displayName: string;
       exp: number;
       iat: number;
     };
     expect(payload.sub).toBe("11111111-1111-1111-1111-111111111111");
     expect(payload.role).toBe("player");
+    expect(payload.displayName).toBe("player1");
     expect(payload.jti).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     );
