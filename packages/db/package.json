@@ -11,7 +11,9 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "build": "prisma generate && tsc -p tsconfig.json",
-    "typecheck": "prisma generate && tsc -p tsconfig.json"
+    "typecheck": "prisma generate && tsc -p tsconfig.json",
+    "seed:bench": "tsx scripts/seed-bench.ts",
+    "explain:queries": "tsx scripts/explain-queries.ts"
   },
   "keywords": [],
   "author": "",
@@ -21,9 +23,12 @@
     "prisma": "*"
   },
   "devDependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "dotenv": "^17.4.2",
+    "pg": "^8.16.3",
     "prisma": "^7.8.0",
+    "tsx": "^4.19.3",
     "typescript": "~5.7.3"
   }
 }
