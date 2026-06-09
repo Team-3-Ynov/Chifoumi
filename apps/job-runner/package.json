@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-notification-templates.mjs",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "pnpm --filter @chifoumi/elo build",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "devDependencies": {
