@@ -22,7 +22,7 @@ type ConnectedPayload = { userId: string; displayName: string };
 type QueueJoinedPayload = { queuedAt: string; currentRating: number };
 type MatchFoundPayload = {
   matchId: string;
-  opponent: { displayName: string; rating: number };
+  opponent: { userId: string; displayName: string; rating: number };
   bestOf: number;
 };
 type ErrorPayload = { code: string; message: string };
@@ -129,8 +129,16 @@ describe("Matchmaking (e2e)", () => {
 
     expect(payloadA.matchId).toBe(payloadB.matchId);
     expect(payloadA.bestOf).toBe(3);
-    expect(payloadA.opponent).toEqual({ displayName: "Bob", rating: 1040 });
-    expect(payloadB.opponent).toEqual({ displayName: "Ace", rating: 1000 });
+    expect(payloadA.opponent).toEqual({
+      userId: "player-b",
+      displayName: "Bob",
+      rating: 1040,
+    });
+    expect(payloadB.opponent).toEqual({
+      userId: "player-a",
+      displayName: "Ace",
+      rating: 1000,
+    });
 
     expect(await redisService.get("match:byUser:player-a")).toBe(payloadA.matchId);
     expect(await redisService.get("match:byUser:player-b")).toBe(payloadA.matchId);

@@ -23,7 +23,7 @@ type ConnectedPayload = { userId: string; displayName: string };
 type QueueJoinedPayload = { queuedAt: string; currentRating: number };
 type MatchFoundPayload = {
   matchId: string;
-  opponent: { displayName: string; rating: number };
+  opponent: { userId: string; displayName: string; rating: number };
   bestOf: number;
 };
 type RoundStartPayload = { matchId: string; roundNumber: number; deadline: string };
@@ -202,7 +202,7 @@ describe("Match play BO3 (e2e)", () => {
   });
 
   it("returns INVALID_MOVE for unknown moves", async () => {
-    const { playerA, matchId, roundStart } = await pairPlayers();
+    const { playerA, playerB, matchId, roundStart } = await pairPlayers();
 
     const errorPromise = waitForEvent<ErrorPayload>(playerA, "error");
     playerA.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "lizard" });
@@ -210,10 +210,11 @@ describe("Match play BO3 (e2e)", () => {
 
     expect(error.code).toBe("INVALID_MOVE");
     playerA.disconnect();
+    playerB.disconnect();
   });
 
   it("returns WRONG_ROUND for stale round numbers", async () => {
-    const { playerA, matchId } = await pairPlayers();
+    const { playerA, playerB, matchId } = await pairPlayers();
 
     const errorPromise = waitForEvent<ErrorPayload>(playerA, "error");
     playerA.emit("play", { matchId, roundNumber: 99, move: "rock" });
@@ -221,5 +222,6 @@ describe("Match play BO3 (e2e)", () => {
 
     expect(error.code).toBe("WRONG_ROUND");
     playerA.disconnect();
+    playerB.disconnect();
   });
 });

@@ -1,5 +1,11 @@
-import { SubscribeMessage, WebSocketGateway } from "@nestjs/websockets";
+import {
+  ConnectedSocket,
+  MessageBody,
+  SubscribeMessage,
+  WebSocketGateway,
+} from "@nestjs/websockets";
 import type { Socket } from "socket.io";
+import { resolveCorsOrigins } from "../cors.js";
 import { MatchPlayService, PlayValidationError } from "./match-play.service.js";
 
 type PlayPayload = {
@@ -8,12 +14,20 @@ type PlayPayload = {
   move: string;
 };
 
-@WebSocketGateway({ namespace: "/game" })
+@WebSocketGateway({
+  namespace: "/game",
+  cors: {
+    origin: resolveCorsOrigins(),
+  },
+})
 export class MatchGateway {
   constructor(private readonly matchPlayService: MatchPlayService) {}
 
   @SubscribeMessage("play")
-  async handlePlay(client: Socket, payload: PlayPayload): Promise<void> {
+  async handlePlay(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: PlayPayload,
+  ): Promise<void> {
     const userId = client.data.userId as string | undefined;
     if (!userId) {
       return;
