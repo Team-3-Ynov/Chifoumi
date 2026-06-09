@@ -24,6 +24,8 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 COPY apps ./apps
 COPY packages ./packages
 RUN pnpm --filter @chifoumi/front build
+RUN mkdir -p apps/front/dist/vendor \
+  && cp "$(find node_modules -path '*/socket.io-client/dist/socket.io.min.js' -print -quit)" apps/front/dist/vendor/socket.io.min.js
 
 FROM nginx:1.27-alpine AS runner
 COPY apps/front/nginx.conf /etc/nginx/conf.d/default.conf
