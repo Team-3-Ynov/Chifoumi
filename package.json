@@ -8,7 +8,8 @@
   },
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "tests/*"
   ],
   "scripts": {
     "dev": "pnpm --parallel --filter @chifoumi/api --filter @chifoumi/game-service --filter @chifoumi/job-runner --filter @chifoumi/front dev",
@@ -16,6 +17,7 @@
     "biome:fix": "biome check --write apps packages .github biome.json lefthook.yml",
     "typecheck": "pnpm --filter @chifoumi/db typecheck && pnpm -r typecheck",
     "docs:openapi": "pnpm --filter @chifoumi/api docs:openapi",
+    "test:e2e:smoke": "pnpm --filter @chifoumi/e2e test:smoke",
     "lefthook:install": "lefthook install"
   },
   "devDependencies": {

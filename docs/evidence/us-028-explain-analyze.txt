@@ -1,0 +1,48 @@
+US-028 AC4/AC5 evidence — leaderboard and history query plans
+Generated: 2026-06-09
+Environment: PostgreSQL 16 (docker compose), migration 20260609120000_sprint_1_ranked_indexes
+Dataset: 10,000 ended matches, 200 benchmark users (+ pre-existing rows)
+Indexes verified:
+  - elo_ratings_rating_desc_idx (rating DESC, games_played DESC)
+  - matches_player_a_id_ended_at_idx
+  - matches_player_b_id_ended_at_idx
+  - elo_history_user_id_created_at_idx
+
+Result: Index Scan confirmed on leaderboard and history — no Seq Scan on hot paths.
+
+--- Query 1: leaderboard top 50 (AC5) ---
+
+ Limit  (cost=0.14..6.77 rows=50 width=24) (actual time=0.009..0.023 rows=50 loops=1)
+   Buffers: shared hit=33
+   ->  Index Scan using elo_ratings_rating_desc_idx on elo_ratings er  (cost=0.14..27.16 rows=204 width=24) (actual time=0.008..0.019 rows=50 loops=1)
+         Buffers: shared hit=33
+ Planning:
+   Buffers: shared hit=27
+ Planning Time: 0.111 ms
+ Execution Time: 0.049 ms
+
+--- Query 2: player history first page (AC4) ---
+
+ Limit  (cost=177.04..177.09 rows=21 width=56) (actual time=0.169..0.172 rows=21 loops=1)
+   Buffers: shared hit=76
+   ->  Sort  (cost=177.04..177.28 rows=95 width=56) (actual time=0.168..0.170 rows=21 loops=1)
+         Sort Key: ended_at DESC, id DESC
+         Sort Method: top-N heapsort  Memory: 30kB
+         Buffers: shared hit=76
+         ->  Bitmap Heap Scan on matches m  (cost=33.58..174.48 rows=95 width=56) (actual time=0.063..0.135 rows=99 loops=1)
+               Recheck Cond: (((player_a_id = 'd1a3365e-5d1d-45e1-999e-54380be2ea10'::uuid) AND (ended_at IS NOT NULL)) OR ((player_b_id = 'd1a3365e-5d1d-45e1-999e-54380be2ea10'::uuid) AND (ended_at IS NOT NULL)))
+               Filter: (status = 'ended'::"MatchStatus")
+               Heap Blocks: exact=72
+               Buffers: shared hit=76
+               ->  BitmapOr  (cost=33.58..33.58 rows=96 width=0) (actual time=0.052..0.052 rows=0 loops=1)
+                     Buffers: shared hit=4
+                     ->  Bitmap Index Scan on matches_player_a_id_ended_at_idx  (cost=0.00..16.80 rows=51 width=0) (actual time=0.031..0.032 rows=51 loops=1)
+                           Index Cond: ((player_a_id = 'd1a3365e-5d1d-45e1-999e-54380be2ea10'::uuid) AND (ended_at IS NOT NULL))
+                           Buffers: shared hit=2
+                     ->  Bitmap Index Scan on matches_player_b_id_ended_at_idx  (cost=0.00..16.73 rows=45 width=0) (actual time=0.012..0.012 rows=48 loops=1)
+                           Index Cond: ((player_b_id = 'd1a3365e-5d1d-45e1-999e-54380be2ea10'::uuid) AND (ended_at IS NOT NULL))
+                           Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=48
+ Planning Time: 0.163 ms
+ Execution Time: 0.229 ms

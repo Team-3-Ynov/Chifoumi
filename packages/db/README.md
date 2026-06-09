@@ -64,6 +64,35 @@ pnpm --filter @chifoumi/db migrate:deploy
 
 Re-running `migrate:deploy` on an already migrated database is a no-op.
 
+## Hot-path indexes (US-028)
+
+| Table | Index | Query |
+|---|---|---|
+| `elo_ratings` | `(rating DESC, games_played DESC)` — `elo_ratings_rating_desc_idx` | `GET /leaderboard` top N |
+| `matches` | `(player_a_id, ended_at DESC)` | `GET /me/history` |
+| `matches` | `(player_b_id, ended_at DESC)` | `GET /me/history` |
+| `elo_history` | `(user_id, created_at DESC)` | ELO audit trail |
+
+Migration `20260609120000_sprint_1_ranked_indexes` replaces the sprint-0 single-column rating index with the composite leaderboard index.
+
+### Benchmark scripts
+
+Seed 10 000 ended matches for local `EXPLAIN ANALYZE`:
+
+```bash
+pnpm --filter @chifoumi/db migrate:deploy
+pnpm --filter @chifoumi/db seed:bench
+pnpm --filter @chifoumi/db explain:queries
+```
+
+Both scripts run via `tsx` and only require `DATABASE_URL` (no `bash` or `psql`).
+
+`seed:bench` is dev/benchmark-only: it inserts users (`bench-*@chifoumi.local`) and ended matches without automatic cleanup. Re-run only on disposable local databases.
+
+Optional env vars: `BENCH_MATCH_COUNT`, `BENCH_USER_COUNT`, `BENCH_USER_ID`, `BENCH_RUN_ID`.
+
+Evidence logs are stored under `docs/evidence/` (see `us-028-explain-analyze.txt`).
+
 ## Exports
 
 `src/index.ts` re-exports `Match`, `Round`, `EloHistory` types and `MatchStatus`, `Move`, `RoundWinner` enums from `@prisma/client`.
