@@ -85,7 +85,11 @@ pnpm --filter @chifoumi/db seed:bench
 pnpm --filter @chifoumi/db explain:queries
 ```
 
-Optional env vars: `BENCH_MATCH_COUNT`, `BENCH_USER_COUNT`, `BENCH_USER_ID`.
+Both scripts run via `tsx` and only require `DATABASE_URL` (no `bash` or `psql`).
+
+`seed:bench` is dev/benchmark-only: it inserts users (`bench-*@chifoumi.local`) and ended matches without automatic cleanup. Re-run only on disposable local databases.
+
+Optional env vars: `BENCH_MATCH_COUNT`, `BENCH_USER_COUNT`, `BENCH_USER_ID`, `BENCH_RUN_ID`.
 
 Evidence logs are stored under `docs/evidence/` (see `us-028-explain-analyze.txt`).
 

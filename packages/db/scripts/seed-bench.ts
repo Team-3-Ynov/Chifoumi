@@ -96,6 +96,9 @@ async function seedMatches(userIds: string[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  console.warn(
+    "seed:bench inserts benchmark data without cleanup. Use only on local/dev databases.",
+  );
   console.log(`Seeding ${USER_COUNT} users and ${MATCH_COUNT} ended matches...`);
   const userIds = await seedUsers();
   await seedMatches(userIds);
