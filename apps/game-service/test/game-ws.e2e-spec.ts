@@ -14,6 +14,7 @@ config({ path: resolve(repoRoot, ".env") });
 
 process.env.JWT_PUBLIC_KEY = testJwtKeys.publicKey;
 process.env.REDIS_URL ??= "redis://localhost:6379";
+process.env.MATCHMAKING_WORKER_ENABLED = "false";
 
 type ConnectedPayload = { userId: string; displayName: string };
 

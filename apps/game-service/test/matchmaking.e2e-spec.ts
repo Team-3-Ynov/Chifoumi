@@ -55,13 +55,14 @@ async function connectAndJoin(
     displayName: input.displayName,
   });
   const socket = connectClient(port, token);
+  const connectedPromise = waitForEvent<ConnectedPayload>(socket, "connected");
 
   await new Promise<void>((resolvePromise, reject) => {
     socket.once("connect", () => resolvePromise());
     socket.once("connect_error", reject);
   });
 
-  await waitForEvent<ConnectedPayload>(socket, "connected");
+  await connectedPromise;
   socket.emit("joinQueue", {});
   const queueJoined = await waitForEvent<QueueJoinedPayload>(socket, "queueJoined");
 
@@ -144,12 +145,13 @@ describe("Matchmaking (e2e)", () => {
   it("rejects duplicate joinQueue with ALREADY_IN_QUEUE", async () => {
     const token = await issueTestAccessToken({ userId: "dup-user", displayName: "Dup" });
     const socket = connectClient(port, token);
+    const connectedPromise = waitForEvent<ConnectedPayload>(socket, "connected");
 
     await new Promise<void>((resolvePromise, reject) => {
       socket.once("connect", () => resolvePromise());
       socket.once("connect_error", reject);
     });
-    await waitForEvent<ConnectedPayload>(socket, "connected");
+    await connectedPromise;
 
     socket.emit("joinQueue", {});
     await waitForEvent<QueueJoinedPayload>(socket, "queueJoined");

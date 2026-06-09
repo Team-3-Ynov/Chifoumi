@@ -20,16 +20,23 @@ export class MatchmakingEventsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.subscriber = await this.redisService.subscribe(
-      MATCHMAKING_MATCH_FOUND_CHANNEL,
-      (message) => {
+    this.subscriber = this.redisService.createSubscriber();
+    await this.subscriber.subscribe(MATCHMAKING_MATCH_FOUND_CHANNEL);
+    this.subscriber.on("message", (channel, message) => {
+      if (channel === MATCHMAKING_MATCH_FOUND_CHANNEL) {
         this.handleMatchFoundMessage(message);
-      },
-    );
+      }
+    });
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.subscriber?.quit();
+    if (!this.subscriber) {
+      return;
+    }
+
+    const subscriber = this.subscriber;
+    this.subscriber = null;
+    await subscriber.quit().catch(() => undefined);
   }
 
   private handleMatchFoundMessage(message: string): void {

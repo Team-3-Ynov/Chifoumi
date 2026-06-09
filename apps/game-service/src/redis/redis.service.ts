@@ -20,7 +20,6 @@ end
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: Redis | null = null;
-  private subscriber: Redis | null = null;
 
   constructor(@Inject(REDIS_CONFIG) private readonly redisConfig: RedisConfig) {}
 
@@ -33,8 +32,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.subscriber?.quit();
     await this.client?.quit();
+    this.client = null;
   }
 
   getClient(): Redis {
@@ -112,18 +111,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async publish(channel: string, message: string): Promise<void> {
     await this.requireClient().publish(channel, message);
-  }
-
-  async subscribe(channel: string, listener: (message: string) => void): Promise<Redis> {
-    const subscriber = this.createSubscriber();
-    await subscriber.subscribe(channel);
-    subscriber.on("message", (receivedChannel, message) => {
-      if (receivedChannel === channel) {
-        listener(message);
-      }
-    });
-    this.subscriber = subscriber;
-    return subscriber;
   }
 
   async evalScript<T>(script: string, keys: string[], args: string[]): Promise<T> {
