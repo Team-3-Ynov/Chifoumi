@@ -148,26 +148,133 @@ describe("Matchmaking (e2e)", () => {
     playerB.socket.disconnect();
   });
 
-  it("rejects duplicate joinQueue with ALREADY_IN_QUEUE", async () => {
-    const token = await issueTestAccessToken({ userId: "dup-user", displayName: "Dup" });
-    const socket = connectClient(port, token);
-    const connectedPromise = waitForEvent<ConnectedPayload>(socket, "connected");
+  describe("US-018 queue events", () => {
+    it("adds the player to Redis and emits queueJoined on joinQueue", async () => {
+      await redisService.setex("user:rating:queue-user", 60, "1200");
 
-    await new Promise<void>((resolvePromise, reject) => {
-      socket.once("connect", () => resolvePromise());
-      socket.once("connect_error", reject);
+      const token = await issueTestAccessToken({ userId: "queue-user", displayName: "Queue" });
+      const socket = connectClient(port, token);
+
+      await new Promise<void>((resolvePromise, reject) => {
+        socket.once("connect", () => resolvePromise());
+        socket.once("connect_error", reject);
+      });
+      await waitForEvent<ConnectedPayload>(socket, "connected");
+
+      const queueJoinedPromise = waitForEvent<QueueJoinedPayload>(socket, "queueJoined");
+      socket.emit("joinQueue", {});
+      const queueJoined = await queueJoinedPromise;
+
+      expect(queueJoined.currentRating).toBe(1200);
+      expect(new Date(queueJoined.queuedAt).getTime()).not.toBeNaN();
+      expect(await redisService.getClient().zscore("matchmaking:queue", "queue-user")).toBe("1200");
+
+      socket.disconnect();
     });
-    await connectedPromise;
 
-    socket.emit("joinQueue", {});
-    await waitForEvent<QueueJoinedPayload>(socket, "queueJoined");
+    it("rejects duplicate joinQueue with ALREADY_IN_QUEUE", async () => {
+      const token = await issueTestAccessToken({ userId: "dup-user", displayName: "Dup" });
+      const socket = connectClient(port, token);
+      const connectedPromise = waitForEvent<ConnectedPayload>(socket, "connected");
 
-    const errorPromise = waitForEvent<ErrorPayload>(socket, "error");
-    socket.emit("joinQueue", {});
-    const error = await errorPromise;
+      await new Promise<void>((resolvePromise, reject) => {
+        socket.once("connect", () => resolvePromise());
+        socket.once("connect_error", reject);
+      });
+      await connectedPromise;
 
-    expect(error.code).toBe("ALREADY_IN_QUEUE");
-    socket.disconnect();
+      socket.emit("joinQueue", {});
+      await waitForEvent<QueueJoinedPayload>(socket, "queueJoined");
+
+      const errorPromise = waitForEvent<ErrorPayload>(socket, "error");
+      socket.emit("joinQueue", {});
+      const error = await errorPromise;
+
+      expect(error.code).toBe("ALREADY_IN_QUEUE");
+      socket.disconnect();
+    });
+
+    it("rejects joinQueue when the player is already in a match", async () => {
+      await redisService.setex("match:byUser:matched-user", 60, "match-123");
+
+      const token = await issueTestAccessToken({ userId: "matched-user", displayName: "Matched" });
+      const socket = connectClient(port, token);
+
+      await new Promise<void>((resolvePromise, reject) => {
+        socket.once("connect", () => resolvePromise());
+        socket.once("connect_error", reject);
+      });
+      await waitForEvent<ConnectedPayload>(socket, "connected");
+
+      const errorPromise = waitForEvent<ErrorPayload>(socket, "error");
+      socket.emit("joinQueue", {});
+      const error = await errorPromise;
+
+      expect(error.code).toBe("ALREADY_IN_MATCH");
+      expect(await redisService.getClient().zscore("matchmaking:queue", "matched-user")).toBeNull();
+      socket.disconnect();
+    });
+
+    it("removes the player from the queue and emits queueLeft on leaveQueue", async () => {
+      const { socket } = await connectAndJoin(port, {
+        userId: "leave-user",
+        displayName: "Leave",
+      });
+
+      expect(
+        await redisService.getClient().zscore("matchmaking:queue", "leave-user"),
+      ).not.toBeNull();
+
+      const queueLeftPromise = waitForEvent<Record<string, never>>(socket, "queueLeft");
+      socket.emit("leaveQueue", {});
+      await queueLeftPromise;
+
+      expect(await redisService.getClient().zscore("matchmaking:queue", "leave-user")).toBeNull();
+      socket.disconnect();
+    });
+
+    it("removes the player from the queue on disconnect", async () => {
+      const { socket } = await connectAndJoin(port, {
+        userId: "disconnect-user",
+        displayName: "Disconnect",
+      });
+
+      expect(
+        await redisService.getClient().zscore("matchmaking:queue", "disconnect-user"),
+      ).not.toBeNull();
+
+      socket.disconnect();
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+
+      expect(
+        await redisService.getClient().zscore("matchmaking:queue", "disconnect-user"),
+      ).toBeNull();
+    });
+
+    it("rate limits joinQueue to one call per second", async () => {
+      const token = await issueTestAccessToken({ userId: "rate-user", displayName: "Rate" });
+      const socket = connectClient(port, token);
+
+      await new Promise<void>((resolvePromise, reject) => {
+        socket.once("connect", () => resolvePromise());
+        socket.once("connect_error", reject);
+      });
+      await waitForEvent<ConnectedPayload>(socket, "connected");
+
+      socket.emit("joinQueue", {});
+      await waitForEvent<QueueJoinedPayload>(socket, "queueJoined");
+
+      const queueLeftPromise = waitForEvent<Record<string, never>>(socket, "queueLeft");
+      socket.emit("leaveQueue", {});
+      await queueLeftPromise;
+
+      const errorPromise = waitForEvent<ErrorPayload>(socket, "error");
+      socket.emit("joinQueue", {});
+      const error = await errorPromise;
+
+      expect(error.code).toBe("RATE_LIMITED");
+      socket.disconnect();
+    });
   });
 
   it("exposes matchmaking prometheus metrics", async () => {
