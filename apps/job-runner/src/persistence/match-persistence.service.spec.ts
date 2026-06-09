@@ -1,3 +1,4 @@
+import { Prisma } from "@chifoumi/db";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { MatchEndedPayload } from "../match-events/match-ended.types.js";
 import type { PrismaService } from "../prisma/prisma.service.js";
@@ -91,7 +92,7 @@ describe("MatchPersistenceService", () => {
   it("persists a match-ended payload and updates both ELO ratings in one transaction", async () => {
     const persisted = await service.persistMatchEnded(createPayload());
 
-    expect(persisted).toBe(true);
+    expect(persisted).toBe("created");
     expect(tx.match.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -127,10 +128,24 @@ describe("MatchPersistenceService", () => {
 
     const persisted = await service.persistMatchEnded(createPayload());
 
-    expect(persisted).toBe(false);
+    expect(persisted).toBe("already_exists");
     expect(tx.match.create).not.toHaveBeenCalled();
     expect(tx.round.upsert).not.toHaveBeenCalled();
     expect(tx.eloRating.update).not.toHaveBeenCalled();
     expect(tx.eloHistory.createMany).not.toHaveBeenCalled();
+  });
+
+  it("treats unique match create conflicts as idempotent replay", async () => {
+    tx.match.create.mockImplementation(async () => {
+      throw new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+        meta: { target: ["id"] },
+      });
+    });
+
+    const persisted = await service.persistMatchEnded(createPayload());
+
+    expect(persisted).toBe("already_exists");
   });
 });

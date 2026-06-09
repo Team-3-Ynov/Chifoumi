@@ -33,7 +33,7 @@ function createJob(overrides: Partial<Job> = {}): Job {
 describe("createMatchEndedProcessor", () => {
   it("persists valid match-ended jobs and invalidates the leaderboard", async () => {
     const matchPersistence = {
-      persistMatchEnded: jest.fn(async () => true),
+      persistMatchEnded: jest.fn(async () => "created"),
     };
     const redisInvalidation = {
       invalidateLeaderboard: jest.fn(async () => undefined),
@@ -49,9 +49,9 @@ describe("createMatchEndedProcessor", () => {
     expect(redisInvalidation.invalidateLeaderboard).toHaveBeenCalledTimes(1);
   });
 
-  it("does not invalidate leaderboard for idempotent replays", async () => {
+  it("invalidates leaderboard for idempotent replays", async () => {
     const matchPersistence = {
-      persistMatchEnded: jest.fn(async () => false),
+      persistMatchEnded: jest.fn(async () => "already_exists"),
     };
     const redisInvalidation = {
       invalidateLeaderboard: jest.fn(async () => undefined),
@@ -63,7 +63,7 @@ describe("createMatchEndedProcessor", () => {
 
     await processor(createJob());
 
-    expect(redisInvalidation.invalidateLeaderboard).not.toHaveBeenCalled();
+    expect(redisInvalidation.invalidateLeaderboard).toHaveBeenCalledTimes(1);
   });
 
   it("rejects invalid payloads without retry", async () => {
@@ -75,5 +75,37 @@ describe("createMatchEndedProcessor", () => {
     await expect(processor(createJob({ data: { invalid: true } }))).rejects.toBeInstanceOf(
       UnrecoverableError,
     );
+  });
+
+  it("rejects payloads whose winner is not a match player without retry", async () => {
+    const processor = createMatchEndedProcessor({
+      matchPersistence: { persistMatchEnded: jest.fn() } as never,
+      redisInvalidation: { invalidateLeaderboard: jest.fn() } as never,
+    });
+
+    await expect(
+      processor(
+        createJob({
+          data: {
+            ...validPayload,
+            winner: "44444444-4444-4444-8444-444444444444",
+          },
+        }),
+      ),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+  });
+
+  it("propagates persistence failures so BullMQ can retry", async () => {
+    const error = new Error("database unavailable");
+    const processor = createMatchEndedProcessor({
+      matchPersistence: {
+        persistMatchEnded: jest.fn(async () => {
+          throw error;
+        }),
+      } as never,
+      redisInvalidation: { invalidateLeaderboard: jest.fn() } as never,
+    });
+
+    await expect(processor(createJob())).rejects.toBe(error);
   });
 });

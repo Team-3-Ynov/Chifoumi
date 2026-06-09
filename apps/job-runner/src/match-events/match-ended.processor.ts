@@ -8,36 +8,47 @@ import type { MatchEndedPayload } from "./match-ended.types.js";
 const moveSchema = z.enum(["rock", "paper", "scissors"]).nullable();
 const roundWinnerSchema = z.enum(["a", "b", "draw"]);
 
-const matchEndedPayloadSchema = z.object({
-  matchId: z.string().uuid(),
-  players: z.tuple([
-    z.object({
-      userId: z.string().uuid(),
-      displayName: z.string(),
-      rating: z.number(),
+const matchEndedPayloadSchema = z
+  .object({
+    matchId: z.string().uuid(),
+    players: z.tuple([
+      z.object({
+        userId: z.string().uuid(),
+        displayName: z.string(),
+        rating: z.number(),
+      }),
+      z.object({
+        userId: z.string().uuid(),
+        displayName: z.string(),
+        rating: z.number(),
+      }),
+    ]),
+    rounds: z.array(
+      z.object({
+        roundNumber: z.number().int().positive(),
+        moveA: moveSchema,
+        moveB: moveSchema,
+        winner: roundWinnerSchema,
+        resolvedAt: z.string().datetime(),
+      }),
+    ),
+    winner: z.string().uuid().nullable(),
+    finalScore: z.object({
+      a: z.number().int().nonnegative(),
+      b: z.number().int().nonnegative(),
     }),
-    z.object({
-      userId: z.string().uuid(),
-      displayName: z.string(),
-      rating: z.number(),
-    }),
-  ]),
-  rounds: z.array(
-    z.object({
-      roundNumber: z.number().int().positive(),
-      moveA: moveSchema,
-      moveB: moveSchema,
-      winner: roundWinnerSchema,
-      resolvedAt: z.string().datetime(),
-    }),
-  ),
-  winner: z.string().uuid().nullable(),
-  finalScore: z.object({
-    a: z.number().int().nonnegative(),
-    b: z.number().int().nonnegative(),
-  }),
-  startedAt: z.string().datetime(),
-});
+    startedAt: z.string().datetime(),
+  })
+  .refine(
+    (payload) =>
+      payload.winner === null ||
+      payload.winner === payload.players[0].userId ||
+      payload.winner === payload.players[1].userId,
+    {
+      message: "winner must be null or one of the match players",
+      path: ["winner"],
+    },
+  );
 
 export type MatchEventsProcessorDependencies = {
   matchPersistence: MatchPersistenceService;
@@ -55,10 +66,10 @@ export function createMatchEndedProcessor(deps: MatchEventsProcessorDependencies
       throw new UnrecoverableError("Invalid match-ended job payload");
     }
 
-    const persisted = await deps.matchPersistence.persistMatchEnded(
+    const persistenceStatus = await deps.matchPersistence.persistMatchEnded(
       parsed.data as MatchEndedPayload,
     );
-    if (persisted) {
+    if (persistenceStatus === "created" || persistenceStatus === "already_exists") {
       await deps.redisInvalidation.invalidateLeaderboard();
     }
   };

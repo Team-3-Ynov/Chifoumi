@@ -29,9 +29,9 @@ function createConfig(overrides: Partial<JobRunnerConfig> = {}): JobRunnerConfig
   };
 }
 
-function createMatchPersistence(): { persistMatchEnded: () => Promise<boolean> } {
+function createMatchPersistence(): { persistMatchEnded: () => Promise<"created"> } {
   return {
-    persistMatchEnded: jest.fn(async () => true),
+    persistMatchEnded: jest.fn(async (): Promise<"created"> => "created"),
   };
 }
 
