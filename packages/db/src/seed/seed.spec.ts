@@ -23,15 +23,17 @@ const seedConfig = getSeedConfig({
 });
 seedConfig.adminDisplayName = `seed_test_${runId}`;
 
+async function cleanupSeedUser(email: string): Promise<void> {
+  await prisma.user.deleteMany({ where: { email } });
+}
+
 describe("database seed", () => {
   beforeAll(async () => {
-    await prisma.eloRating.deleteMany({ where: { user: { email: seedConfig.adminEmail } } });
-    await prisma.user.deleteMany({ where: { email: seedConfig.adminEmail } });
+    await cleanupSeedUser(seedConfig.adminEmail);
   });
 
   afterAll(async () => {
-    await prisma.eloRating.deleteMany({ where: { user: { email: seedConfig.adminEmail } } });
-    await prisma.user.deleteMany({ where: { email: seedConfig.adminEmail } });
+    await cleanupSeedUser(seedConfig.adminEmail);
     await prisma.$disconnect();
   });
 
