@@ -47,6 +47,52 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  job-runner-match:
+    build:
+      context: .
+      dockerfile: apps/job-runner/Dockerfile
+    container_name: chifoumi-job-runner-match
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+      REDIS_URL: redis://redis:6379
+      WORKER_QUEUES: match-events
+      WORKER_CONCURRENCY: 8
+      WORKER_ROLE: match-processor
+      CRON_ENABLED: "false"
+      BULLMQ_PREFIX: rps
+      MAIL_TRANSPORT: mailhog
+    restart: unless-stopped
+
+  job-runner-misc:
+    build:
+      context: .
+      dockerfile: apps/job-runner/Dockerfile
+    container_name: chifoumi-job-runner-misc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+      REDIS_URL: redis://redis:6379
+      WORKER_QUEUES: notifications,tournaments
+      WORKER_CONCURRENCY: 4
+      WORKER_ROLE: notifier
+      CRON_ENABLED: "true"
+      BULLMQ_PREFIX: rps
+      MAIL_TRANSPORT: mailhog
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+    restart: unless-stopped
+
 volumes:
   pg_data:
   redis_data:

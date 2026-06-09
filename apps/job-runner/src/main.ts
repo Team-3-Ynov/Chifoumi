@@ -1,11 +1,21 @@
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { config as dotenvConfig } from "dotenv";
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module.js";
-import { RunnerService } from "./runner.service.js";
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+dotenvConfig({ path: resolve(repoRoot, ".env") });
 
 async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(AppModule);
-  app.get(RunnerService).markReady();
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    bufferLogs: true,
+  });
+  // biome-ignore lint/correctness/useHookAtTopLevel: NestJS bootstrap, not React hooks
+  app.useLogger(app.get(Logger));
+  app.enableShutdownHooks();
 
   let isShuttingDown = false;
   const shutdown = async () => {
