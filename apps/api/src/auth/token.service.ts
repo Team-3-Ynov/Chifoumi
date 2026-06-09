@@ -8,6 +8,7 @@ export type AccessTokenPayload = {
   sub: string;
   role: string;
   jti: string;
+  displayName: string;
 };
 
 @Injectable()
@@ -20,10 +21,11 @@ export class TokenService {
   async issueAccessToken(input: {
     userId: string;
     role: string;
+    displayName: string;
   }): Promise<{ accessToken: string }> {
     const jti = uuidv4();
     const accessToken = await this.jwtService.signAsync(
-      { sub: input.userId, role: input.role, jti },
+      { sub: input.userId, role: input.role, jti, displayName: input.displayName },
       {
         algorithm: "RS256",
         expiresIn: this.jwtConfig.accessTtlSeconds,
