@@ -1,4 +1,4 @@
-Bienvenue sur Chifoumi, {{displayName}} !
+Bienvenue sur Chifoumi, __DISPLAY_NAME__ !
 
 Ton compte est prêt. Tu peux maintenant rejoindre la file de matchmaking et grimper dans le classement.
 

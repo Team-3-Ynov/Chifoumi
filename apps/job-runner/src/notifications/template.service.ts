@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Injectable } from "@nestjs/common";
-import Handlebars from "handlebars";
 
 export type RenderedMail = {
   subject: string;
@@ -29,9 +28,16 @@ export class TemplateService {
 
     return {
       subject,
-      html: Handlebars.compile(htmlSource)(data),
-      text: Handlebars.compile(textSource)(data),
+      html: this.interpolate(htmlSource, data),
+      text: this.interpolate(textSource, data),
     };
+  }
+
+  private interpolate(source: string, data: Record<string, string>): string {
+    return Object.entries(data).reduce((content, [key, value]) => {
+      const placeholder = `__${key.replace(/([A-Z])/g, "_$1").toUpperCase()}__`;
+      return content.replaceAll(placeholder, value);
+    }, source);
   }
 
   private readTemplate(template: string, extension: "html" | "txt"): string {

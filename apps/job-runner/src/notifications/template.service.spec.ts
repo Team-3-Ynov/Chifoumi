@@ -10,8 +10,8 @@ describe("TemplateService", () => {
     expect(rendered.subject).toBe("Bienvenue sur Chifoumi");
     expect(rendered.html).toContain("alice");
     expect(rendered.text).toContain("alice");
-    expect(rendered.html).not.toContain("{{displayName}}");
-    expect(rendered.text).not.toContain("{{displayName}}");
+    expect(rendered.html).not.toContain("__DISPLAY_NAME__");
+    expect(rendered.text).not.toContain("__DISPLAY_NAME__");
   });
 
   it("throws a clear error when template is unknown", () => {

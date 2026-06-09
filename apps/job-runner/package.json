@@ -25,7 +25,6 @@
     "@nestjs/core": "^11.1.21",
     "bullmq": "^5.49.2",
     "dotenv": "^17.2.3",
-    "handlebars": "^4.7.8",
     "nodemailer": "^6.10.1",
     "ioredis": "^5.11.1",
     "nestjs-pino": "4.2.0",
