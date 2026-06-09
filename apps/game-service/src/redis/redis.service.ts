@@ -4,6 +4,14 @@ import { REDIS_CONFIG, type RedisConfig } from "../config/redis.config.js";
 
 const USER_SOCKET_TTL_SECONDS = 3600;
 
+const REMOVE_USER_SOCKET_IF_MATCH_SCRIPT = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+else
+  return 0
+end
+`;
+
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: Redis | null = null;
@@ -42,10 +50,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async removeUserSocket(userId: string, socketId: string): Promise<void> {
     const key = `ws:user:${userId}:socket`;
-    const current = await this.requireClient().get(key);
-    if (current === socketId) {
-      await this.requireClient().del(key);
-    }
+    await this.requireClient().eval(REMOVE_USER_SOCKET_IF_MATCH_SCRIPT, 1, key, socketId);
   }
 
   async getUserSocket(userId: string): Promise<string | null> {

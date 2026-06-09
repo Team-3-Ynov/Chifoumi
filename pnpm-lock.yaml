@@ -212,12 +212,18 @@ importers:
       '@nestjs/testing':
         specifier: 11.1.21
         version: 11.1.21(@nestjs/common@11.1.21(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.21)(@nestjs/platform-express@11.1.21)
+      '@types/ioredis-mock':
+        specifier: ^8.2.7
+        version: 8.2.7(ioredis@5.11.1)
       '@types/jest':
         specifier: 29.5.14
         version: 29.5.14
       '@types/node':
         specifier: ^24.12.4
         version: 24.12.4
+      ioredis-mock:
+        specifier: ^8.13.1
+        version: 8.13.1(@types/ioredis-mock@8.2.7(ioredis@5.11.1))(ioredis@5.11.1)
       jest:
         specifier: 29.7.0
         version: 29.7.0(@types/node@24.12.4)
