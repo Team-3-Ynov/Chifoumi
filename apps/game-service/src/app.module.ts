@@ -4,6 +4,7 @@ import { AuthModule } from "./auth/auth.module.js";
 import { AppConfigModule } from "./config/config.module.js";
 import { GameGateway } from "./game.gateway.js";
 import { HealthModule } from "./health/health.module.js";
+import { MatchmakingModule } from "./matchmaking/matchmaking.module.js";
 import { RedisModule } from "./redis/redis.module.js";
 
 @Module({
@@ -17,6 +18,7 @@ import { RedisModule } from "./redis/redis.module.js";
     RedisModule,
     AuthModule,
     HealthModule,
+    MatchmakingModule,
   ],
   providers: [GameGateway],
 })
