@@ -1,0 +1,267 @@
+x-api-common: &api-common
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  environment: &api-env
+    DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+    REDIS_URL: redis://redis:6379
+    API_PORT: "3000"
+    CORS_ORIGINS: http://front.localhost,http://localhost:5173
+    FRONTEND_URL: http://front.localhost
+    JWT_PRIVATE_KEY_PATH: infra/keys/jwt-private.pem
+    JWT_PUBLIC_KEY_PATH: infra/keys/jwt-public.pem
+    JWT_ACCESS_TTL_SECONDS: "900"
+    JWT_REFRESH_TTL_SECONDS: "604800"
+    BULLMQ_PREFIX: rps
+    MAIL_TRANSPORT: mailhog
+    MAIL_HOST: mailhog
+    MAIL_PORT: "1025"
+    MAIL_FROM: noreply@chifoumi.local
+  volumes:
+    - ./infra/keys:/app/infra/keys:ro
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+      ]
+    interval: 10s
+    timeout: 5s
+    retries: 6
+    start_period: 40s
+  restart: unless-stopped
+  networks:
+    - chifoumi
+
+x-game-common: &game-common
+  build:
+    context: .
+    dockerfile: apps/game-service/Dockerfile
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  environment: &game-env
+    DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+    REDIS_URL: redis://redis:6379
+    GAME_SERVICE_PORT: "3001"
+    CORS_ORIGINS: http://front.localhost,http://localhost:5173
+    FRONTEND_URL: http://front.localhost
+    JWT_PUBLIC_KEY_PATH: infra/keys/jwt-public.pem
+    BULLMQ_PREFIX: rps
+  volumes:
+    - ./infra/keys:/app/infra/keys:ro
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+      ]
+    interval: 10s
+    timeout: 5s
+    retries: 6
+    start_period: 30s
+  restart: unless-stopped
+  networks:
+    - chifoumi
+
+x-traefik-api-labels: &traefik-api-labels
+  traefik.enable: "true"
+  traefik.http.routers.api.rule: Host(`api.localhost`)
+  traefik.http.routers.api.entrypoints: web
+  traefik.http.services.api.loadbalancer.server.port: "3000"
+
+x-traefik-game-labels: &traefik-game-labels
+  traefik.enable: "true"
+  traefik.http.routers.game.rule: Host(`game.localhost`)
+  traefik.http.routers.game.entrypoints: web
+  traefik.http.services.game.loadbalancer.server.port: "3001"
+  traefik.http.services.game.loadbalancer.sticky.cookie: "true"
+  traefik.http.services.game.loadbalancer.sticky.cookie.name: chifoumi_game
+
+services:
+  postgres:
+    networks:
+      - chifoumi
+
+  redis:
+    networks:
+      - chifoumi
+
+  mailhog:
+    networks:
+      - chifoumi
+
+  job-runner-match:
+    networks:
+      - chifoumi
+
+  job-runner-misc:
+    networks:
+      - chifoumi
+
+  traefik:
+    image: traefik:v3.3
+    container_name: chifoumi-traefik
+    command:
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.traefik.rule: Host(`traefik.localhost`)
+      traefik.http.routers.traefik.entrypoints: web
+      traefik.http.routers.traefik.service: api@internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - chifoumi
+
+  api-1:
+    <<: *api-common
+    container_name: chifoumi-api-1
+    environment:
+      <<: *api-env
+      INSTANCE_ID: api-1
+    labels:
+      <<: *traefik-api-labels
+
+  api-2:
+    <<: *api-common
+    container_name: chifoumi-api-2
+    environment:
+      <<: *api-env
+      INSTANCE_ID: api-2
+    labels:
+      <<: *traefik-api-labels
+
+  game-1:
+    <<: *game-common
+    container_name: chifoumi-game-1
+    environment:
+      <<: *game-env
+      INSTANCE_ID: game-1
+    labels:
+      <<: *traefik-game-labels
+
+  game-2:
+    <<: *game-common
+    container_name: chifoumi-game-2
+    environment:
+      <<: *game-env
+      INSTANCE_ID: game-2
+    labels:
+      <<: *traefik-game-labels
+
+  front:
+    build:
+      context: .
+      dockerfile: apps/front/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://api.localhost
+    container_name: chifoumi-front
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.front.rule: Host(`front.localhost`)
+      traefik.http.routers.front.entrypoints: web
+      traefik.http.services.front.loadbalancer.server.port: "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - chifoumi
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    container_name: chifoumi-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.prometheus.rule: Host(`prometheus.localhost`)
+      traefik.http.routers.prometheus.entrypoints: web
+      traefik.http.services.prometheus.loadbalancer.server.port: "9090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9090/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - chifoumi
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: chifoumi-grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3002:3000"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.grafana.rule: Host(`grafana.localhost`)
+      traefik.http.routers.grafana.entrypoints: web
+      traefik.http.services.grafana.loadbalancer.server.port: "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - chifoumi
+
+networks:
+  chifoumi:
+    name: chifoumi
+
+volumes:
+  prometheus_data:
+  grafana_data:

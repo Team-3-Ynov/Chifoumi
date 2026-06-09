@@ -19,10 +19,13 @@ COPY packages/tsconfig/package.json packages/tsconfig/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder
+ARG VITE_API_BASE_URL=http://localhost:3000
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 COPY apps ./apps
 COPY packages ./packages
 RUN pnpm --filter @chifoumi/front build
 
 FROM nginx:1.27-alpine AS runner
+COPY apps/front/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/apps/front/dist /usr/share/nginx/html
 EXPOSE 80
