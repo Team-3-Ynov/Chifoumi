@@ -46,10 +46,10 @@ function waitForEvent<T>(socket: Socket, event: string): Promise<T> {
   });
 }
 
-async function connectAndJoin(
+async function connectAuthenticated(
   port: number,
   input: { userId: string; displayName: string },
-): Promise<{ socket: Socket; queueJoined: QueueJoinedPayload }> {
+): Promise<{ socket: Socket; connected: ConnectedPayload }> {
   const token = await issueTestAccessToken({
     userId: input.userId,
     displayName: input.displayName,
@@ -62,7 +62,15 @@ async function connectAndJoin(
     socket.once("connect_error", reject);
   });
 
-  await connectedPromise;
+  const connected = await connectedPromise;
+  return { socket, connected };
+}
+
+async function connectAndJoin(
+  port: number,
+  input: { userId: string; displayName: string },
+): Promise<{ socket: Socket; queueJoined: QueueJoinedPayload }> {
+  const { socket } = await connectAuthenticated(port, input);
   socket.emit("joinQueue", {});
   const queueJoined = await waitForEvent<QueueJoinedPayload>(socket, "queueJoined");
 
@@ -152,14 +160,10 @@ describe("Matchmaking (e2e)", () => {
     it("adds the player to Redis and emits queueJoined on joinQueue", async () => {
       await redisService.setex("user:rating:queue-user", 60, "1200");
 
-      const token = await issueTestAccessToken({ userId: "queue-user", displayName: "Queue" });
-      const socket = connectClient(port, token);
-
-      await new Promise<void>((resolvePromise, reject) => {
-        socket.once("connect", () => resolvePromise());
-        socket.once("connect_error", reject);
+      const { socket } = await connectAuthenticated(port, {
+        userId: "queue-user",
+        displayName: "Queue",
       });
-      await waitForEvent<ConnectedPayload>(socket, "connected");
 
       const queueJoinedPromise = waitForEvent<QueueJoinedPayload>(socket, "queueJoined");
       socket.emit("joinQueue", {});
@@ -173,15 +177,10 @@ describe("Matchmaking (e2e)", () => {
     });
 
     it("rejects duplicate joinQueue with ALREADY_IN_QUEUE", async () => {
-      const token = await issueTestAccessToken({ userId: "dup-user", displayName: "Dup" });
-      const socket = connectClient(port, token);
-      const connectedPromise = waitForEvent<ConnectedPayload>(socket, "connected");
-
-      await new Promise<void>((resolvePromise, reject) => {
-        socket.once("connect", () => resolvePromise());
-        socket.once("connect_error", reject);
+      const { socket } = await connectAuthenticated(port, {
+        userId: "dup-user",
+        displayName: "Dup",
       });
-      await connectedPromise;
 
       socket.emit("joinQueue", {});
       await waitForEvent<QueueJoinedPayload>(socket, "queueJoined");
@@ -197,14 +196,10 @@ describe("Matchmaking (e2e)", () => {
     it("rejects joinQueue when the player is already in a match", async () => {
       await redisService.setex("match:byUser:matched-user", 60, "match-123");
 
-      const token = await issueTestAccessToken({ userId: "matched-user", displayName: "Matched" });
-      const socket = connectClient(port, token);
-
-      await new Promise<void>((resolvePromise, reject) => {
-        socket.once("connect", () => resolvePromise());
-        socket.once("connect_error", reject);
+      const { socket } = await connectAuthenticated(port, {
+        userId: "matched-user",
+        displayName: "Matched",
       });
-      await waitForEvent<ConnectedPayload>(socket, "connected");
 
       const errorPromise = waitForEvent<ErrorPayload>(socket, "error");
       socket.emit("joinQueue", {});
@@ -252,14 +247,10 @@ describe("Matchmaking (e2e)", () => {
     });
 
     it("rate limits joinQueue to one call per second", async () => {
-      const token = await issueTestAccessToken({ userId: "rate-user", displayName: "Rate" });
-      const socket = connectClient(port, token);
-
-      await new Promise<void>((resolvePromise, reject) => {
-        socket.once("connect", () => resolvePromise());
-        socket.once("connect_error", reject);
+      const { socket } = await connectAuthenticated(port, {
+        userId: "rate-user",
+        displayName: "Rate",
       });
-      await waitForEvent<ConnectedPayload>(socket, "connected");
 
       socket.emit("joinQueue", {});
       await waitForEvent<QueueJoinedPayload>(socket, "queueJoined");
