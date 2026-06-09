@@ -1,0 +1,54 @@
+import { Inject, Injectable } from "@nestjs/common";
+import { Worker, type WorkerOptions } from "bullmq";
+import { Logger } from "nestjs-pino";
+import { JOB_RUNNER_CONFIG, type JobRunnerConfig, type WorkerQueueName } from "../config/env.js";
+import { WorkerMetricsService } from "../metrics/worker-metrics.service.js";
+import { getProcessorForQueue } from "./worker-processors.js";
+
+export type ManagedWorker = {
+  queue: WorkerQueueName;
+  worker: Worker;
+};
+
+@Injectable()
+export class WorkerFactory {
+  constructor(
+    @Inject(JOB_RUNNER_CONFIG) private readonly config: JobRunnerConfig,
+    private readonly metrics: WorkerMetricsService,
+    private readonly logger: Logger,
+  ) {}
+
+  createWorkers(): ManagedWorker[] {
+    return this.config.WORKER_QUEUES.map((queue) => this.createWorker(queue));
+  }
+
+  private createWorker(queue: WorkerQueueName): ManagedWorker {
+    const workerOptions: WorkerOptions = {
+      connection: { url: this.config.REDIS_URL },
+      prefix: this.config.BULLMQ_PREFIX,
+      concurrency: this.config.WORKER_CONCURRENCY,
+    };
+
+    const worker = new Worker(queue, getProcessorForQueue(queue), workerOptions);
+
+    worker.on("completed", () => {
+      this.metrics.recordJobProcessed(queue, "completed");
+    });
+
+    worker.on("failed", () => {
+      this.metrics.recordJobProcessed(queue, "failed");
+    });
+
+    this.logger.log(
+      {
+        worker_role: this.config.WORKER_ROLE,
+        queue,
+        concurrency: this.config.WORKER_CONCURRENCY,
+        prefix: this.config.BULLMQ_PREFIX,
+      },
+      "BullMQ worker started",
+    );
+
+    return { queue, worker };
+  }
+}
