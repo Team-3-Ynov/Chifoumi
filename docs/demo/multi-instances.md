@@ -119,17 +119,29 @@ Verification API (optionnel) :
 curl http://api.localhost/leaderboard?limit=5
 ```
 
-### Etape 4 — Crash game-1 en plein match (~1 min)
+### Etape 4 — Crash controle de game-1 (~1 min)
 
-Pendant le **round suivant** d'un second match (relancer queue des deux cotes) :
+Apres le BO3 principal, montrer la resilience de la stack sans risquer de bloquer la demo de match :
 
 ```bash
 docker stop chifoumi-game-1
 ```
 
-- Fenetre **A** : le client affiche `disconnect`.
-- **Comportement attendu (P2 / US-038)** : reconnecter A sur game-2 (`gameUrl=http://127.0.0.1:3102`) et reprendre le match (etat Redis).
-- **Comportement actuel** : B peut continuer ; A doit se reconnecter manuellement. Si le match reste bloque, voir [Cas de recuperation](#cas-de-recuperation).
+- Verifier que `game-2` reste disponible :
+
+```bash
+curl http://127.0.0.1:3102/health
+```
+
+- Fenetre **B** : le client connecte a `game-2` reste utilisable.
+- Fenetre **A** : si elle etait connectee a `game-1`, elle affiche `disconnect`.
+- Pour continuer la demo cote A, ouvrir une nouvelle fenetre A sur `game-2` :
+
+```text
+http://front.localhost/demo-client.html?player=A2&apiUrl=http://api.localhost&gameUrl=http://127.0.0.1:3102
+```
+
+La reprise automatique d'un match en cours apres crash d'instance est gardee pour l'US-038. Ici, la promesse US-032 est une procedure de demonstration reproductible avec detection du crash, service restant disponible et recuperation manuelle documentee.
 
 ![Crash game-1](assets/04-crash-game-1.svg)
 
@@ -167,7 +179,7 @@ Montrer au minimum :
 1. « Deux replicas Game Service, etat partage Redis, matchmaking cross-instance. »
 2. « Round-robin API derriere Traefik ; sticky WS sur `game.localhost`. »
 3. « On force A sur game-1 et B sur game-2 via ports directs — preuve que le matchmaking distribue fonctionne. »
-4. « Crash d'une instance : resilience (reconnexion P2) + procedures de recuperation documentees. »
+4. « Crash controle d'une instance : detection, autre replica disponible et procedures de recuperation documentees. »
 5. « Observabilite : Prometheus + Grafana dans la stack. »
 
 ## Fichiers associes
@@ -176,7 +188,7 @@ Montrer au minimum :
 |---|---|
 | [`scripts/demo/run-demo.sh`](../../scripts/demo/run-demo.sh) | Demarrage stack + onglets (bash) |
 | [`scripts/demo/run-demo.ps1`](../../scripts/demo/run-demo.ps1) | Idem Windows |
-| [`apps/front/public/demo-client.html`](../../apps/front/public/demo-client.html) | Client WebSocket minimal pour la demo |
+| [`apps/front/public/demo-client.html`](../../apps/front/public/demo-client.html) | Client WebSocket minimal pour la demo, sans dependance CDN |
 | [`docker-compose.demo.yml`](../../docker-compose.demo.yml) | Override ports game-1 / game-2 |
 
 Captures placeholder : remplacer les SVG dans `docs/demo/assets/` par de vraies captures avant la soutenance.

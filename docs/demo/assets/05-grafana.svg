@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
   <rect width="960" height="540" fill="#0f172a"/>
-  <text x="48" y="72" fill="#e2e8f0" font-family="Segoe UI, sans-serif" font-size="32" font-weight="700">Placeholder  Grafana live</text>
-  <text x="48" y="120" fill="#94a3b8" font-family="Segoe UI, sans-serif" font-size="18">http://grafana.localhost  admin / admin</text>
+  <text x="48" y="72" fill="#e2e8f0" font-family="Segoe UI, sans-serif" font-size="32" font-weight="700">Placeholder - Grafana live</text>
+  <text x="48" y="120" fill="#94a3b8" font-family="Segoe UI, sans-serif" font-size="18">http://grafana.localhost - admin / admin</text>
   <rect x="48" y="160" width="864" height="320" rx="12" fill="#111827" stroke="#334155"/>
   <polyline points="80,420 180,380 280,360 380,300 480,280 580,240 680,220 780,180 880,160" fill="none" stroke="#38bdf8" stroke-width="4"/>
   <text x="72" y="210" fill="#cbd5e1" font-family="Segoe UI, sans-serif" font-size="18">Prometheus scrape (US-039) + dashboard Chifoumi Overview a venir</text>
