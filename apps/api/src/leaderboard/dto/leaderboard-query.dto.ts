@@ -3,7 +3,7 @@ import { Type } from "class-transformer";
 import { IsInt, IsOptional, Max, Min } from "class-validator";
 
 export class LeaderboardQueryDto {
-  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 50 })
+  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 100, default: 50, example: 50 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

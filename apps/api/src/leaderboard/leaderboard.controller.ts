@@ -1,5 +1,11 @@
 import { Controller, Get, Query, Res, UseGuards } from "@nestjs/common";
-import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBadRequestResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
 import { Public } from "../auth/decorators/public.decorator.js";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
@@ -16,9 +22,33 @@ export class LeaderboardController {
 
   @Public()
   @Get()
-  @ApiOperation({ summary: "Get global top players by rating" })
-  @ApiOkResponse({ description: "Leaderboard page", type: LeaderboardResponseDto })
-  @ApiBadRequestResponse({ description: "Invalid query parameters" })
+  @ApiOperation({
+    summary: "Get global top players by rating",
+    description:
+      "Public leaderboard sorted by `rating DESC, gamesPlayed DESC`. Results are cached in Redis for 30 seconds.",
+  })
+  @ApiQuery({ name: "limit", required: false, type: Number, example: 50, minimum: 1, maximum: 100 })
+  @ApiOkResponse({
+    description: "Leaderboard page",
+    type: LeaderboardResponseDto,
+    headers: {
+      "X-Cache": {
+        description:
+          "Cache status returned by the API: HIT when Redis served the response, MISS otherwise.",
+        schema: { type: "string", enum: ["HIT", "MISS"] },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: "Invalid query parameters",
+    schema: {
+      example: {
+        statusCode: 400,
+        message: ["limit must be ≤ 100"],
+        error: "Bad Request",
+      },
+    },
+  })
   async getLeaderboard(
     @Query() query: LeaderboardQueryDto,
     @Res({ passthrough: true }) res: { setHeader(name: string, value: string): void },

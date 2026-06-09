@@ -100,9 +100,13 @@ pnpm --filter @chifoumi/front dev
 | Front | `http://localhost:5173` | disponible |
 | API health | `http://localhost:3000/health` | disponible |
 | Game service health | `http://localhost:3001/health` | disponible |
-| Swagger | `http://localhost:3000/api/docs` | prevu par US-008 |
+| Swagger | `http://localhost:3000/api/docs` | disponible |
+| OpenAPI JSON | `http://localhost:3000/api/docs-json` | disponible |
 | MailHog | `http://localhost:8025` | disponible apres `docker compose up -d` |
 | Grafana | `http://localhost:3002` | prevu avec la stack observabilite |
+
+En production, la documentation Swagger est protegee par Basic Auth via `SWAGGER_USER` et `SWAGGER_PASSWORD`.
+Sans ces deux variables en production, les routes `/api/docs` et `/api/docs-json` ne sont pas exposees.
 
 ## Contributing
 
