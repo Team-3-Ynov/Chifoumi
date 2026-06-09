@@ -88,6 +88,10 @@ describe("MatchPlayService", () => {
     expect(state?.scoreA).toBe(2);
     expect(state?.winnerId).toBe("a");
     expect(publishedJobs).toHaveLength(1);
+    expect(state?.rounds).toEqual([
+      expect.objectContaining({ roundNumber: 1, moveA: "rock", moveB: "scissors", winner: "a" }),
+      expect.objectContaining({ roundNumber: 2, moveA: "paper", moveB: "rock", winner: "a" }),
+    ]);
     expect(await client.get("match:byUser:a")).toBeNull();
   });
 

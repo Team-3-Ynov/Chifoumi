@@ -248,12 +248,24 @@ importers:
 
   apps/job-runner:
     dependencies:
+      '@chifoumi/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@chifoumi/elo':
+        specifier: workspace:*
+        version: link:../../packages/elo
       '@nestjs/common':
         specifier: ^11.1.21
         version: 11.1.21(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core':
         specifier: ^11.1.21
         version: 11.1.21(@nestjs/common@11.1.21(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.21)(@nestjs/websockets@11.1.21)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@prisma/adapter-pg':
+        specifier: ^7.8.0
+        version: 7.8.0
+      '@prisma/client':
+        specifier: ^7.8.0
+        version: 7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.7.3))(typescript@5.7.3)
       bullmq:
         specifier: ^5.49.2
         version: 5.78.0
@@ -266,6 +278,9 @@ importers:
       nestjs-pino:
         specifier: 4.2.0
         version: 4.2.0(@nestjs/common@11.1.21(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.4.0)
+      pg:
+        specifier: ^8.16.3
+        version: 8.21.0
       pino-http:
         specifier: 10.4.0
         version: 10.4.0

@@ -1,14 +1,14 @@
 import type { Job } from "bullmq";
 import type { WorkerQueueName } from "../config/env.js";
+import {
+  createMatchEndedProcessor,
+  type MatchEventsProcessorDependencies,
+} from "../match-events/match-ended.processor.js";
 
 export type WorkerProcessor = (job: Job) => Promise<void>;
+export type ProcessorDependencies = MatchEventsProcessorDependencies;
 
-const STUB_PROCESSORS: Record<WorkerQueueName, WorkerProcessor> = {
-  "match-events": async (job) => {
-    if (job.name !== "match-ended") {
-      throw new Error(`Unsupported job name on match-events: ${job.name}`);
-    }
-  },
+const STUB_PROCESSORS: Record<Exclude<WorkerQueueName, "match-events">, WorkerProcessor> = {
   notifications: async (job) => {
     if (job.name !== "send-mail") {
       throw new Error(`Unsupported job name on notifications: ${job.name}`);
@@ -26,6 +26,13 @@ const STUB_PROCESSORS: Record<WorkerQueueName, WorkerProcessor> = {
   },
 };
 
-export function getProcessorForQueue(queue: WorkerQueueName): WorkerProcessor {
+export function getProcessorForQueue(
+  queue: WorkerQueueName,
+  deps: ProcessorDependencies,
+): WorkerProcessor {
+  if (queue === "match-events") {
+    return createMatchEndedProcessor(deps);
+  }
+
   return STUB_PROCESSORS[queue];
 }

@@ -6,6 +6,7 @@ import { WorkerMetricsService } from "../metrics/worker-metrics.service.js";
 const workerCtor = jest.fn();
 
 jest.unstable_mockModule("bullmq", () => ({
+  UnrecoverableError: class UnrecoverableError extends Error {},
   Worker: workerCtor,
 }));
 
@@ -25,6 +26,18 @@ function createConfig(overrides: Partial<JobRunnerConfig> = {}): JobRunnerConfig
   };
 }
 
+function createMatchPersistence(): { persistMatchEnded: () => Promise<boolean> } {
+  return {
+    persistMatchEnded: jest.fn(async () => true),
+  };
+}
+
+function createRedisInvalidation(): { invalidateLeaderboard: () => Promise<void> } {
+  return {
+    invalidateLeaderboard: jest.fn(async () => undefined),
+  };
+}
+
 describe("WorkerFactory", () => {
   beforeEach(() => {
     workerCtor.mockReset();
@@ -38,7 +51,13 @@ describe("WorkerFactory", () => {
     const config = createConfig({ WORKER_QUEUES: ["match-events"] });
     const metrics = new WorkerMetricsService(config);
     const logger = { log: jest.fn() } as unknown as Logger;
-    const factory = new WorkerFactoryClass(config, metrics, logger);
+    const factory = new WorkerFactoryClass(
+      config,
+      metrics,
+      createMatchPersistence() as never,
+      createRedisInvalidation() as never,
+      logger,
+    );
 
     const workers = factory.createWorkers();
 
@@ -64,7 +83,13 @@ describe("WorkerFactory", () => {
     });
     const metrics = new WorkerMetricsService(config);
     const logger = { log: jest.fn() } as unknown as Logger;
-    const factory = new WorkerFactoryClass(config, metrics, logger);
+    const factory = new WorkerFactoryClass(
+      config,
+      metrics,
+      createMatchPersistence() as never,
+      createRedisInvalidation() as never,
+      logger,
+    );
 
     const workers = factory.createWorkers();
 
