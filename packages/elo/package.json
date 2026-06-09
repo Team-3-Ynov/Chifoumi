@@ -2,10 +2,18 @@
   "name": "@chifoumi/elo",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
   },
   "devDependencies": {
+    "@jest/globals": "29.7.0",
+    "@types/jest": "29.5.14",
+    "@types/node": "^24.12.4",
+    "jest": "29.7.0",
+    "ts-jest": "29.2.5",
     "typescript": "~5.7.3"
   }
 }
