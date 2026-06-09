@@ -44,10 +44,12 @@ export class AuthService {
         passwordHash,
         displayName: input.displayName,
       });
-      await this.notificationsQueue.enqueueWelcomeMail({
-        to: email,
-        displayName: input.displayName,
-      });
+      void this.notificationsQueue
+        .enqueueWelcomeMail({
+          to: email,
+          displayName: input.displayName,
+        })
+        .catch(() => undefined);
       return this.issueTokensForUser(user.id, user);
     } catch (error) {
       if (this.usersService.isUniqueConstraintError(error)) {
