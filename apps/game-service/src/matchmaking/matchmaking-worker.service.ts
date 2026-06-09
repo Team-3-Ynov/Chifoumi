@@ -50,7 +50,7 @@ return 1
 
 @Injectable()
 export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
-  private interval: NodeJS.Timeout | null = null;
+  private interval: ReturnType<typeof setInterval> | null = null;
   private running = false;
 
   constructor(
@@ -66,10 +66,10 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.interval = setInterval(() => {
+    const interval = setInterval(() => {
       void this.tick();
     }, MATCHMAKING_WORKER_INTERVAL_MS);
-    this.interval.unref();
+    this.interval = interval;
   }
 
   onModuleDestroy(): void {
