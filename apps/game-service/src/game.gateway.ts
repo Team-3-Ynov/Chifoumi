@@ -11,6 +11,8 @@ import { WS_AUTH_INVALID_TOKEN_CODE, WsAuthError } from "./auth/ws-auth.error.js
 import { WsAuthService } from "./auth/ws-auth.service.js";
 import { resolveCorsOrigins } from "./cors.js";
 import { scrubTokenFromUrl } from "./logging/scrub-token.js";
+import { MatchmakingService } from "./matchmaking/matchmaking.service.js";
+import { MatchmakingEventsService } from "./matchmaking/matchmaking-events.service.js";
 import { RedisService } from "./redis/redis.service.js";
 
 function extractToken(socket: Socket): string | undefined {
@@ -37,10 +39,14 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   constructor(
     private readonly wsAuthService: WsAuthService,
     private readonly redisService: RedisService,
+    private readonly matchmakingService: MatchmakingService,
+    private readonly matchmakingEventsService: MatchmakingEventsService,
     private readonly logger: Logger,
   ) {}
 
   afterInit(server: Server): void {
+    this.matchmakingEventsService.setServer(server);
+
     server.use(async (socket, next) => {
       try {
         const auth = await this.wsAuthService.verifyToken(extractToken(socket));
@@ -79,6 +85,7 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   async handleDisconnect(client: Socket): Promise<void> {
     const userId = client.data.userId as string | undefined;
     if (userId) {
+      await this.matchmakingService.leaveQueue(userId);
       await this.redisService.removeUserSocket(userId, client.id);
     }
   }
