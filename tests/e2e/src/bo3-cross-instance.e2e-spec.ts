@@ -46,10 +46,12 @@ describe("US-031 BO3 cross-instance smoke @e2e", () => {
     await joinQueue(socketA);
     await joinQueue(socketB);
 
-    const payloadA = await matchFoundA;
-    const payloadB = await matchFoundB;
-    const roundStart = await roundStartA;
-    await roundStartB;
+    const [payloadA, payloadB, roundStart] = await Promise.all([
+      matchFoundA,
+      matchFoundB,
+      roundStartA,
+      roundStartB,
+    ]);
 
     expect(payloadA.matchId).toBe(payloadB.matchId);
     expect(payloadA.bestOf).toBe(3);

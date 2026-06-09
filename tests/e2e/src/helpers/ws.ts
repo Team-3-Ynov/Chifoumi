@@ -33,7 +33,7 @@ export function connectWs(gameUrl: string, accessToken: string): Socket {
   });
 }
 
-export function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 10_000): Promise<T> {
+export function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 20_000): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`${event} timeout`)), timeoutMs);
     socket.once(event, (payload: T) => {

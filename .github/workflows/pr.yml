@@ -49,6 +49,19 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: chifoumi_dev
+          POSTGRES_DB: chifoumi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d chifoumi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
       DATABASE_URL: postgresql://app:chifoumi_dev@localhost:5432/chifoumi
@@ -59,14 +72,22 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build database package
-        run: pnpm --filter @chifoumi/db build
+      - name: Build workspace packages for tests
+        run: |
+          pnpm --filter @chifoumi/db build
+          pnpm --filter @chifoumi/elo build
+
+      - name: Apply database migrations
+        run: pnpm --filter @chifoumi/db migrate:deploy
 
       - name: Test with coverage
         run: pnpm -r run --if-present test
 
       - name: Game service WebSocket e2e tests
         run: pnpm --filter @chifoumi/game-service test:e2e
+
+      - name: Job-runner match-events integration tests
+        run: pnpm --filter @chifoumi/job-runner test:integration
 
       - name: Upload coverage artifact
         if: always()
