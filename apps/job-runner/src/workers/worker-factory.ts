@@ -50,7 +50,9 @@ export class WorkerFactory {
     });
 
     worker.on("failed", (job, error) => {
-      this.metrics.recordJobProcessed(queue, "failed");
+      const maxAttempts = job?.opts.attempts ?? 1;
+      const isPermanentFailure = !job || job.attemptsMade >= maxAttempts;
+      this.metrics.recordJobProcessed(queue, isPermanentFailure ? "failed_permanent" : "retry");
 
       if (queue === "match-events" && job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
         this.logger.error(
