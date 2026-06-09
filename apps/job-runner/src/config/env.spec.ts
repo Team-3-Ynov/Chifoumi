@@ -24,6 +24,9 @@ describe("loadEnv", () => {
     expect(config.BULLMQ_PREFIX).toBe("rps");
     expect(config.CRON_ENABLED).toBe(false);
     expect(config.MAIL_TRANSPORT).toBe("mailhog");
+    expect(config.MAIL_HOST).toBe("localhost");
+    expect(config.MAIL_PORT).toBe(1025);
+    expect(config.MAIL_FROM).toBe("noreply@chifoumi.local");
   });
 
   it("parses multiple queues and custom values", () => {

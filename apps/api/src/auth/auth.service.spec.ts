@@ -2,6 +2,7 @@ import { jest } from "@jest/globals";
 import { ConflictException, UnauthorizedException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { NotificationsQueueService } from "../queues/notifications-queue.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { UsersService } from "../users/users.service.js";
 import { AuthService } from "./auth.service.js";
@@ -41,6 +42,9 @@ describe("AuthService", () => {
     setnx: jest.fn<RedisService["setnx"]>(),
     del: jest.fn<RedisService["del"]>(),
   };
+  const notificationsQueue = {
+    enqueueWelcomeMail: jest.fn<NotificationsQueueService["enqueueWelcomeMail"]>(),
+  };
   let authService: AuthService;
 
   beforeEach(async () => {
@@ -67,6 +71,7 @@ describe("AuthService", () => {
         { provide: PasswordService, useValue: passwordService },
         { provide: TokenService, useValue: tokenService },
         { provide: RedisService, useValue: redisService },
+        { provide: NotificationsQueueService, useValue: notificationsQueue },
       ],
     }).compile();
     authService = moduleRef.get(AuthService);
@@ -107,6 +112,10 @@ describe("AuthService", () => {
     expect(usersService.createUser).toHaveBeenCalledWith({
       email: "a@b.com",
       passwordHash: "hash",
+      displayName: "alice",
+    });
+    expect(notificationsQueue.enqueueWelcomeMail).toHaveBeenCalledWith({
+      to: "a@b.com",
       displayName: "alice",
     });
     expect(prisma.refreshToken.create).toHaveBeenCalledWith({

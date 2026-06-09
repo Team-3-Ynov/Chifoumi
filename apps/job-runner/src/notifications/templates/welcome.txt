@@ -1,0 +1,5 @@
+Bienvenue sur Chifoumi, {{displayName}} !
+
+Ton compte est prêt. Tu peux maintenant rejoindre la file de matchmaking et grimper dans le classement.
+
+À très vite sur le terrain.

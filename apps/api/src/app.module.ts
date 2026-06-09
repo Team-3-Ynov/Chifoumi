@@ -9,6 +9,7 @@ import { JwksModule } from "./jwks/jwks.module.js";
 import { LeaderboardModule } from "./leaderboard/leaderboard.module.js";
 import { MeModule } from "./me/me.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
+import { QueuesModule } from "./queues/queues.module.js";
 import { RedisModule } from "./redis/redis.module.js";
 import { UsersModule } from "./users/users.module.js";
 
@@ -29,6 +30,7 @@ import { UsersModule } from "./users/users.module.js";
     AppConfigModule,
     PrismaModule,
     RedisModule,
+    QueuesModule,
     HealthModule,
     UsersModule,
     AuthModule,
