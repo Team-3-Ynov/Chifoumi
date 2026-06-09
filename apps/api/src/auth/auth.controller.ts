@@ -120,11 +120,39 @@ export class AuthController {
 
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Rotate refresh token and issue a new access token" })
+  @ApiOperation({
+    summary: "Rotate refresh token and issue a new access token",
+    description:
+      "Exchanges a valid opaque refresh token for a new access/refresh token pair and revokes the previous refresh token.",
+  })
+  @ApiBody({
+    type: RefreshDto,
+    examples: {
+      refresh: {
+        summary: "Refresh token rotation",
+        value: { refreshToken: "dGhpcyBpcyBhbiBvcGFxdWUgcmVmcmVzaCB0b2tlbg" },
+      },
+    },
+  })
   @ApiOkResponse({ description: "New token pair issued", type: RefreshResponseDto })
-  @ApiBadRequestResponse({ description: "Validation error" })
+  @ApiBadRequestResponse({
+    description: "Validation error",
+    schema: {
+      example: {
+        statusCode: 400,
+        message: ["refreshToken must be longer than or equal to 20 characters"],
+        error: "Bad Request",
+      },
+    },
+  })
   @ApiUnauthorizedResponse({
     description: "Invalid, expired, revoked or unknown refresh token",
+    schema: {
+      example: {
+        statusCode: 401,
+        message: "Unauthorized",
+      },
+    },
   })
   async refresh(@Body() dto: RefreshDto) {
     return this.authService.refresh(dto.refreshToken);

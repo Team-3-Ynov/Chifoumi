@@ -83,6 +83,7 @@ describe("Swagger docs (e2e)", () => {
       expect.arrayContaining([
         "/auth/register",
         "/auth/login",
+        "/auth/refresh",
         "/auth/logout",
         "/me",
         "/me/history",
