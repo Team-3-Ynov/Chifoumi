@@ -48,7 +48,7 @@ async function waitForJobState(
 ): Promise<Job> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const current = await Job.fromId(bullQueue, job.id!);
+    const current = await Job.fromId(bullQueue, job.id as string);
     if (current && (await current.getState()) === expected) {
       return current;
     }
@@ -108,7 +108,6 @@ describe("match-events worker (integration)", () => {
     queue = createQueue();
     redisSubscriber = new Redis(redisUrl);
 
-    runnerService.onModuleInit();
     await redisSubscriber.subscribe(LEADERBOARD_INVALIDATE_CHANNEL);
   }, 30_000);
 
