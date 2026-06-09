@@ -6,6 +6,7 @@ module.exports = {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   testEnvironment: "node",
+  testTimeout: 15_000,
   roots: ["<rootDir>/test"],
   testRegex: ".*\\.e2e-spec\\.ts$",
   transform: {

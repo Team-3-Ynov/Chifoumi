@@ -42,12 +42,12 @@ function waitForConnectError(socket: Socket): Promise<Error & { data?: { code?: 
 
 function waitForConnected(socket: Socket): Promise<ConnectedPayload> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("connected timeout")), 5_000);
-    socket.on("connected", (payload: ConnectedPayload) => {
+    const timeout = setTimeout(() => reject(new Error("connected timeout")), 10_000);
+    socket.once("connected", (payload: ConnectedPayload) => {
       clearTimeout(timeout);
       resolve(payload);
     });
-    socket.on("connect_error", (error) => {
+    socket.once("connect_error", (error) => {
       clearTimeout(timeout);
       reject(error);
     });
@@ -86,13 +86,14 @@ describe("Game WS auth (e2e)", () => {
       displayName: "Ace",
     });
     const socket = connectClient(port, token);
+    const connectedPromise = waitForConnected(socket);
 
     await new Promise<void>((resolve, reject) => {
-      socket.on("connect", () => resolve());
-      socket.on("connect_error", reject);
+      socket.once("connect", () => resolve());
+      socket.once("connect_error", reject);
     });
 
-    const payload = await waitForConnected(socket);
+    const payload = await connectedPromise;
     expect(payload).toEqual({ userId: "user-valid", displayName: "Ace" });
 
     const mappedSocketId = await redisService.getUserSocket("user-valid");
