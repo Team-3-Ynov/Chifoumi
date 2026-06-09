@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#0f172a"/>
+  <text x="48" y="72" fill="#e2e8f0" font-family="Segoe UI, sans-serif" font-size="32" font-weight="700">Placeholder  4 fenetres navigateur</text>
+  <text x="48" y="120" fill="#94a3b8" font-family="Segoe UI, sans-serif" font-size="18">Joueur A sur game-1 (3101) · Joueur B sur game-2 (3102) · Grafana · Traefik</text>
+  <rect x="48" y="160" width="410" height="140" rx="10" fill="#1d4ed8"/>
+  <rect x="502" y="160" width="410" height="140" rx="10" fill="#047857"/>
+  <rect x="48" y="340" width="410" height="140" rx="10" fill="#7c3aed"/>
+  <rect x="502" y="340" width="410" height="140" rx="10" fill="#b45309"/>
+  <text x="72" y="240" fill="#fff" font-family="Segoe UI, sans-serif" font-size="22">Player A · demo-client · game-1</text>
+  <text x="526" y="240" fill="#fff" font-family="Segoe UI, sans-serif" font-size="22">Player B · demo-client · game-2</text>
+  <text x="72" y="420" fill="#fff" font-family="Segoe UI, sans-serif" font-size="22">Grafana · localhost:3002</text>
+  <text x="526" y="420" fill="#fff" font-family="Segoe UI, sans-serif" font-size="22">Traefik · traefik.localhost</text>
+</svg>

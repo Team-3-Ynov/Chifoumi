@@ -1,0 +1,11 @@
+# US-032 demo override: expose game replicas on fixed ports for cross-instance demo.
+# Use with: docker compose -f docker-compose.yml -f docker-compose.scale.yml -f docker-compose.demo.yml up -d
+
+services:
+  game-1:
+    ports:
+      - "3101:3001"
+
+  game-2:
+    ports:
+      - "3102:3001"

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chifoumi demo client</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #e8edf5;
+        background: #0f172a;
+      }
+      body {
+        margin: 0;
+        padding: 1.25rem;
+        max-width: 52rem;
+      }
+      h1 {
+        margin: 0 0 0.25rem;
+        font-size: 1.35rem;
+      }
+      .meta {
+        color: #94a3b8;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+      button {
+        border: 0;
+        border-radius: 0.5rem;
+        padding: 0.55rem 0.9rem;
+        background: #2563eb;
+        color: white;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #334155;
+      }
+      button.move {
+        background: #059669;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      #log {
+        background: #020617;
+        border: 1px solid #1e293b;
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+        min-height: 14rem;
+        white-space: pre-wrap;
+        font: 0.85rem/1.45 ui-monospace, monospace;
+      }
+      .status {
+        margin: 0.5rem 0 1rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+        background: #1e293b;
+      }
+    </style>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  </head>
+  <body>
+    <h1 id="title">Chifoumi demo client</h1>
+    <div class="meta" id="meta"></div>
+    <div class="status" id="status">Not connected</div>
+
+    <div class="row">
+      <button id="registerBtn">Register &amp; connect</button>
+      <button id="queueBtn" class="secondary" disabled>Join queue</button>
+      <button id="disconnectBtn" class="secondary" disabled>Disconnect</button>
+    </div>
+
+    <div class="row" id="moves" hidden>
+      <button class="move" data-move="rock">Rock</button>
+      <button class="move" data-move="paper">Paper</button>
+      <button class="move" data-move="scissors">Scissors</button>
+    </div>
+
+    <pre id="log"></pre>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      const player = params.get("player") ?? "X";
+      const apiUrl = params.get("apiUrl") ?? "http://api.localhost";
+      const gameUrl = params.get("gameUrl") ?? "http://127.0.0.1:3101";
+
+      document.getElementById("title").textContent = `Chifoumi demo — Player ${player}`;
+      document.getElementById("meta").textContent = `API: ${apiUrl} · Game: ${gameUrl}`;
+
+      const logEl = document.getElementById("log");
+      const statusEl = document.getElementById("status");
+      const queueBtn = document.getElementById("queueBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const movesEl = document.getElementById("moves");
+
+      let socket = null;
+      let accessToken = null;
+      let matchId = null;
+      let roundNumber = null;
+
+      function log(message) {
+        const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logEl.textContent = `${line}\n${logEl.textContent}`;
+      }
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      async function registerAndConnect() {
+        const suffix = Date.now().toString(36);
+        const body = {
+          email: `demo-${player.toLowerCase()}-${suffix}@chifoumi.local`,
+          password: "password1234",
+          displayName: `Demo${player}${suffix.slice(-4)}`,
+        };
+
+        log(`Registering ${body.displayName} ...`);
+        const response = await fetch(`${apiUrl}/auth/register`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+          throw new Error(`Register failed (${response.status})`);
+        }
+        const payload = await response.json();
+        accessToken = payload.tokens.access;
+        log(`Registered user ${payload.user.displayName}`);
+
+        socket = io(`${gameUrl}/game`, {
+          transports: ["websocket"],
+          forceNew: true,
+          reconnection: true,
+          query: { token: accessToken },
+        });
+
+        socket.on("connect", () => {
+          setStatus(`WS connected (${socket.id})`);
+          log("Socket connected");
+          queueBtn.disabled = false;
+          disconnectBtn.disabled = false;
+        });
+
+        socket.on("connect_error", (error) => {
+          setStatus("WS connect error");
+          log(`connect_error: ${error.message}`);
+        });
+
+        socket.on("disconnect", (reason) => {
+          setStatus(`WS disconnected (${reason})`);
+          log(`disconnect: ${reason}`);
+          queueBtn.disabled = true;
+          movesEl.hidden = true;
+        });
+
+        socket.on("connected", (data) => log(`connected event: ${JSON.stringify(data)}`));
+        socket.on("queueJoined", (data) => log(`queueJoined: ${JSON.stringify(data)}`));
+        socket.on("matchFound", (data) => {
+          matchId = data.matchId;
+          log(`matchFound: ${JSON.stringify(data)}`);
+          setStatus(`Match ${matchId} — waiting for roundStart`);
+        });
+        socket.on("roundStart", (data) => {
+          roundNumber = data.roundNumber;
+          movesEl.hidden = false;
+          log(`roundStart: ${JSON.stringify(data)}`);
+          setStatus(`Round ${roundNumber} — pick a move`);
+        });
+        socket.on("roundResolved", (data) => log(`roundResolved: ${JSON.stringify(data)}`));
+        socket.on("matchEnded", (data) => {
+          movesEl.hidden = true;
+          matchId = null;
+          roundNumber = null;
+          log(`matchEnded: ${JSON.stringify(data)}`);
+          setStatus("Match ended — you can join queue again");
+          queueBtn.disabled = false;
+        });
+      }
+
+      document.getElementById("registerBtn").addEventListener("click", () => {
+        registerAndConnect().catch((error) => log(error.message));
+      });
+
+      queueBtn.addEventListener("click", () => {
+        if (!socket) return;
+        socket.emit("joinQueue", {});
+        queueBtn.disabled = true;
+        log("joinQueue emitted");
+      });
+
+      disconnectBtn.addEventListener("click", () => {
+        if (socket) socket.disconnect();
+      });
+
+      for (const button of document.querySelectorAll("button.move")) {
+        button.addEventListener("click", () => {
+          if (!socket || !matchId || !roundNumber) return;
+          const move = button.dataset.move;
+          socket.emit("play", { matchId, roundNumber, move });
+          log(`play ${move} on round ${roundNumber}`);
+          movesEl.hidden = true;
+        });
+      }
+    </script>
+  </body>
+</html>

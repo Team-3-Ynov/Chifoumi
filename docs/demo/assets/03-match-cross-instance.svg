@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#0f172a"/>
+  <text x="48" y="72" fill="#e2e8f0" font-family="Segoe UI, sans-serif" font-size="32" font-weight="700">Placeholder  Match cross-instance</text>
+  <text x="48" y="120" fill="#94a3b8" font-family="Segoe UI, sans-serif" font-size="18">matchFound identique · BO3 joue entre game-1 et game-2</text>
+  <rect x="48" y="170" width="864" height="300" rx="12" fill="#111827" stroke="#334155"/>
+  <text x="72" y="230" fill="#22c55e" font-family="Consolas, monospace" font-size="16">[A/game-1] matchFound matchId=...</text>
+  <text x="72" y="270" fill="#22c55e" font-family="Consolas, monospace" font-size="16">[B/game-2] matchFound matchId=...</text>
+  <text x="72" y="330" fill="#fbbf24" font-family="Consolas, monospace" font-size="16">roundResolved scoreA=1 scoreB=0</text>
+  <text x="72" y="390" fill="#38bdf8" font-family="Consolas, monospace" font-size="16">matchEnded winner=A</text>
+</svg>
