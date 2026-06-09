@@ -48,7 +48,7 @@ function waitForEvent<T>(socket: Socket, event: string): Promise<T> {
 
 async function connectAndJoin(
   port: number,
-  input: { userId: string; displayName: string; rating: number },
+  input: { userId: string; displayName: string },
 ): Promise<{ socket: Socket; queueJoined: QueueJoinedPayload }> {
   const token = await issueTestAccessToken({
     userId: input.userId,
@@ -112,12 +112,10 @@ describe("Matchmaking (e2e)", () => {
     const playerA = await connectAndJoin(port, {
       userId: "player-a",
       displayName: "Ace",
-      rating: 1000,
     });
     const playerB = await connectAndJoin(port, {
       userId: "player-b",
       displayName: "Bob",
-      rating: 1040,
     });
 
     const matchFoundA = waitForEvent<MatchFoundPayload>(playerA.socket, "matchFound");

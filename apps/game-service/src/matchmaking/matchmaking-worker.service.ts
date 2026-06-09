@@ -93,16 +93,23 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
       }
 
       const members = await this.matchmakingService.listQueueMembers();
+      const pairedUserIds = new Set<string>();
       let matchesCreated = 0;
 
       for (const candidate of members) {
-        const opponent = this.findOpponent(candidate, members, now);
+        if (pairedUserIds.has(candidate.userId)) {
+          continue;
+        }
+
+        const opponent = this.findOpponent(candidate, members, now, pairedUserIds);
         if (!opponent) {
           continue;
         }
 
         const paired = await this.tryPairPlayers(candidate, opponent, now);
         if (paired) {
+          pairedUserIds.add(candidate.userId);
+          pairedUserIds.add(opponent.userId);
           matchesCreated += 1;
         }
       }
@@ -117,11 +124,16 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
     player: QueueMemberMeta,
     members: QueueMemberMeta[],
     now: number,
+    pairedUserIds: ReadonlySet<string> = new Set(),
   ): QueueMemberMeta | null {
     const playerWindow = getEloWindow(now - player.queuedAt);
 
     for (const candidate of members) {
       if (candidate.userId === player.userId) {
+        continue;
+      }
+
+      if (pairedUserIds.has(candidate.userId)) {
         continue;
       }
 

@@ -94,6 +94,23 @@ describe("MatchmakingWorkerService", () => {
     expect(matches).toBe(1);
   });
 
+  it("pairs multiple compatible groups in a single tick", async () => {
+    const now = Date.now();
+    await seedQueueMember(client, "player-a", 1000, "Ace", now);
+    await seedQueueMember(client, "player-b", 1020, "Bob", now);
+    await seedQueueMember(client, "player-c", 1040, "Cara", now);
+    await seedQueueMember(client, "player-d", 1060, "Dan", now);
+
+    const matches = await worker.tick(now + 100);
+
+    expect(matches).toBe(2);
+    expect(await client.zcard(MATCHMAKING_QUEUE_KEY)).toBe(0);
+    expect(await client.get(matchByUserKey("player-a"))).not.toBeNull();
+    expect(await client.get(matchByUserKey("player-b"))).not.toBeNull();
+    expect(await client.get(matchByUserKey("player-c"))).not.toBeNull();
+    expect(await client.get(matchByUserKey("player-d"))).not.toBeNull();
+  });
+
   it("allows only one worker to commit the same pair", async () => {
     const now = Date.now();
     await seedQueueMember(client, "player-a", 1000, "Ace", now);
