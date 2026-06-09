@@ -70,7 +70,7 @@ Ajouter les entrees suivantes au fichier hosts local (`C:\Windows\System32\drive
 docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --build
 ```
 
-Services demarres : `postgres` x1, `redis` x1, `api-1` + `api-2`, `game-1` + `game-2`, `job-runner-match` x1, `job-runner-misc` x1, `front` x1, `traefik` x1, `mailhog` x1, `prometheus` x1, `grafana` x1.
+Services demarres : `postgres` x1, `redis` x1, `db-migrate` (one-shot), `api-1` + `api-2`, `game-1` + `game-2`, `job-runner-match` x1, `job-runner-misc` x1, `front` x1, `traefik` x1, `mailhog` x1, `prometheus` x1, `grafana` x1.
 
 | Service | URL via Traefik | Port direct |
 |---|---:|---|

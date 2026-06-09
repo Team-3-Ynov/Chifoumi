@@ -3,8 +3,8 @@ x-api-common: &api-common
     context: .
     dockerfile: apps/api/Dockerfile
   depends_on:
-    postgres:
-      condition: service_healthy
+    db-migrate:
+      condition: service_completed_successfully
     redis:
       condition: service_healthy
   environment: &api-env
@@ -107,6 +107,21 @@ services:
       - chifoumi
 
   job-runner-misc:
+    networks:
+      - chifoumi
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: chifoumi-db-migrate
+    entrypoint: ["/app/apps/api/docker-migrate.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+    restart: "no"
     networks:
       - chifoumi
 
