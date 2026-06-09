@@ -5,6 +5,7 @@ import { MatchEventBus } from "../match-session/match-event-bus.js";
 import { MatchSessionService } from "../match-session/match-session.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
+import { MatchEventsRelayService } from "./match-events-relay.service.js";
 import { MatchPlayService, PlayValidationError } from "./match-play.service.js";
 
 describe("MatchPlayService", () => {
@@ -30,9 +31,19 @@ describe("MatchPlayService", () => {
       }),
     } as unknown as MatchEndedPublisher;
 
+    const matchEventsRelay = {
+      emitToUser: jest.fn(async () => undefined),
+    } as unknown as MatchEventsRelayService;
+
     const logger = { warn: jest.fn() } as unknown as Logger;
 
-    service = new MatchPlayService(matchSessionService, eventBus, matchEndedPublisher, logger);
+    service = new MatchPlayService(
+      matchSessionService,
+      eventBus,
+      matchEventsRelay,
+      matchEndedPublisher,
+      logger,
+    );
 
     await matchSessionService.create({
       matchId: "match-1",

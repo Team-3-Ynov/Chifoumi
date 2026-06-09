@@ -1,11 +1,21 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import { MatchEventBus } from "../match-session/match-event-bus.js";
-import { MatchSessionService } from "../match-session/match-session.service.js";
-import { type MatchState, type Move, playerIndex } from "../match-session/match-session.types.js";
+import {
+  MatchSessionLockError,
+  MatchSessionService,
+} from "../match-session/match-session.service.js";
+import {
+  emptyRoundPlays,
+  type MatchState,
+  type Move,
+  playerIndex,
+  type RoundResolvedPayload,
+} from "../match-session/match-session.types.js";
 import { transitionMatchState } from "../match-session/match-state-machine.js";
 import { isValidMove, resolveRound as resolveRps } from "../rps/resolve.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
+import { MatchEventsRelayService } from "./match-events-relay.service.js";
 
 export type PlayInput = {
   userId: string;
@@ -41,6 +51,7 @@ export class MatchPlayService implements OnModuleDestroy {
   constructor(
     private readonly matchSessionService: MatchSessionService,
     private readonly eventBus: MatchEventBus,
+    private readonly matchEventsRelay: MatchEventsRelayService,
     private readonly matchEndedPublisher: MatchEndedPublisher,
     private readonly logger: Logger,
   ) {}
@@ -61,26 +72,51 @@ export class MatchPlayService implements OnModuleDestroy {
       throw new PlayValidationError("INVALID_MOVE");
     }
 
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        const resolved = await this.trySubmitPlay(input);
+        if (resolved) {
+          await this.afterRoundResolved(resolved.state, resolved.resolution);
+        }
+        return;
+      } catch (error) {
+        if (error instanceof MatchSessionLockError && attempt < 4) {
+          await new Promise((resolve) => setTimeout(resolve, 10 * (attempt + 1)));
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
+  private async trySubmitPlay(
+    input: PlayInput,
+  ): Promise<{ state: MatchState; resolution: RoundResolution } | null> {
     const move = input.move as Move;
     let resolution: RoundResolution | null = null;
 
     const nextState = await this.matchSessionService.mutateState(input.matchId, (state) => {
-      const index = playerIndex(state, input.userId);
+      const normalized: MatchState = {
+        ...state,
+        roundPlays: state.roundPlays ?? emptyRoundPlays(),
+      };
+
+      const index = playerIndex(normalized, input.userId);
       if (index === null) {
         throw new PlayValidationError("NOT_IN_MATCH");
       }
 
-      if (state.status !== "WAITING_PLAYS" || input.roundNumber !== state.currentRound) {
+      if (normalized.status !== "WAITING_PLAYS" || input.roundNumber !== normalized.currentRound) {
         throw new PlayValidationError("WRONG_ROUND");
       }
 
       const slot = index === 0 ? "a" : "b";
-      if (state.roundPlays[slot] !== null) {
+      if (normalized.roundPlays[slot] !== null) {
         throw new PlayValidationError("ALREADY_PLAYED");
       }
 
-      const roundPlays = { ...state.roundPlays, [slot]: move };
-      const updated: MatchState = { ...state, roundPlays };
+      const roundPlays = { ...normalized.roundPlays, [slot]: move };
+      const updated: MatchState = { ...normalized, roundPlays };
 
       if (roundPlays.a === null || roundPlays.b === null) {
         return updated;
@@ -89,7 +125,7 @@ export class MatchPlayService implements OnModuleDestroy {
       resolution = {
         moveA: roundPlays.a,
         moveB: roundPlays.b,
-        roundNumber: state.currentRound,
+        roundNumber: normalized.currentRound,
       };
 
       const resolving = transitionMatchState(updated, { type: "PLAYS_RECEIVED" });
@@ -102,10 +138,10 @@ export class MatchPlayService implements OnModuleDestroy {
     });
 
     if (!resolution) {
-      return;
+      return null;
     }
 
-    await this.afterRoundResolved(nextState, resolution);
+    return { state: nextState, resolution };
   }
 
   async handleRoundTimeout(matchId: string, roundNumber: number): Promise<void> {
@@ -136,37 +172,37 @@ export class MatchPlayService implements OnModuleDestroy {
   private async afterRoundResolved(state: MatchState, resolution: RoundResolution): Promise<void> {
     const { moveA, moveB, roundNumber } = resolution;
     const winnerSide = resolveRps(moveA, moveB);
-    const winnerLabel = winnerSide === "DRAW" ? "draw" : winnerSide === "A" ? "a" : "b";
+    const winnerLabel: RoundResolvedPayload["winner"] =
+      winnerSide === "DRAW" ? "draw" : winnerSide === "A" ? "a" : "b";
+
+    const payloadA: RoundResolvedPayload = {
+      matchId: state.matchId,
+      roundNumber,
+      yourMove: moveA,
+      theirMove: moveB,
+      winner: winnerLabel,
+      scoreA: state.scoreA,
+      scoreB: state.scoreB,
+    };
+    const payloadB: RoundResolvedPayload = {
+      matchId: state.matchId,
+      roundNumber,
+      yourMove: moveB,
+      theirMove: moveA,
+      winner: winnerLabel,
+      scoreA: state.scoreA,
+      scoreB: state.scoreB,
+    };
 
     await Promise.all([
-      this.eventBus.broadcastToMatch(
-        state.matchId,
-        "roundResolved",
-        {
-          matchId: state.matchId,
-          roundNumber,
-          yourMove: moveA,
-          theirMove: moveB,
-          winner: winnerLabel,
-          scoreA: state.scoreA,
-          scoreB: state.scoreB,
-        },
-        { recipientUserId: state.players[0].userId },
-      ),
-      this.eventBus.broadcastToMatch(
-        state.matchId,
-        "roundResolved",
-        {
-          matchId: state.matchId,
-          roundNumber,
-          yourMove: moveB,
-          theirMove: moveA,
-          winner: winnerLabel,
-          scoreA: state.scoreA,
-          scoreB: state.scoreB,
-        },
-        { recipientUserId: state.players[1].userId },
-      ),
+      this.eventBus.broadcastToMatch(state.matchId, "roundResolved", payloadA, {
+        recipientUserId: state.players[0].userId,
+      }),
+      this.eventBus.broadcastToMatch(state.matchId, "roundResolved", payloadB, {
+        recipientUserId: state.players[1].userId,
+      }),
+      this.matchEventsRelay.emitToUser(state.players[0].userId, "roundResolved", payloadA),
+      this.matchEventsRelay.emitToUser(state.players[1].userId, "roundResolved", payloadB),
     ]);
 
     if (state.status === "ENDED") {
@@ -181,31 +217,23 @@ export class MatchPlayService implements OnModuleDestroy {
   private async finalizeMatch(state: MatchState): Promise<void> {
     this.clearTimer(state.matchId);
 
+    const payload = {
+      matchId: state.matchId,
+      winner: state.winnerId ?? null,
+      finalScore: { a: state.scoreA, b: state.scoreB },
+      eloDelta: { a: 0, b: 0 },
+      reason: state.endReason,
+    };
+
     await Promise.all([
-      this.eventBus.broadcastToMatch(
-        state.matchId,
-        "matchEnded",
-        {
-          matchId: state.matchId,
-          winner: state.winnerId ?? null,
-          finalScore: { a: state.scoreA, b: state.scoreB },
-          eloDelta: { a: 0, b: 0 },
-          reason: state.endReason,
-        },
-        { recipientUserId: state.players[0].userId },
-      ),
-      this.eventBus.broadcastToMatch(
-        state.matchId,
-        "matchEnded",
-        {
-          matchId: state.matchId,
-          winner: state.winnerId ?? null,
-          finalScore: { a: state.scoreA, b: state.scoreB },
-          eloDelta: { a: 0, b: 0 },
-          reason: state.endReason,
-        },
-        { recipientUserId: state.players[1].userId },
-      ),
+      this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
+        recipientUserId: state.players[0].userId,
+      }),
+      this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
+        recipientUserId: state.players[1].userId,
+      }),
+      this.matchEventsRelay.emitToUser(state.players[0].userId, "matchEnded", payload),
+      this.matchEventsRelay.emitToUser(state.players[1].userId, "matchEnded", payload),
     ]);
 
     await this.matchSessionService.cleanupUserMappings(state);

@@ -162,6 +162,7 @@ describe("Match play BO3 (e2e)", () => {
     const round1ResolvedB = waitForEvent<RoundResolvedPayload>(playerB, "roundResolved");
 
     playerA.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "rock" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
     playerB.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "scissors" });
 
     const resolvedA = await round1ResolvedA;
@@ -178,6 +179,7 @@ describe("Match play BO3 (e2e)", () => {
     const round2ResolvedA = waitForEvent<RoundResolvedPayload>(playerA, "roundResolved");
 
     playerA.emit("play", { matchId, roundNumber: round2Start.roundNumber, move: "paper" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
     playerB.emit("play", { matchId, roundNumber: round2Start.roundNumber, move: "rock" });
     await round2ResolvedA;
 

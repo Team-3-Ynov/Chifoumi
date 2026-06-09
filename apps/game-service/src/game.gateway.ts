@@ -88,8 +88,12 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   async handleDisconnect(client: Socket): Promise<void> {
     const userId = client.data.userId as string | undefined;
     if (userId) {
-      await this.matchmakingService.leaveQueue(userId);
-      await this.redisService.removeUserSocket(userId, client.id);
+      try {
+        await this.matchmakingService.leaveQueue(userId);
+        await this.redisService.removeUserSocket(userId, client.id);
+      } catch {
+        // Redis may already be closed during app shutdown in e2e tests.
+      }
     }
   }
 }
