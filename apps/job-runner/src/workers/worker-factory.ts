@@ -3,6 +3,7 @@ import { Worker, type WorkerOptions } from "bullmq";
 import { Logger } from "nestjs-pino";
 import { JOB_RUNNER_CONFIG, type JobRunnerConfig, type WorkerQueueName } from "../config/env.js";
 import { WorkerMetricsService } from "../metrics/worker-metrics.service.js";
+import { MailService } from "../notifications/mail.service.js";
 import { getProcessorForQueue } from "./worker-processors.js";
 
 export type ManagedWorker = {
@@ -15,6 +16,7 @@ export class WorkerFactory {
   constructor(
     @Inject(JOB_RUNNER_CONFIG) private readonly config: JobRunnerConfig,
     private readonly metrics: WorkerMetricsService,
+    private readonly mailService: MailService,
     private readonly logger: Logger,
   ) {}
 
@@ -29,14 +31,34 @@ export class WorkerFactory {
       concurrency: this.config.WORKER_CONCURRENCY,
     };
 
-    const worker = new Worker(queue, getProcessorForQueue(queue), workerOptions);
+    const worker = new Worker(
+      queue,
+      getProcessorForQueue(queue, { mailService: this.mailService }),
+      workerOptions,
+    );
 
     worker.on("completed", () => {
       this.metrics.recordJobProcessed(queue, "completed");
     });
 
-    worker.on("failed", () => {
+    worker.on("failed", (job, error) => {
       this.metrics.recordJobProcessed(queue, "failed");
+
+      if (queue === "notifications" && job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+        this.logger.error(
+          {
+            worker_role: this.config.WORKER_ROLE,
+            queue,
+            job_name: job.name,
+            job_id: job.id,
+            to: (job.data as { to?: string }).to,
+            template: (job.data as { template?: string }).template,
+            attempts_made: job.attemptsMade,
+            err: error,
+          },
+          "Notification job failed permanently",
+        );
+      }
     });
 
     worker.on("error", (error) => {

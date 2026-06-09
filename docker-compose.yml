@@ -91,6 +91,7 @@ services:
       MAIL_TRANSPORT: mailhog
       MAIL_HOST: mailhog
       MAIL_PORT: 1025
+      MAIL_FROM: noreply@chifoumi.local
     restart: unless-stopped
 
 volumes:

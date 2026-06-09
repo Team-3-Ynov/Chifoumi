@@ -20,8 +20,17 @@ function createConfig(overrides: Partial<JobRunnerConfig> = {}): JobRunnerConfig
     REDIS_URL: "redis://localhost:6379",
     DATABASE_URL: "postgresql://app:password@localhost:5432/chifoumi",
     MAIL_TRANSPORT: "mailhog",
+    MAIL_HOST: "localhost",
+    MAIL_PORT: 1025,
+    MAIL_FROM: "noreply@chifoumi.local",
     CRON_ENABLED: false,
     ...overrides,
+  };
+}
+
+function createMailService(): { send: () => Promise<void> } {
+  return {
+    send: jest.fn(async () => undefined),
   };
 }
 
@@ -38,7 +47,7 @@ describe("WorkerFactory", () => {
     const config = createConfig({ WORKER_QUEUES: ["match-events"] });
     const metrics = new WorkerMetricsService(config);
     const logger = { log: jest.fn() } as unknown as Logger;
-    const factory = new WorkerFactoryClass(config, metrics, logger);
+    const factory = new WorkerFactoryClass(config, metrics, createMailService() as never, logger);
 
     const workers = factory.createWorkers();
 
@@ -64,7 +73,7 @@ describe("WorkerFactory", () => {
     });
     const metrics = new WorkerMetricsService(config);
     const logger = { log: jest.fn() } as unknown as Logger;
-    const factory = new WorkerFactoryClass(config, metrics, logger);
+    const factory = new WorkerFactoryClass(config, metrics, createMailService() as never, logger);
 
     const workers = factory.createWorkers();
 

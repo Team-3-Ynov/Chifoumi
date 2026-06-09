@@ -34,6 +34,9 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1, "REDIS_URL is required"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   MAIL_TRANSPORT: z.enum(["smtp", "mailhog"]).default("mailhog"),
+  MAIL_HOST: z.string().min(1).default("localhost"),
+  MAIL_PORT: z.coerce.number().int().positive().default(1025),
+  MAIL_FROM: z.string().email().default("noreply@chifoumi.local"),
   CRON_ENABLED: z
     .enum(["true", "false"])
     .default("false")

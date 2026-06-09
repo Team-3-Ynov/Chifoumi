@@ -2,6 +2,7 @@ import { jest } from "@jest/globals";
 import { ConflictException, UnauthorizedException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { NotificationsQueueService } from "../queues/notifications-queue.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { UsersService } from "../users/users.service.js";
 import { AuthService } from "./auth.service.js";
@@ -41,6 +42,9 @@ describe("AuthService", () => {
     setnx: jest.fn<RedisService["setnx"]>(),
     del: jest.fn<RedisService["del"]>(),
   };
+  const notificationsQueue = {
+    enqueueWelcomeMail: jest.fn<NotificationsQueueService["enqueueWelcomeMail"]>(),
+  };
   let authService: AuthService;
 
   beforeEach(async () => {
@@ -49,6 +53,7 @@ describe("AuthService", () => {
     redisService.setex.mockResolvedValue();
     redisService.setnx.mockResolvedValue(true);
     redisService.del.mockResolvedValue();
+    notificationsQueue.enqueueWelcomeMail.mockResolvedValue(undefined);
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) =>
       (callback as (tx: never) => Promise<unknown>)({
@@ -67,6 +72,7 @@ describe("AuthService", () => {
         { provide: PasswordService, useValue: passwordService },
         { provide: TokenService, useValue: tokenService },
         { provide: RedisService, useValue: redisService },
+        { provide: NotificationsQueueService, useValue: notificationsQueue },
       ],
     }).compile();
     authService = moduleRef.get(AuthService);
@@ -109,6 +115,10 @@ describe("AuthService", () => {
       passwordHash: "hash",
       displayName: "alice",
     });
+    expect(notificationsQueue.enqueueWelcomeMail).toHaveBeenCalledWith({
+      to: "a@b.com",
+      displayName: "alice",
+    });
     expect(prisma.refreshToken.create).toHaveBeenCalledWith({
       data: {
         userId: "u1",
@@ -118,6 +128,45 @@ describe("AuthService", () => {
     });
     expect(result.tokens.access).toBe("access");
     expect(result.tokens.refresh).toBe("refresh");
+  });
+
+  it("register still returns tokens when welcome mail enqueue fails", async () => {
+    usersService.findByEmail.mockResolvedValue(null);
+    passwordService.hash.mockResolvedValue("hash");
+    usersService.createUser.mockResolvedValue({
+      id: "u1",
+      email: "a@b.com",
+      displayName: "alice",
+      role: "player",
+    } as Awaited<ReturnType<UsersService["createUser"]>>);
+    usersService.toSafeUser.mockReturnValue({
+      id: "u1",
+      email: "a@b.com",
+      displayName: "alice",
+      role: "player",
+    });
+    notificationsQueue.enqueueWelcomeMail.mockRejectedValue(new Error("queue unavailable"));
+    tokenService.issueAccessToken.mockResolvedValue({ accessToken: "access" });
+    tokenService.issueRefreshToken.mockReturnValue({
+      refreshToken: "refresh",
+      refreshTokenHash: "hashrefresh",
+    });
+    tokenService.getRefreshExpiresAt.mockReturnValue(new Date("2030-01-01"));
+    prisma.refreshToken.create.mockResolvedValue(
+      {} as Awaited<ReturnType<PrismaService["refreshToken"]["create"]>>,
+    );
+
+    const result = await authService.register({
+      email: "a@b.com",
+      password: "password1234",
+      displayName: "alice",
+    });
+
+    expect(notificationsQueue.enqueueWelcomeMail).toHaveBeenCalledWith({
+      to: "a@b.com",
+      displayName: "alice",
+    });
+    expect(result.tokens).toEqual({ access: "access", refresh: "refresh" });
   });
 
   it("register throws ConflictException on duplicate without leaking field", async () => {

@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { NotificationsQueueService } from "../queues/notifications-queue.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { type SafeUser, UsersService } from "../users/users.service.js";
 import { PasswordService } from "./password.service.js";
@@ -21,6 +22,7 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
+    private readonly notificationsQueue: NotificationsQueueService,
   ) {}
 
   async register(input: {
@@ -42,6 +44,12 @@ export class AuthService {
         passwordHash,
         displayName: input.displayName,
       });
+      void this.notificationsQueue
+        .enqueueWelcomeMail({
+          to: email,
+          displayName: input.displayName,
+        })
+        .catch(() => undefined);
       return this.issueTokensForUser(user.id, user);
     } catch (error) {
       if (this.usersService.isUniqueConstraintError(error)) {

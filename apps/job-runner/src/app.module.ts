@@ -3,6 +3,8 @@ import { LoggerModule } from "nestjs-pino";
 import { ConfigModule } from "./config/config.module.js";
 import { CronSchedulerService } from "./cron/cron-scheduler.service.js";
 import { WorkerMetricsService } from "./metrics/worker-metrics.service.js";
+import { MailService } from "./notifications/mail.service.js";
+import { TemplateService } from "./notifications/template.service.js";
 import { RunnerService } from "./runner.service.js";
 import { WorkerFactory } from "./workers/worker-factory.js";
 
@@ -15,6 +17,13 @@ import { WorkerFactory } from "./workers/worker-factory.js";
     }),
     ConfigModule,
   ],
-  providers: [WorkerMetricsService, WorkerFactory, CronSchedulerService, RunnerService],
+  providers: [
+    WorkerMetricsService,
+    TemplateService,
+    MailService,
+    WorkerFactory,
+    CronSchedulerService,
+    RunnerService,
+  ],
 })
 export class AppModule {}
