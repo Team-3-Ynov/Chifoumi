@@ -3,6 +3,7 @@ import { Worker, type WorkerOptions } from "bullmq";
 import { Logger } from "nestjs-pino";
 import { JOB_RUNNER_CONFIG, type JobRunnerConfig, type WorkerQueueName } from "../config/env.js";
 import { WorkerMetricsService } from "../metrics/worker-metrics.service.js";
+import { MailService } from "../notifications/mail.service.js";
 import { MatchPersistenceService } from "../persistence/match-persistence.service.js";
 import { RedisInvalidationService } from "../redis/redis-invalidation.service.js";
 import { getProcessorForQueue } from "./worker-processors.js";
@@ -19,6 +20,7 @@ export class WorkerFactory {
     private readonly metrics: WorkerMetricsService,
     private readonly matchPersistence: MatchPersistenceService,
     private readonly redisInvalidation: RedisInvalidationService,
+    private readonly mailService: MailService,
     private readonly logger: Logger,
   ) {}
 
@@ -38,6 +40,7 @@ export class WorkerFactory {
       getProcessorForQueue(queue, {
         matchPersistence: this.matchPersistence,
         redisInvalidation: this.redisInvalidation,
+        mailService: this.mailService,
       }),
       workerOptions,
     );
@@ -48,6 +51,7 @@ export class WorkerFactory {
 
     worker.on("failed", (job, error) => {
       this.metrics.recordJobProcessed(queue, "failed");
+
       if (queue === "match-events" && job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
         this.logger.error(
           {
@@ -60,6 +64,22 @@ export class WorkerFactory {
             err: error,
           },
           "Match event job failed permanently",
+        );
+      }
+
+      if (queue === "notifications" && job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+        this.logger.error(
+          {
+            worker_role: this.config.WORKER_ROLE,
+            queue,
+            job_name: job.name,
+            job_id: job.id,
+            to: (job.data as { to?: string }).to,
+            template: (job.data as { template?: string }).template,
+            attempts_made: job.attemptsMade,
+            err: error,
+          },
+          "Notification job failed permanently",
         );
       }
     });

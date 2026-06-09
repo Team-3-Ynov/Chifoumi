@@ -3,6 +3,8 @@ import { LoggerModule } from "nestjs-pino";
 import { ConfigModule } from "./config/config.module.js";
 import { CronSchedulerService } from "./cron/cron-scheduler.service.js";
 import { WorkerMetricsService } from "./metrics/worker-metrics.service.js";
+import { MailService } from "./notifications/mail.service.js";
+import { TemplateService } from "./notifications/template.service.js";
 import { MatchPersistenceService } from "./persistence/match-persistence.service.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { RedisInvalidationService } from "./redis/redis-invalidation.service.js";
@@ -21,6 +23,8 @@ import { WorkerFactory } from "./workers/worker-factory.js";
   ],
   providers: [
     WorkerMetricsService,
+    TemplateService,
+    MailService,
     MatchPersistenceService,
     RedisInvalidationService,
     WorkerFactory,

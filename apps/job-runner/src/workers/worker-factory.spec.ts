@@ -21,6 +21,9 @@ function createConfig(overrides: Partial<JobRunnerConfig> = {}): JobRunnerConfig
     REDIS_URL: "redis://localhost:6379",
     DATABASE_URL: "postgresql://app:password@localhost:5432/chifoumi",
     MAIL_TRANSPORT: "mailhog",
+    MAIL_HOST: "localhost",
+    MAIL_PORT: 1025,
+    MAIL_FROM: "noreply@chifoumi.local",
     CRON_ENABLED: false,
     ...overrides,
   };
@@ -35,6 +38,12 @@ function createMatchPersistence(): { persistMatchEnded: () => Promise<boolean> }
 function createRedisInvalidation(): { invalidateLeaderboard: () => Promise<void> } {
   return {
     invalidateLeaderboard: jest.fn(async () => undefined),
+  };
+}
+
+function createMailService(): { send: () => Promise<void> } {
+  return {
+    send: jest.fn(async () => undefined),
   };
 }
 
@@ -56,6 +65,7 @@ describe("WorkerFactory", () => {
       metrics,
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
+      createMailService() as never,
       logger,
     );
 
@@ -88,6 +98,7 @@ describe("WorkerFactory", () => {
       metrics,
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
+      createMailService() as never,
       logger,
     );
 
