@@ -9,6 +9,14 @@ export type RedisQueueEntry = {
   rating: number;
 };
 
+const RELEASE_LOCK_IF_TOKEN_MATCHES_SCRIPT = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+else
+  return 0
+end
+`;
+
 const REMOVE_USER_SOCKET_IF_MATCH_SCRIPT = `
 if redis.call("GET", KEYS[1]) == ARGV[1] then
   return redis.call("DEL", KEYS[1])
@@ -16,6 +24,8 @@ else
   return 0
 end
 `;
+
+export type RedisMessageHandler = (message: string) => void;
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -55,6 +65,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async setnx(key: string, ttlSeconds: number, value = "1"): Promise<boolean> {
     const result = await this.requireClient().set(key, value, "EX", ttlSeconds, "NX");
     return result === "OK";
+  }
+
+  async releaseLock(key: string, token: string): Promise<boolean> {
+    const released = await this.requireClient().eval(
+      RELEASE_LOCK_IF_TOKEN_MATCHES_SCRIPT,
+      1,
+      key,
+      token,
+    );
+    return released === 1;
+  }
+
+  async subscribe(channel: string, handler: RedisMessageHandler): Promise<void> {
+    const subscriber = this.createSubscriber();
+    subscriber.on("message", (receivedChannel: string, message: string) => {
+      if (receivedChannel === channel) {
+        handler(message);
+      }
+    });
+    await subscriber.subscribe(channel);
   }
 
   async del(key: string): Promise<void> {
