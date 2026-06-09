@@ -27,6 +27,8 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV API_PORT=3000
 COPY --from=builder /app /app
+COPY apps/api/docker-entrypoint.sh /app/apps/api/docker-entrypoint.sh
+RUN chmod +x /app/apps/api/docker-entrypoint.sh
 USER node
 EXPOSE 3000
-CMD ["node", "apps/api/dist/main.js"]
+ENTRYPOINT ["/app/apps/api/docker-entrypoint.sh"]

@@ -40,6 +40,19 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: chifoumi_dev
+          POSTGRES_DB: chifoumi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
       redis:
         image: redis:7
         ports:
@@ -61,6 +74,9 @@ jobs:
 
       - name: Build database package
         run: pnpm --filter @chifoumi/db build
+
+      - name: Apply database migrations
+        run: pnpm --filter @chifoumi/db migrate:deploy
 
       - name: Test with coverage
         run: pnpm -r run --if-present test
