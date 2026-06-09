@@ -4,13 +4,13 @@ import { Redis } from "ioredis";
 import { Logger } from "nestjs-pino";
 import { JOB_RUNNER_CONFIG, type JobRunnerConfig } from "../config/env.js";
 
-const CRON_LOCK_KEY = "job-runner:cron-scheduler-lock";
 const CRON_LOCK_TTL_SECONDS = 60;
 
 @Injectable()
 export class CronSchedulerService implements OnModuleInit, OnModuleDestroy {
   private redis: Redis | null = null;
   private seasonsQueue: Queue | null = null;
+  private lockHeld = false;
 
   constructor(
     @Inject(JOB_RUNNER_CONFIG) private readonly config: JobRunnerConfig,
@@ -27,10 +27,6 @@ export class CronSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.redis = new Redis(this.config.REDIS_URL);
-    this.seasonsQueue = new Queue("seasons", {
-      connection: { url: this.config.REDIS_URL },
-      prefix: this.config.BULLMQ_PREFIX,
-    });
 
     const lockAcquired = await this.acquireSchedulerLock();
     if (!lockAcquired) {
@@ -38,8 +34,16 @@ export class CronSchedulerService implements OnModuleInit, OnModuleDestroy {
         { worker_role: this.config.WORKER_ROLE, queue: "seasons" },
         "Cron scheduler lock not acquired; skipping repeatable job registration",
       );
+      await this.redis.quit();
+      this.redis = null;
       return;
     }
+
+    this.lockHeld = true;
+    this.seasonsQueue = new Queue("seasons", {
+      connection: { url: this.config.REDIS_URL },
+      prefix: this.config.BULLMQ_PREFIX,
+    });
 
     await this.seasonsQueue.add(
       "season-reset",
@@ -58,9 +62,17 @@ export class CronSchedulerService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     await this.seasonsQueue?.close();
+    if (this.lockHeld && this.redis) {
+      await this.redis.del(this.cronLockKey());
+    }
     await this.redis?.quit();
     this.seasonsQueue = null;
     this.redis = null;
+    this.lockHeld = false;
+  }
+
+  private cronLockKey(): string {
+    return `${this.config.BULLMQ_PREFIX}:job-runner:cron-scheduler-lock`;
   }
 
   private async acquireSchedulerLock(): Promise<boolean> {
@@ -69,7 +81,7 @@ export class CronSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
 
     const result = await this.redis.set(
-      CRON_LOCK_KEY,
+      this.cronLockKey(),
       this.config.WORKER_ROLE,
       "EX",
       CRON_LOCK_TTL_SECONDS,

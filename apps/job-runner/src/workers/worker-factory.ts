@@ -39,6 +39,13 @@ export class WorkerFactory {
       this.metrics.recordJobProcessed(queue, "failed");
     });
 
+    worker.on("error", (error) => {
+      this.logger.error(
+        { worker_role: this.config.WORKER_ROLE, queue, err: error },
+        "BullMQ worker error",
+      );
+    });
+
     this.logger.log(
       {
         worker_role: this.config.WORKER_ROLE,

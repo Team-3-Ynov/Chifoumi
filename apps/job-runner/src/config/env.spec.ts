@@ -60,4 +60,14 @@ describe("loadEnv", () => {
     expect(() => loadEnv(env)).toThrow("process.exit:1");
     expect(console.error).toHaveBeenCalled();
   });
+
+  it("fails when WORKER_QUEUES contains an unknown queue", () => {
+    expect(() =>
+      loadEnv({
+        ...baseEnv,
+        WORKER_QUEUES: "match-events,unknown-queue",
+      }),
+    ).toThrow("process.exit:1");
+    expect(console.error).toHaveBeenCalled();
+  });
 });
