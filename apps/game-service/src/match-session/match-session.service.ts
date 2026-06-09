@@ -27,6 +27,13 @@ export class MatchSessionLockError extends Error {
   }
 }
 
+export class MatchSessionCorruptStateError extends Error {
+  constructor(matchId: string) {
+    super(`Match session state is corrupt: ${matchId}`);
+    this.name = "MatchSessionCorruptStateError";
+  }
+}
+
 @Injectable()
 export class MatchSessionService {
   constructor(
@@ -68,7 +75,11 @@ export class MatchSessionService {
     if (!serialized) {
       return null;
     }
-    return JSON.parse(serialized) as MatchState;
+    try {
+      return JSON.parse(serialized) as MatchState;
+    } catch {
+      return null;
+    }
   }
 
   async mutateState(
@@ -76,7 +87,8 @@ export class MatchSessionService {
     mutator: (state: MatchState) => MatchState | Promise<MatchState>,
   ): Promise<MatchState> {
     const lockKey = matchLockKey(matchId);
-    const lockAcquired = await this.redis.setnx(lockKey, MATCH_LOCK_TTL_SECONDS, uuidv4());
+    const lockToken = uuidv4();
+    const lockAcquired = await this.redis.setnx(lockKey, MATCH_LOCK_TTL_SECONDS, lockToken);
     if (!lockAcquired) {
       throw new MatchSessionLockError(matchId);
     }
@@ -91,7 +103,7 @@ export class MatchSessionService {
       await this.saveState(nextState);
       return nextState;
     } finally {
-      await this.redis.del(lockKey);
+      await this.redis.releaseLock(lockKey, lockToken);
     }
   }
 

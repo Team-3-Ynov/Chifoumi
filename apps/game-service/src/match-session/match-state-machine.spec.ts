@@ -39,6 +39,23 @@ describe("match state machine", () => {
     });
   });
 
+  it("advances the round without changing scores after a draw", () => {
+    const resolving = transitionMatchState(baseState, { type: "PLAYS_RECEIVED" });
+    const next = transitionMatchState(resolving, {
+      type: "ROUND_RESOLVED",
+      winner: "DRAW",
+      now: new Date("2026-06-09T10:00:01.000Z"),
+    });
+
+    expect(next).toMatchObject({
+      status: "WAITING_PLAYS",
+      scoreA: 0,
+      scoreB: 0,
+      currentRound: 2,
+      roundDeadline: "2026-06-09T10:00:06.000Z",
+    });
+  });
+
   it("ends the match once a player reaches two wins", () => {
     const resolving: MatchState = {
       ...baseState,

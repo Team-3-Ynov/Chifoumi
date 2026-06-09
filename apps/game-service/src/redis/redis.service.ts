@@ -4,6 +4,14 @@ import { REDIS_CONFIG, type RedisConfig } from "../config/redis.config.js";
 
 const USER_SOCKET_TTL_SECONDS = 3600;
 
+const RELEASE_LOCK_IF_TOKEN_MATCHES_SCRIPT = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+else
+  return 0
+end
+`;
+
 const REMOVE_USER_SOCKET_IF_MATCH_SCRIPT = `
 if redis.call("GET", KEYS[1]) == ARGV[1] then
   return redis.call("DEL", KEYS[1])
@@ -17,7 +25,6 @@ export type RedisMessageHandler = (message: string) => void;
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: Redis | null = null;
-  private subscriber: Redis | null = null;
 
   constructor(@Inject(REDIS_CONFIG) private readonly redisConfig: RedisConfig) {}
 
@@ -27,12 +34,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.client = new Redis(this.redisConfig.url);
-    this.subscriber = new Redis(this.redisConfig.url);
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.subscriber?.quit();
     await this.client?.quit();
+  }
+
+  createSubscriber(): Redis {
+    return new Redis(this.redisConfig.url);
   }
 
   async get(key: string): Promise<string | null> {
@@ -48,6 +57,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return result === "OK";
   }
 
+  async releaseLock(key: string, token: string): Promise<boolean> {
+    const released = await this.requireClient().eval(
+      RELEASE_LOCK_IF_TOKEN_MATCHES_SCRIPT,
+      1,
+      key,
+      token,
+    );
+    return released === 1;
+  }
+
   async del(key: string): Promise<void> {
     await this.requireClient().del(key);
   }
@@ -57,7 +76,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async subscribe(channel: string, handler: RedisMessageHandler): Promise<void> {
-    const subscriber = this.requireSubscriber();
+    const subscriber = this.createSubscriber();
     subscriber.on("message", (receivedChannel: string, message: string) => {
       if (receivedChannel === channel) {
         handler(message);
@@ -98,12 +117,5 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       throw new Error("Redis client is not connected");
     }
     return this.client;
-  }
-
-  private requireSubscriber(): Redis {
-    if (!this.subscriber) {
-      throw new Error("Redis subscriber is not connected");
-    }
-    return this.subscriber;
   }
 }
