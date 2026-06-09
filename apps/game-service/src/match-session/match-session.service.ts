@@ -4,6 +4,7 @@ import { RedisService } from "../redis/redis.service.js";
 import { MatchEventBus } from "./match-event-bus.js";
 import {
   emptyRoundPlays,
+  MATCH_LOCK_TTL_SECONDS,
   MATCH_SESSION_TTL_SECONDS,
   type MatchPlayer,
   type MatchState,
@@ -24,6 +25,13 @@ export class MatchSessionLockError extends Error {
   constructor(matchId: string) {
     super(`Match session is locked: ${matchId}`);
     this.name = "MatchSessionLockError";
+  }
+}
+
+export class MatchSessionCorruptStateError extends Error {
+  constructor(matchId: string) {
+    super(`Match session state is corrupt: ${matchId}`);
+    this.name = "MatchSessionCorruptStateError";
   }
 }
 
@@ -90,7 +98,7 @@ export class MatchSessionService {
   ): Promise<MatchState> {
     const lockKey = matchLockKey(matchId);
     const lockToken = uuidv4();
-    const lockAcquired = await this.redis.setnx(lockKey, 2, lockToken);
+    const lockAcquired = await this.redis.setnx(lockKey, MATCH_LOCK_TTL_SECONDS, lockToken);
     if (!lockAcquired) {
       throw new MatchSessionLockError(matchId);
     }

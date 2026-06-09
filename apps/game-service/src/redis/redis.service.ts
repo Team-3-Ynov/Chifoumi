@@ -4,11 +4,6 @@ import { REDIS_CONFIG, type RedisConfig } from "../config/redis.config.js";
 
 const USER_SOCKET_TTL_SECONDS = 3600;
 
-export type RedisQueueEntry = {
-  userId: string;
-  rating: number;
-};
-
 const RELEASE_LOCK_IF_TOKEN_MATCHES_SCRIPT = `
 if redis.call("GET", KEYS[1]) == ARGV[1] then
   return redis.call("DEL", KEYS[1])
@@ -26,6 +21,11 @@ end
 `;
 
 export type RedisMessageHandler = (message: string) => void;
+
+export type RedisQueueEntry = {
+  userId: string;
+  rating: number;
+};
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -59,7 +59,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async setex(key: string, ttlSeconds: number, value: string): Promise<void> {
-    await this.requireClient().setex(key, ttlSeconds, value);
+    await this.requireClient().set(key, value, "EX", ttlSeconds);
   }
 
   async setnx(key: string, ttlSeconds: number, value = "1"): Promise<boolean> {
@@ -75,16 +75,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       token,
     );
     return released === 1;
-  }
-
-  async subscribe(channel: string, handler: RedisMessageHandler): Promise<void> {
-    const subscriber = this.createSubscriber();
-    subscriber.on("message", (receivedChannel: string, message: string) => {
-      if (receivedChannel === channel) {
-        handler(message);
-      }
-    });
-    await subscriber.subscribe(channel);
   }
 
   async del(key: string): Promise<void> {
@@ -139,8 +129,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return count;
   }
 
-  async publish(channel: string, message: string): Promise<void> {
-    await this.requireClient().publish(channel, message);
+  async publish(channel: string, payload: string): Promise<void> {
+    await this.requireClient().publish(channel, payload);
+  }
+
+  async subscribe(channel: string, handler: RedisMessageHandler): Promise<void> {
+    const subscriber = this.createSubscriber();
+    subscriber.on("message", (receivedChannel: string, message: string) => {
+      if (receivedChannel === channel) {
+        handler(message);
+      }
+    });
+    await subscriber.subscribe(channel);
   }
 
   async evalScript<T>(script: string, keys: string[], args: string[]): Promise<T> {

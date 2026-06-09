@@ -54,6 +54,7 @@ describe("match state machine", () => {
       scoreA: 0,
       scoreB: 0,
       currentRound: 2,
+      roundDeadline: "2026-06-09T10:00:06.000Z",
       roundPlays: { a: null, b: null },
     });
   });

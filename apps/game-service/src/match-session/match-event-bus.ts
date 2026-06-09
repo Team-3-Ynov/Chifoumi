@@ -27,4 +27,13 @@ export class MatchEventBus {
       JSON.stringify({ event, recipientUserId: options?.recipientUserId, payload }),
     );
   }
+
+  async subscribeToMatch(
+    matchId: string,
+    handler: (event: SerializedMatchEvent) => void,
+  ): Promise<void> {
+    await this.redis.subscribe(matchChannel(matchId), (message) => {
+      handler(JSON.parse(message) as SerializedMatchEvent);
+    });
+  }
 }
