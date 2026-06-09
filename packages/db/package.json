@@ -13,6 +13,8 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "typecheck": "prisma generate && tsc -p tsconfig.json",
     "seed": "tsx prisma/seed.ts",
+    "seed:bench": "tsx scripts/seed-bench.ts",
+    "explain:queries": "tsx scripts/explain-queries.ts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "keywords": [],
