@@ -21,6 +21,14 @@ export type RoundPlays = {
   b: Move | null;
 };
 
+export type ResolvedRound = {
+  roundNumber: number;
+  moveA: Move | null;
+  moveB: Move | null;
+  winner: "a" | "b" | "draw";
+  resolvedAt: string;
+};
+
 export type MatchState = {
   matchId: string;
   players: [MatchPlayer, MatchPlayer];
@@ -31,6 +39,7 @@ export type MatchState = {
   startedAt: string;
   roundDeadline: string;
   roundPlays: RoundPlays;
+  rounds?: ResolvedRound[];
   winnerId?: string;
   endReason?: MatchEndReason;
 };

@@ -128,11 +128,28 @@ export class MatchPlayService implements OnModuleDestroy {
 
       const resolving = transitionMatchState(updated, { type: "PLAYS_RECEIVED" });
       const winner = resolveRps(roundPlays.a, roundPlays.b);
-      return transitionMatchState(resolving, {
-        type: "ROUND_RESOLVED",
-        winner,
-        now: new Date(),
-      });
+      const resolvedAt = new Date();
+      const winnerLabel = winner === "DRAW" ? "draw" : winner === "A" ? "a" : "b";
+      return transitionMatchState(
+        {
+          ...resolving,
+          rounds: [
+            ...(normalized.rounds ?? []),
+            {
+              roundNumber: normalized.currentRound,
+              moveA: roundPlays.a,
+              moveB: roundPlays.b,
+              winner: winnerLabel,
+              resolvedAt: resolvedAt.toISOString(),
+            },
+          ],
+        },
+        {
+          type: "ROUND_RESOLVED",
+          winner,
+          now: resolvedAt,
+        },
+      );
     });
 
     if (!resolution) {
@@ -154,12 +171,29 @@ export class MatchPlayService implements OnModuleDestroy {
           : state.roundPlays.b === null && state.roundPlays.a !== null
             ? "B"
             : "A";
+      const winnerLabel = silentPlayer === "A" ? "b" : "a";
 
-      return transitionMatchState(state, {
-        type: "TIMEOUT",
-        silentPlayer,
-        now: new Date(),
-      });
+      const resolvedAt = new Date();
+      return transitionMatchState(
+        {
+          ...state,
+          rounds: [
+            ...(state.rounds ?? []),
+            {
+              roundNumber,
+              moveA: state.roundPlays.a,
+              moveB: state.roundPlays.b,
+              winner: winnerLabel,
+              resolvedAt: resolvedAt.toISOString(),
+            },
+          ],
+        },
+        {
+          type: "TIMEOUT",
+          silentPlayer,
+          now: resolvedAt,
+        },
+      );
     });
 
     if (nextState.status === "ENDED") {
