@@ -40,6 +40,21 @@ describe("computeElo", () => {
     });
   });
 
+  it("applies each player's K-factor independently on a draw", () => {
+    expect(computeElo(1000, 1000, "DRAW", 3, 30)).toEqual({
+      newRatingA: 1000,
+      newRatingB: 1000,
+      deltaA: 0,
+      deltaB: 0,
+    });
+    expect(computeElo(900, 1100, "DRAW", 3, 30)).toEqual({
+      newRatingA: 910,
+      newRatingB: 1092,
+      deltaA: 10,
+      deltaB: -8,
+    });
+  });
+
   it("handles rating edge cases", () => {
     expect(computeElo(0, 9999, "DRAW", 30, 30)).toEqual({
       newRatingA: 16,
@@ -61,6 +76,9 @@ describe("computeElo", () => {
       expect.objectContaining({ code: "INVALID_GAMES_PLAYED" }),
     );
     expect(() => computeElo(1000, 1000, "A", 30, Number.NaN)).toThrow(EloError);
+    expect(() => computeElo(1000, 1000, "A", 29.9, 30)).toThrow(
+      expect.objectContaining({ code: "INVALID_GAMES_PLAYED" }),
+    );
   });
 
   it("throws a typed EloError for an invalid winner", () => {

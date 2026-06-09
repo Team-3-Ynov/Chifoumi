@@ -26,5 +26,8 @@ describe("getKFactor", () => {
     expect(() => getKFactor(1000, -1)).toThrow(
       expect.objectContaining({ code: "INVALID_GAMES_PLAYED" }),
     );
+    expect(() => getKFactor(1000, 29.9)).toThrow(
+      expect.objectContaining({ code: "INVALID_GAMES_PLAYED" }),
+    );
   });
 });
