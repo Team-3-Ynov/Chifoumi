@@ -1,0 +1,11 @@
+# Prometheus self-scrape only for US-030 stack bootstrap.
+# Application targets (API, game-service, job-runner) are planned in US-039.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

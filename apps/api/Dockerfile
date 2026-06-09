@@ -27,9 +27,9 @@ RUN pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/api build
 FROM base AS runner
 ENV NODE_ENV=production
 ENV API_PORT=3000
-COPY --from=builder /app /app
-COPY apps/api/docker-entrypoint.sh /app/apps/api/docker-entrypoint.sh
-RUN chmod +x /app/apps/api/docker-entrypoint.sh
+COPY --from=builder --chown=node:node /app /app
+COPY --chown=node:node apps/api/docker-migrate.sh /app/apps/api/docker-migrate.sh
+RUN chmod +x /app/apps/api/docker-migrate.sh
 USER node
 EXPOSE 3000
-ENTRYPOINT ["/app/apps/api/docker-entrypoint.sh"]
+CMD ["node", "apps/api/dist/main.js"]

@@ -7,6 +7,7 @@ export class HealthController {
     return {
       status: "ok",
       service: "api",
+      instance: process.env.INSTANCE_ID ?? "api",
       version: "1.0.0",
     };
   }
