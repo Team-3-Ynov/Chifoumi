@@ -15,7 +15,6 @@ import {
 import { transitionMatchState } from "../match-session/match-state-machine.js";
 import { isValidMove, resolveRound as resolveRps } from "../rps/resolve.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
-import { MatchEventsRelayService } from "./match-events-relay.service.js";
 
 export type PlayInput = {
   userId: string;
@@ -34,7 +33,7 @@ export class PlayValidationError extends Error {
 }
 
 type ActiveTimer = {
-  timeout: NodeJS.Timeout;
+  timeout: ReturnType<typeof setTimeout>;
   roundNumber: number;
 };
 
@@ -51,7 +50,6 @@ export class MatchPlayService implements OnModuleDestroy {
   constructor(
     private readonly matchSessionService: MatchSessionService,
     private readonly eventBus: MatchEventBus,
-    private readonly matchEventsRelay: MatchEventsRelayService,
     private readonly matchEndedPublisher: MatchEndedPublisher,
     private readonly logger: Logger,
   ) {}
@@ -201,8 +199,6 @@ export class MatchPlayService implements OnModuleDestroy {
       this.eventBus.broadcastToMatch(state.matchId, "roundResolved", payloadB, {
         recipientUserId: state.players[1].userId,
       }),
-      this.matchEventsRelay.emitToUser(state.players[0].userId, "roundResolved", payloadA),
-      this.matchEventsRelay.emitToUser(state.players[1].userId, "roundResolved", payloadB),
     ]);
 
     if (state.status === "ENDED") {
@@ -232,8 +228,6 @@ export class MatchPlayService implements OnModuleDestroy {
       this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
         recipientUserId: state.players[1].userId,
       }),
-      this.matchEventsRelay.emitToUser(state.players[0].userId, "matchEnded", payload),
-      this.matchEventsRelay.emitToUser(state.players[1].userId, "matchEnded", payload),
     ]);
 
     await this.matchSessionService.cleanupUserMappings(state);
@@ -249,7 +243,6 @@ export class MatchPlayService implements OnModuleDestroy {
         this.logger.warn({ matchId, roundNumber, error }, "round timeout handling failed");
       });
     }, delayMs);
-    timeout.unref();
 
     this.timers.set(matchId, { timeout, roundNumber });
   }

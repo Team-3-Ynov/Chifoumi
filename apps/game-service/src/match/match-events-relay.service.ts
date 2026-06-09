@@ -15,17 +15,6 @@ export class MatchEventsRelayService implements OnModuleInit, OnModuleDestroy {
     this.server = server;
   }
 
-  async emitToUser(userId: string, event: string, payload: unknown): Promise<void> {
-    if (!this.server) {
-      return;
-    }
-
-    const socketId = await this.redisService.getUserSocket(userId);
-    if (socketId) {
-      this.server.to(socketId).emit(event, payload);
-    }
-  }
-
   async onModuleInit(): Promise<void> {
     if (process.env.SKIP_REDIS_CONNECT === "true") {
       return;

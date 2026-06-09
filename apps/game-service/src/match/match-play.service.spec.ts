@@ -5,7 +5,6 @@ import { MatchEventBus } from "../match-session/match-event-bus.js";
 import { MatchSessionService } from "../match-session/match-session.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
-import { MatchEventsRelayService } from "./match-events-relay.service.js";
 import { MatchPlayService, PlayValidationError } from "./match-play.service.js";
 
 describe("MatchPlayService", () => {
@@ -31,19 +30,9 @@ describe("MatchPlayService", () => {
       }),
     } as unknown as MatchEndedPublisher;
 
-    const matchEventsRelay = {
-      emitToUser: jest.fn(async () => undefined),
-    } as unknown as MatchEventsRelayService;
-
     const logger = { warn: jest.fn() } as unknown as Logger;
 
-    service = new MatchPlayService(
-      matchSessionService,
-      eventBus,
-      matchEventsRelay,
-      matchEndedPublisher,
-      logger,
-    );
+    service = new MatchPlayService(matchSessionService, eventBus, matchEndedPublisher, logger);
 
     await matchSessionService.create({
       matchId: "match-1",
@@ -122,6 +111,21 @@ describe("MatchPlayService", () => {
         move: "rock",
       }),
     ).rejects.toMatchObject({ code: "WRONG_ROUND" });
+  });
+
+  it("publishes roundResolved exactly once per player on the event bus", async () => {
+    const broadcastSpy = jest.spyOn(eventBus, "broadcastToMatch");
+
+    await service.submitPlay({ userId: "a", matchId: "match-1", roundNumber: 1, move: "rock" });
+    await service.submitPlay({ userId: "b", matchId: "match-1", roundNumber: 1, move: "scissors" });
+
+    const roundResolvedCalls = broadcastSpy.mock.calls.filter(
+      (call) => call[1] === "roundResolved",
+    );
+    expect(roundResolvedCalls).toHaveLength(2);
+    expect(roundResolvedCalls.map((call) => call[3]?.recipientUserId).sort()).toEqual(["a", "b"]);
+
+    broadcastSpy.mockRestore();
   });
 
   it("does not increment score on a draw", async () => {

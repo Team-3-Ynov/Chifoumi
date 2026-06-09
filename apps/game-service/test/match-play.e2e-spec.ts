@@ -155,6 +155,58 @@ describe("Match play BO3 (e2e)", () => {
     };
   }
 
+  it("emits roundResolved and matchEnded exactly once per player", async () => {
+    const { playerA, playerB, matchId, roundStart } = await pairPlayers();
+
+    let roundResolvedCountA = 0;
+    let roundResolvedCountB = 0;
+    let matchEndedCountA = 0;
+    let matchEndedCountB = 0;
+
+    playerA.on("roundResolved", () => {
+      roundResolvedCountA += 1;
+    });
+    playerB.on("roundResolved", () => {
+      roundResolvedCountB += 1;
+    });
+    playerA.on("matchEnded", () => {
+      matchEndedCountA += 1;
+    });
+    playerB.on("matchEnded", () => {
+      matchEndedCountB += 1;
+    });
+
+    const round1ResolvedA = waitForEvent<RoundResolvedPayload>(playerA, "roundResolved");
+    const round1ResolvedB = waitForEvent<RoundResolvedPayload>(playerB, "roundResolved");
+    const matchEndedA = waitForEvent<MatchEndedPayload>(playerA, "matchEnded");
+    const matchEndedB = waitForEvent<MatchEndedPayload>(playerB, "matchEnded");
+
+    playerA.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "rock" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    playerB.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "scissors" });
+    await round1ResolvedA;
+    await round1ResolvedB;
+
+    const round2Start = await waitForEvent<RoundStartPayload>(playerA, "roundStart");
+    await waitForEvent<RoundStartPayload>(playerB, "roundStart");
+
+    playerA.emit("play", { matchId, roundNumber: round2Start.roundNumber, move: "paper" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    playerB.emit("play", { matchId, roundNumber: round2Start.roundNumber, move: "rock" });
+    await matchEndedA;
+    await matchEndedB;
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(roundResolvedCountA).toBe(2);
+    expect(roundResolvedCountB).toBe(2);
+    expect(matchEndedCountA).toBe(1);
+    expect(matchEndedCountB).toBe(1);
+
+    playerA.disconnect();
+    playerB.disconnect();
+  });
+
   it("plays a full 2-0 BO3 match with roundResolved and matchEnded", async () => {
     const { playerA, playerB, matchId, roundStart } = await pairPlayers();
 
