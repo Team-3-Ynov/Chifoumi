@@ -1,7 +1,8 @@
 import { Module } from "@nestjs/common";
+import { MatchModule } from "../match/match.module.js";
+import { MatchSessionModule } from "../match-session/match-session.module.js";
 import { MetricsController } from "../metrics/metrics.controller.js";
 import { RedisModule } from "../redis/redis.module.js";
-import { MatchSessionService } from "./match-session.service.js";
 import { MatchmakingGateway } from "./matchmaking.gateway.js";
 import { MatchmakingService } from "./matchmaking.service.js";
 import { MatchmakingEventsService } from "./matchmaking-events.service.js";
@@ -10,12 +11,11 @@ import { MatchmakingWorkerService } from "./matchmaking-worker.service.js";
 import { RatingService } from "./rating.service.js";
 
 @Module({
-  imports: [RedisModule],
+  imports: [RedisModule, MatchSessionModule, MatchModule],
   controllers: [MetricsController],
   providers: [
     RatingService,
     MatchmakingService,
-    MatchSessionService,
     MatchmakingWorkerService,
     MatchmakingEventsService,
     MatchmakingMetricsService,

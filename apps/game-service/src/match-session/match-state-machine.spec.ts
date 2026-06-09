@@ -13,6 +13,7 @@ const baseState: MatchState = {
   status: "WAITING_PLAYS",
   startedAt: "2026-06-09T10:00:00.000Z",
   roundDeadline: "2026-06-09T10:00:05.000Z",
+  roundPlays: { a: null, b: null },
 };
 
 describe("match state machine", () => {
@@ -36,6 +37,7 @@ describe("match state machine", () => {
       scoreB: 0,
       currentRound: 2,
       roundDeadline: "2026-06-09T10:00:06.000Z",
+      roundPlays: { a: null, b: null },
     });
   });
 
@@ -53,6 +55,7 @@ describe("match state machine", () => {
       scoreB: 0,
       currentRound: 2,
       roundDeadline: "2026-06-09T10:00:06.000Z",
+      roundPlays: { a: null, b: null },
     });
   });
 
@@ -74,6 +77,27 @@ describe("match state machine", () => {
       scoreA: 2,
       winnerId: "a",
       endReason: "BEST_OF_3",
+    });
+  });
+
+  it("ends in a draw after max rounds without a winner", () => {
+    const resolving: MatchState = {
+      ...baseState,
+      status: "RESOLVING",
+      scoreA: 1,
+      scoreB: 1,
+      currentRound: 5,
+    };
+    const next = transitionMatchState(resolving, {
+      type: "ROUND_RESOLVED",
+      winner: "DRAW",
+      now: new Date("2026-06-09T10:00:20.000Z"),
+    });
+
+    expect(next).toMatchObject({
+      status: "ENDED",
+      endReason: "MAX_ROUNDS_DRAW",
+      winnerId: undefined,
     });
   });
 

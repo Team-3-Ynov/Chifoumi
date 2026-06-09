@@ -1,8 +1,11 @@
 import {
+  emptyRoundPlays,
+  MAX_ROUNDS,
   type MatchEndReason,
   type MatchState,
   type MatchStatus,
   ROUND_DEADLINE_MS,
+  WINS_TO_END,
 } from "./match-session.types.js";
 
 export class InvalidMatchTransitionError extends Error {
@@ -51,9 +54,13 @@ function resolveRound(state: MatchState, winner: "A" | "B" | "DRAW", now: Date):
   const scoreA = state.scoreA + (winner === "A" ? 1 : 0);
   const scoreB = state.scoreB + (winner === "B" ? 1 : 0);
 
-  if (scoreA === 2 || scoreB === 2) {
-    const winnerId = scoreA === 2 ? state.players[0].userId : state.players[1].userId;
+  if (scoreA === WINS_TO_END || scoreB === WINS_TO_END) {
+    const winnerId = scoreA === WINS_TO_END ? state.players[0].userId : state.players[1].userId;
     return endMatch({ ...state, scoreA, scoreB }, winnerId, "BEST_OF_3");
+  }
+
+  if (state.currentRound >= MAX_ROUNDS) {
+    return endMatch({ ...state, scoreA, scoreB }, null, "MAX_ROUNDS_DRAW");
   }
 
   return {
@@ -63,14 +70,19 @@ function resolveRound(state: MatchState, winner: "A" | "B" | "DRAW", now: Date):
     status: "WAITING_PLAYS",
     currentRound: state.currentRound + 1,
     roundDeadline: new Date(now.getTime() + ROUND_DEADLINE_MS).toISOString(),
+    roundPlays: emptyRoundPlays(),
   };
 }
 
-function endMatch(state: MatchState, winnerId: string, endReason: MatchEndReason): MatchState {
+function endMatch(
+  state: MatchState,
+  winnerId: string | null,
+  endReason: MatchEndReason,
+): MatchState {
   return {
     ...state,
     status: "ENDED",
-    winnerId,
+    winnerId: winnerId ?? undefined,
     endReason,
   };
 }

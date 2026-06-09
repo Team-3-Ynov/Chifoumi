@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import Redis from "ioredis-mock";
 import { Logger } from "nestjs-pino";
+import { MatchPlayService } from "../match/match-play.service.js";
+import { MatchEventBus } from "../match-session/match-event-bus.js";
+import { MatchSessionService } from "../match-session/match-session.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import { MatchSessionService } from "./match-session.service.js";
 import {
   MATCHMAKING_QUEUE_KEY,
   matchByUserKey,
@@ -18,7 +20,11 @@ import { RatingService } from "./rating.service.js";
 function createWorker(redisService: RedisService): MatchmakingWorkerService {
   const ratingService = new RatingService(redisService);
   const matchmakingService = new MatchmakingService(redisService, ratingService);
-  const matchSessionService = new MatchSessionService(redisService);
+  const eventBus = new MatchEventBus(redisService);
+  const matchSessionService = new MatchSessionService(redisService, eventBus);
+  const matchPlayService = {
+    onMatchStarted: jest.fn(async () => undefined),
+  } as unknown as MatchPlayService;
   const metricsService = new MatchmakingMetricsService();
   const logger = { log: jest.fn() } as unknown as Logger;
 
@@ -26,6 +32,7 @@ function createWorker(redisService: RedisService): MatchmakingWorkerService {
     redisService,
     matchmakingService,
     matchSessionService,
+    matchPlayService,
     metricsService,
     logger,
   );

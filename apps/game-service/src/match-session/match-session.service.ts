@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { RedisService } from "../redis/redis.service.js";
 import { MatchEventBus } from "./match-event-bus.js";
 import {
+  emptyRoundPlays,
   MATCH_LOCK_TTL_SECONDS,
   MATCH_SESSION_TTL_SECONDS,
   type MatchPlayer,
@@ -41,28 +42,37 @@ export class MatchSessionService {
     private readonly eventBus: MatchEventBus,
   ) {}
 
-  async create(input: {
-    players: [MatchPlayer, MatchPlayer];
-    matchId?: string;
-    now?: Date;
-  }): Promise<MatchState> {
-    const now = input.now ?? new Date();
-    const matchId = input.matchId ?? uuidv4();
-    const state: MatchState = {
+  buildInitialState(
+    playerA: MatchPlayer,
+    playerB: MatchPlayer,
+    matchId = uuidv4(),
+    now = new Date(),
+  ): MatchState {
+    return {
       matchId,
-      players: input.players,
+      players: [playerA, playerB],
       scoreA: 0,
       scoreB: 0,
       currentRound: 1,
       status: "WAITING_PLAYS",
       startedAt: now.toISOString(),
       roundDeadline: new Date(now.getTime() + ROUND_DEADLINE_MS).toISOString(),
+      roundPlays: emptyRoundPlays(),
     };
+  }
+
+  async create(input: {
+    players: [MatchPlayer, MatchPlayer];
+    matchId?: string;
+    now?: Date;
+  }): Promise<MatchState> {
+    const now = input.now ?? new Date();
+    const state = this.buildInitialState(input.players[0], input.players[1], input.matchId, now);
 
     await this.saveState(state);
     await Promise.all(
       input.players.map((player) =>
-        this.redis.setex(userMatchKey(player.userId), MATCH_SESSION_TTL_SECONDS, matchId),
+        this.redis.setex(userMatchKey(player.userId), MATCH_SESSION_TTL_SECONDS, state.matchId),
       ),
     );
     await this.broadcastInitialEvents(state);
@@ -107,15 +117,20 @@ export class MatchSessionService {
     }
   }
 
-  private async saveState(state: MatchState): Promise<void> {
-    await this.redis.setex(
-      matchStateKey(state.matchId),
-      MATCH_SESSION_TTL_SECONDS,
-      JSON.stringify(state),
+  async persistStateOnly(state: MatchState): Promise<void> {
+    await this.saveState(state);
+    await Promise.all(
+      state.players.map((player) =>
+        this.redis.setex(userMatchKey(player.userId), MATCH_SESSION_TTL_SECONDS, state.matchId),
+      ),
     );
   }
 
-  private async broadcastInitialEvents(state: MatchState): Promise<void> {
+  async cleanupUserMappings(state: MatchState): Promise<void> {
+    await Promise.all(state.players.map((player) => this.redis.del(userMatchKey(player.userId))));
+  }
+
+  async broadcastInitialEvents(state: MatchState): Promise<void> {
     const [playerA, playerB] = state.players;
     await Promise.all([
       this.eventBus.broadcastToMatch(
@@ -126,9 +141,7 @@ export class MatchSessionService {
           opponent: playerB,
           bestOf: 3,
         },
-        {
-          recipientUserId: playerA.userId,
-        },
+        { recipientUserId: playerA.userId },
       ),
       this.eventBus.broadcastToMatch(
         state.matchId,
@@ -138,9 +151,7 @@ export class MatchSessionService {
           opponent: playerA,
           bestOf: 3,
         },
-        {
-          recipientUserId: playerB.userId,
-        },
+        { recipientUserId: playerB.userId },
       ),
       this.eventBus.broadcastToMatch(state.matchId, "roundStart", {
         matchId: state.matchId,
@@ -148,5 +159,21 @@ export class MatchSessionService {
         deadline: state.roundDeadline,
       }),
     ]);
+  }
+
+  async broadcastRoundStart(state: MatchState): Promise<void> {
+    await this.eventBus.broadcastToMatch(state.matchId, "roundStart", {
+      matchId: state.matchId,
+      roundNumber: state.currentRound,
+      deadline: state.roundDeadline,
+    });
+  }
+
+  private async saveState(state: MatchState): Promise<void> {
+    await this.redis.setex(
+      matchStateKey(state.matchId),
+      MATCH_SESSION_TTL_SECONDS,
+      JSON.stringify(state),
+    );
   }
 }

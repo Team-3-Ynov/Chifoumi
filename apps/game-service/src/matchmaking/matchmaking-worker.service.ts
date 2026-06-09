@@ -1,16 +1,14 @@
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import { v4 as uuidv4 } from "uuid";
+import { MatchPlayService } from "../match/match-play.service.js";
+import { MatchSessionService } from "../match-session/match-session.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { getEloWindow, ratingsMatch } from "./elo-window.js";
-import { MatchSessionService } from "./match-session.service.js";
 import {
-  BEST_OF,
-  MATCHMAKING_MATCH_FOUND_CHANNEL,
   MATCHMAKING_PAIR_LOCK_TTL_SECONDS,
   MATCHMAKING_QUEUE_KEY,
   MATCHMAKING_WORKER_INTERVAL_MS,
-  type MatchFoundEvent,
   matchmakingPairLockKey,
   type QueueMemberMeta,
 } from "./matchmaking.constants.js";
@@ -57,6 +55,7 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly redisService: RedisService,
     private readonly matchmakingService: MatchmakingService,
     private readonly matchSessionService: MatchSessionService,
+    private readonly matchPlayService: MatchPlayService,
     private readonly metricsService: MatchmakingMetricsService,
     private readonly logger: Logger,
   ) {}
@@ -161,7 +160,7 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
     }
 
     const matchId = uuidv4();
-    const matchState = this.matchSessionService.buildMatchState(
+    const matchState = this.matchSessionService.buildInitialState(
       {
         userId: playerA.userId,
         displayName: playerA.displayName,
@@ -173,6 +172,7 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
         rating: playerB.rating,
       },
       matchId,
+      new Date(now),
     );
 
     const committed = await this.redisService.evalScript<number>(
@@ -198,8 +198,8 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
     this.metricsService.observeMatchDuration(playerA.queuedAt, now);
     this.metricsService.observeMatchDuration(playerB.queuedAt, now);
 
-    await this.publishMatchFound(playerA, playerB, matchId);
-    await this.publishMatchFound(playerB, playerA, matchId);
+    await this.matchSessionService.broadcastInitialEvents(matchState);
+    await this.matchPlayService.onMatchStarted(matchState);
 
     this.logger.log(
       { matchId, playerA: playerA.userId, playerB: playerB.userId },
@@ -207,26 +207,5 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
     );
 
     return true;
-  }
-
-  private async publishMatchFound(
-    player: QueueMemberMeta,
-    opponent: QueueMemberMeta,
-    matchId: string,
-  ): Promise<void> {
-    const event: MatchFoundEvent = {
-      userId: player.userId,
-      queuedAt: player.queuedAt,
-      payload: {
-        matchId,
-        opponent: {
-          displayName: opponent.displayName,
-          rating: opponent.rating,
-        },
-        bestOf: BEST_OF,
-      },
-    };
-
-    await this.redisService.publish(MATCHMAKING_MATCH_FOUND_CHANNEL, JSON.stringify(event));
   }
 }

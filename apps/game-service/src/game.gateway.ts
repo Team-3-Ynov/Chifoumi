@@ -11,6 +11,7 @@ import { WS_AUTH_INVALID_TOKEN_CODE, WsAuthError } from "./auth/ws-auth.error.js
 import { WsAuthService } from "./auth/ws-auth.service.js";
 import { resolveCorsOrigins } from "./cors.js";
 import { scrubTokenFromUrl } from "./logging/scrub-token.js";
+import { MatchEventsRelayService } from "./match/match-events-relay.service.js";
 import { MatchmakingService } from "./matchmaking/matchmaking.service.js";
 import { MatchmakingEventsService } from "./matchmaking/matchmaking-events.service.js";
 import { RedisService } from "./redis/redis.service.js";
@@ -41,11 +42,13 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     private readonly redisService: RedisService,
     private readonly matchmakingService: MatchmakingService,
     private readonly matchmakingEventsService: MatchmakingEventsService,
+    private readonly matchEventsRelayService: MatchEventsRelayService,
     private readonly logger: Logger,
   ) {}
 
   afterInit(server: Server): void {
     this.matchmakingEventsService.setServer(server);
+    this.matchEventsRelayService.setServer(server);
 
     server.use(async (socket, next) => {
       try {
@@ -85,8 +88,12 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   async handleDisconnect(client: Socket): Promise<void> {
     const userId = client.data.userId as string | undefined;
     if (userId) {
-      await this.matchmakingService.leaveQueue(userId);
-      await this.redisService.removeUserSocket(userId, client.id);
+      try {
+        await this.matchmakingService.leaveQueue(userId);
+        await this.redisService.removeUserSocket(userId, client.id);
+      } catch {
+        // Redis may already be closed during app shutdown in e2e tests.
+      }
     }
   }
 }
