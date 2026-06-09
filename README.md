@@ -29,8 +29,32 @@ pnpm install
 cp .env.example .env
 docker compose up -d
 pnpm --filter @chifoumi/db generate
+pnpm --filter @chifoumi/db migrate:deploy
 pnpm dev
 ```
+
+## Premier lancement
+
+Au premier demarrage (base Postgres vide), appliquer les migrations puis le seed :
+
+```bash
+docker compose up -d postgres
+pnpm --filter @chifoumi/db migrate:deploy
+pnpm db:seed
+```
+
+Le seed cree un compte admin par defaut :
+
+| Champ | Valeur dev |
+|---|---|
+| Email | `admin@chifoumi.local` |
+| Mot de passe | `admin-CHANGE-ME!` |
+| Role | `admin` |
+| ELO initial | `1000` |
+
+**En production**, definir obligatoirement `ADMIN_DEFAULT_EMAIL` et `ADMIN_DEFAULT_PASSWORD` dans l'environnement — ne jamais conserver les valeurs par defaut.
+
+Le seed est idempotent : relance sur une base deja initialisee, il ne duplique rien. En conteneur Docker, l'entrypoint API execute `migrate deploy` puis `db:seed` avant le demarrage (skip si l'admin existe deja).
 
 Services lances par `pnpm dev` :
 

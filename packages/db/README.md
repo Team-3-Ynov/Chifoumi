@@ -9,9 +9,10 @@ pnpm --filter @chifoumi/db generate
 pnpm --filter @chifoumi/db migrate:dev
 pnpm --filter @chifoumi/db migrate:deploy
 pnpm --filter @chifoumi/db typecheck
+pnpm --filter @chifoumi/db seed
 ```
 
-Requires `DATABASE_URL` (see root `.env.example`).
+Requires `DATABASE_URL` (see root `.env.example`). Optional seed overrides: `ADMIN_DEFAULT_EMAIL`, `ADMIN_DEFAULT_PASSWORD`.
 
 ## Tables
 
@@ -63,6 +64,26 @@ pnpm --filter @chifoumi/db migrate:deploy
 ```
 
 Re-running `migrate:deploy` on an already migrated database is a no-op.
+
+## Initial seed (US-029)
+
+Create the default admin account and ELO rating:
+
+```bash
+pnpm --filter @chifoumi/db migrate:deploy
+pnpm --filter @chifoumi/db seed
+# or from repo root:
+pnpm db:seed
+```
+
+Default credentials (override via env — **change in production**):
+
+| Variable | Dev default |
+|---|---|
+| `ADMIN_DEFAULT_EMAIL` | `admin@chifoumi.local` |
+| `ADMIN_DEFAULT_PASSWORD` | `admin-CHANGE-ME!` |
+
+The seed is idempotent: re-running it does not duplicate the admin user.
 
 ## Exports
 
