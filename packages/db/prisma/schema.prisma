@@ -70,7 +70,7 @@ model EloRating {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([rating(sort: Desc)])
+  @@index([rating(sort: Desc), gamesPlayed(sort: Desc)], map: "elo_ratings_rating_desc_idx")
   @@map("elo_ratings")
 }
 
