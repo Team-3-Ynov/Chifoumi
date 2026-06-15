@@ -28,6 +28,11 @@ import { UsersModule } from "./users/users.module.js";
         limit: 5,
       },
       {
+        name: "forgot-password",
+        ttl: 60_000,
+        limit: 3,
+      },
+      {
         name: "audit",
         ttl: 60_000,
         limit: 10,

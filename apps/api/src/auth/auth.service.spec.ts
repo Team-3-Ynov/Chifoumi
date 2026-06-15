@@ -17,6 +17,14 @@ describe("AuthService", () => {
       findUnique: jest.fn<PrismaService["refreshToken"]["findUnique"]>(),
       updateMany: jest.fn<PrismaService["refreshToken"]["updateMany"]>(),
     },
+    passwordResetToken: {
+      create: jest.fn<PrismaService["passwordResetToken"]["create"]>(),
+      findUnique: jest.fn<PrismaService["passwordResetToken"]["findUnique"]>(),
+      updateMany: jest.fn<PrismaService["passwordResetToken"]["updateMany"]>(),
+    },
+    user: {
+      update: jest.fn<PrismaService["user"]["update"]>(),
+    },
   };
   const usersService = {
     findByEmail: jest.fn<UsersService["findByEmail"]>(),
@@ -34,6 +42,8 @@ describe("AuthService", () => {
     issueRefreshToken: jest.fn<TokenService["issueRefreshToken"]>(),
     hashRefreshToken: jest.fn<TokenService["hashRefreshToken"]>(),
     getRefreshExpiresAt: jest.fn<TokenService["getRefreshExpiresAt"]>(),
+    issuePasswordResetToken: jest.fn<TokenService["issuePasswordResetToken"]>(),
+    hashPasswordResetToken: jest.fn<TokenService["hashPasswordResetToken"]>(),
   };
   const redisService = {
     revokeAccessToken: jest.fn<RedisService["revokeAccessToken"]>(),
@@ -44,6 +54,7 @@ describe("AuthService", () => {
   };
   const notificationsQueue = {
     enqueueWelcomeMail: jest.fn<NotificationsQueueService["enqueueWelcomeMail"]>(),
+    enqueuePasswordResetMail: jest.fn<NotificationsQueueService["enqueuePasswordResetMail"]>(),
   };
   let authService: AuthService;
 
@@ -54,12 +65,19 @@ describe("AuthService", () => {
     redisService.setnx.mockResolvedValue(true);
     redisService.del.mockResolvedValue();
     notificationsQueue.enqueueWelcomeMail.mockResolvedValue(undefined);
+    notificationsQueue.enqueuePasswordResetMail.mockResolvedValue(undefined);
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback: unknown) =>
       (callback as (tx: never) => Promise<unknown>)({
         refreshToken: {
           updateMany: prisma.refreshToken.updateMany,
           create: prisma.refreshToken.create,
+        },
+        passwordResetToken: {
+          updateMany: prisma.passwordResetToken.updateMany,
+        },
+        user: {
+          update: prisma.user.update,
         },
       } as never),
     );
@@ -384,6 +402,120 @@ describe("AuthService", () => {
         revokedAt: expect.any(Date),
       },
     });
+  });
+
+  it("requestPasswordReset persists hashed token and enqueues mail when email is known", async () => {
+    usersService.findByEmail.mockResolvedValue({
+      id: "u1",
+      email: "a@b.com",
+    } as Awaited<ReturnType<UsersService["findByEmail"]>>);
+    tokenService.issuePasswordResetToken.mockReturnValue({
+      token: "raw-token",
+      tokenHash: "hashed-token",
+    });
+    prisma.passwordResetToken.create.mockResolvedValue(
+      {} as Awaited<ReturnType<PrismaService["passwordResetToken"]["create"]>>,
+    );
+
+    await authService.requestPasswordReset("A@B.com");
+
+    expect(usersService.findByEmail).toHaveBeenCalledWith("a@b.com");
+    expect(prisma.passwordResetToken.create).toHaveBeenCalledWith({
+      data: {
+        userId: "u1",
+        tokenHash: "hashed-token",
+        expiresAt: expect.any(Date),
+      },
+    });
+    expect(notificationsQueue.enqueuePasswordResetMail).toHaveBeenCalledWith({
+      to: "a@b.com",
+      resetUrl: expect.stringContaining("/reset-password?token=raw-token"),
+    });
+  });
+
+  it("requestPasswordReset is silent when email is unknown (anti-enumeration)", async () => {
+    usersService.findByEmail.mockResolvedValue(null);
+
+    await authService.requestPasswordReset("missing@example.com");
+
+    expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+    expect(notificationsQueue.enqueuePasswordResetMail).not.toHaveBeenCalled();
+    expect(tokenService.issuePasswordResetToken).not.toHaveBeenCalled();
+  });
+
+  it("resetPassword updates password, marks token used and revokes refresh tokens", async () => {
+    tokenService.hashPasswordResetToken.mockReturnValue("hashed-token");
+    prisma.passwordResetToken.findUnique.mockResolvedValue({
+      id: "prt1",
+      userId: "u1",
+      tokenHash: "hashed-token",
+      expiresAt: new Date(Date.now() + 60_000),
+      usedAt: null,
+    } as Awaited<ReturnType<PrismaService["passwordResetToken"]["findUnique"]>>);
+    prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
+    passwordService.hash.mockResolvedValue("new-hash");
+
+    await authService.resetPassword("raw-token", "newPassword1234");
+
+    expect(passwordService.hash).toHaveBeenCalledWith("newPassword1234");
+    expect(prisma.passwordResetToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "prt1",
+        usedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      },
+      data: { usedAt: expect.any(Date) },
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "u1" },
+      data: { passwordHash: "new-hash" },
+    });
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { userId: "u1", revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+  });
+
+  it("resetPassword rejects unknown token", async () => {
+    tokenService.hashPasswordResetToken.mockReturnValue("missing");
+    prisma.passwordResetToken.findUnique.mockResolvedValue(null);
+
+    await expect(authService.resetPassword("nope", "newPassword1234")).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(passwordService.hash).not.toHaveBeenCalled();
+  });
+
+  it("resetPassword rejects expired token", async () => {
+    tokenService.hashPasswordResetToken.mockReturnValue("hashed-token");
+    prisma.passwordResetToken.findUnique.mockResolvedValue({
+      id: "prt1",
+      userId: "u1",
+      tokenHash: "hashed-token",
+      expiresAt: new Date(Date.now() - 60_000),
+      usedAt: null,
+    } as Awaited<ReturnType<PrismaService["passwordResetToken"]["findUnique"]>>);
+
+    await expect(authService.resetPassword("expired", "newPassword1234")).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(passwordService.hash).not.toHaveBeenCalled();
+  });
+
+  it("resetPassword rejects already used token", async () => {
+    tokenService.hashPasswordResetToken.mockReturnValue("hashed-token");
+    prisma.passwordResetToken.findUnique.mockResolvedValue({
+      id: "prt1",
+      userId: "u1",
+      tokenHash: "hashed-token",
+      expiresAt: new Date(Date.now() + 60_000),
+      usedAt: new Date(Date.now() - 1_000),
+    } as Awaited<ReturnType<PrismaService["passwordResetToken"]["findUnique"]>>);
+
+    await expect(authService.resetPassword("reused", "newPassword1234")).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(passwordService.hash).not.toHaveBeenCalled();
   });
 
   it("logout rejects already expired access tokens", async () => {

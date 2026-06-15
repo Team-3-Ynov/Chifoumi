@@ -40,12 +40,26 @@ model User {
 
   eloRating       EloRating?
   refreshTokens   RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
   matchesAsPlayerA Match[]      @relation("PlayerA")
   matchesAsPlayerB Match[]      @relation("PlayerB")
   matchesWon       Match[]      @relation("Winner")
   eloHistory       EloHistory[]
 
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model RefreshToken {

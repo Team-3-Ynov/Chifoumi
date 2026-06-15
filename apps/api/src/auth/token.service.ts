@@ -46,4 +46,13 @@ export class TokenService {
   getRefreshExpiresAt(): Date {
     return new Date(Date.now() + this.jwtConfig.refreshTtlSeconds * 1000);
   }
+
+  hashPasswordResetToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
+  issuePasswordResetToken(): { token: string; tokenHash: string } {
+    const token = uuidv4();
+    return { token, tokenHash: this.hashPasswordResetToken(token) };
+  }
 }
