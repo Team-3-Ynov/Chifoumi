@@ -31,8 +31,12 @@ type AuthenticatedRequest = {
   };
 };
 
+const IS_TEST_ENV = process.env.NODE_ENV === "test";
+const AUTH_THROTTLE_LIMIT = IS_TEST_ENV ? 1_000_000 : 5;
+const FORGOT_PASSWORD_THROTTLE_LIMIT = IS_TEST_ENV ? 1_000_000 : 3;
+
 @ApiTags("auth")
-@Throttle({ auth: { limit: 5, ttl: 60_000 } })
+@Throttle({ auth: { limit: AUTH_THROTTLE_LIMIT, ttl: 60_000 } })
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -189,7 +193,7 @@ export class AuthController {
 
   @Post("forgot-password")
   @HttpCode(HttpStatus.OK)
-  @Throttle({ "forgot-password": { limit: 3, ttl: 60_000 } })
+  @Throttle({ "forgot-password": { limit: FORGOT_PASSWORD_THROTTLE_LIMIT, ttl: 60_000 } })
   @ApiOperation({
     summary: "Request a password reset email",
     description:

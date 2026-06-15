@@ -21,23 +21,19 @@ import { UsersModule } from "./users/users.module.js";
         redact: ["req.headers.authorization", "req.body.password", "req.body.refreshToken"],
       },
     }),
-    ThrottlerModule.forRoot([
-      {
-        name: "auth",
-        ttl: 60_000,
-        limit: 5,
-      },
-      {
-        name: "forgot-password",
-        ttl: 60_000,
-        limit: 3,
-      },
-      {
-        name: "audit",
-        ttl: 60_000,
-        limit: 10,
-      },
-    ]),
+    ThrottlerModule.forRoot(
+      process.env.NODE_ENV === "test"
+        ? [
+            { name: "auth", ttl: 60_000, limit: 1_000_000 },
+            { name: "forgot-password", ttl: 60_000, limit: 1_000_000 },
+            { name: "audit", ttl: 60_000, limit: 10 },
+          ]
+        : [
+            { name: "auth", ttl: 60_000, limit: 5 },
+            { name: "forgot-password", ttl: 60_000, limit: 3 },
+            { name: "audit", ttl: 60_000, limit: 10 },
+          ],
+    ),
     AppConfigModule,
     PrismaModule,
     RedisModule,
