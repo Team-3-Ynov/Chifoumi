@@ -193,7 +193,10 @@ export class AuthController {
 
   @Post("forgot-password")
   @HttpCode(HttpStatus.OK)
-  @Throttle({ "forgot-password": { limit: FORGOT_PASSWORD_THROTTLE_LIMIT, ttl: 60_000 } })
+  // Override the shared "auth" throttler with a stricter limit for this route
+  // only (the throttler key is per-handler), instead of a global throttler that
+  // would rate-limit unrelated endpoints such as GET /me.
+  @Throttle({ auth: { limit: FORGOT_PASSWORD_THROTTLE_LIMIT, ttl: 60_000 } })
   @ApiOperation({
     summary: "Request a password reset email",
     description:
@@ -228,7 +231,7 @@ export class AuthController {
   @ApiOperation({
     summary: "Reset the account password using a reset token",
     description:
-      "Validates the opaque reset token, updates the password (Argon2id) and revokes all active refresh tokens for the user.",
+      "Validates the opaque reset token, updates the password (Argon2id) and revokes all active refresh tokens for the user. Existing access tokens are not blacklisted and stay valid until their short expiry.",
   })
   @ApiBody({
     type: ResetPasswordDto,

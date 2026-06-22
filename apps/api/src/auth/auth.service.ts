@@ -169,7 +169,14 @@ export class AuthService {
     const { token, tokenHash } = this.tokenService.issuePasswordResetToken();
     const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
 
-    await this.prisma.passwordResetToken.create({
+    // Invalidate any previously issued, still-unused reset token so only the
+    // latest reset link remains valid for a given user.
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const created = await this.prisma.passwordResetToken.create({
       data: {
         userId: user.id,
         tokenHash,
@@ -178,10 +185,19 @@ export class AuthService {
     });
 
     const resetUrl = this.buildPasswordResetUrl(token);
-    await this.notificationsQueue.enqueuePasswordResetMail({
-      to: normalizedEmail,
-      resetUrl,
-    });
+    try {
+      await this.notificationsQueue.enqueuePasswordResetMail({
+        to: normalizedEmail,
+        resetUrl,
+      });
+    } catch {
+      // Compensation: if the mail job cannot be enqueued, drop the token we just
+      // persisted so no unusable orphan reset token is left behind. The error is
+      // swallowed to preserve the anti-enumeration contract (always responds 200).
+      await this.prisma.passwordResetToken
+        .delete({ where: { id: created.id } })
+        .catch(() => undefined);
+    }
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
@@ -221,6 +237,9 @@ export class AuthService {
         data: { passwordHash: newPasswordHash },
       });
 
+      // AC4: only refresh tokens are revoked here. Existing access JWTs are NOT
+      // blacklisted on reset — they remain valid until their short (15 min)
+      // expiry. This is an accepted trade-off documented for the reset flow.
       await tx.refreshToken.updateMany({
         where: { userId: stored.userId, revokedAt: null },
         data: { revokedAt: new Date() },

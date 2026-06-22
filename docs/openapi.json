@@ -310,6 +310,112 @@
         "tags": ["auth"]
       }
     },
+    "/auth/forgot-password": {
+      "post": {
+        "description": "Sends a password reset link to the provided email if an account exists. Always responds 200 to prevent account enumeration.",
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              },
+              "examples": {
+                "player": {
+                  "summary": "Forgot password request",
+                  "value": {
+                    "email": "player@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reset email requested (idempotent, anti-enumeration)"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": ["email must be an email"],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Request a password reset email",
+        "tags": ["auth"]
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "description": "Validates the opaque reset token, updates the password (Argon2id) and revokes all active refresh tokens for the user. Existing access tokens are not blacklisted and stay valid until their short expiry.",
+        "operationId": "AuthController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              },
+              "examples": {
+                "player": {
+                  "summary": "Reset password",
+                  "value": {
+                    "token": "5a7a7a8e-6c4a-4b1a-9f24-9b6f7c2a4e8c",
+                    "newPassword": "newPassword1234"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password updated and refresh tokens revoked"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": ["newPassword must be longer than or equal to 10 characters"],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, expired or already used reset token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reset the account password using a reset token",
+        "tags": ["auth"]
+      }
+    },
     "/me": {
       "get": {
         "description": "Returns private profile data for the current player, including email and ELO stats.",
@@ -480,6 +586,62 @@
         },
         "summary": "Get global top players by rating",
         "tags": ["leaderboard"]
+      }
+    },
+    "/matches/{id}/audit": {
+      "get": {
+        "description": "Returns commits, reveals, nonces and server-side hash verification so anyone can replay a finished match and detect cheating.",
+        "operationId": "MatchesController_getAudit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Match id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit trail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchAuditResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "MATCH_NOT_ENDED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "error": "MATCH_NOT_ENDED"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MATCH_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "error": "MATCH_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Public commit-reveal audit trail for an ended match",
+        "tags": ["matches"]
       }
     },
     "/.well-known/jwks.json": {
@@ -661,6 +823,34 @@
         },
         "required": ["tokens"]
       },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "player@example.com"
+          }
+        },
+        "required": ["email"]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Opaque password reset token received by email",
+            "example": "5a7a7a8e-6c4a-4b1a-9f24-9b6f7c2a4e8c"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 128,
+            "example": "newPassword1234"
+          }
+        },
+        "required": ["token", "newPassword"]
+      },
       "MeProfileDto": {
         "type": "object",
         "properties": {
@@ -804,6 +994,125 @@
           }
         },
         "required": ["items"]
+      },
+      "RoundHashCheckDto": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "string",
+            "enum": ["match", "mismatch"],
+            "example": "match"
+          },
+          "b": {
+            "type": "string",
+            "enum": ["match", "mismatch"],
+            "example": "match"
+          }
+        },
+        "required": ["a", "b"]
+      },
+      "MatchAuditRoundDto": {
+        "type": "object",
+        "properties": {
+          "roundNumber": {
+            "type": "number",
+            "example": 1
+          },
+          "commitA": {
+            "type": "object",
+            "nullable": true,
+            "example": "a1b2c3..."
+          },
+          "commitB": {
+            "type": "object",
+            "nullable": true,
+            "example": "d4e5f6..."
+          },
+          "moveA": {
+            "type": "string",
+            "enum": ["rock", "paper", "scissors"],
+            "nullable": true,
+            "example": "rock"
+          },
+          "moveB": {
+            "type": "string",
+            "enum": ["rock", "paper", "scissors"],
+            "nullable": true,
+            "example": "paper"
+          },
+          "nonceA": {
+            "type": "object",
+            "nullable": true,
+            "example": "deadbeef..."
+          },
+          "nonceB": {
+            "type": "object",
+            "nullable": true,
+            "example": "cafebabe..."
+          },
+          "hashCheck": {
+            "$ref": "#/components/schemas/RoundHashCheckDto"
+          }
+        },
+        "required": [
+          "roundNumber",
+          "commitA",
+          "commitB",
+          "moveA",
+          "moveB",
+          "nonceA",
+          "nonceB",
+          "hashCheck"
+        ]
+      },
+      "MatchAuditFinalScoreDto": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "number",
+            "example": 2
+          },
+          "b": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": ["a", "b"]
+      },
+      "MatchAuditResponseDto": {
+        "type": "object",
+        "properties": {
+          "matchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "players": {
+            "description": "Player A and player B user ids",
+            "example": [
+              "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1",
+              "8c7c06a3-40ea-5a3e-9b69-ac9691e3a8b2"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchAuditRoundDto"
+            }
+          },
+          "finalScore": {
+            "$ref": "#/components/schemas/MatchAuditFinalScoreDto"
+          },
+          "winner": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": ["matchId", "players", "rounds", "finalScore", "winner"]
       }
     }
   }
