@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://lefthook.dev/schemas/lefthook.json
+# yaml-language-server: $schema=./node_modules/lefthook/schema.json
 
 pre-commit:
   parallel: false
