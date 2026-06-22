@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleDestroy } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import { MatchEventBus } from "../match-session/match-event-bus.js";
 import {
@@ -15,6 +15,8 @@ import {
 import { transitionMatchState } from "../match-session/match-state-machine.js";
 import { isValidMove, resolveRound as resolveRps } from "../rps/resolve.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
+import type { MatchTimeoutExpectedState } from "./match-timeout.types.js";
+import { MatchTimeoutSchedulerService } from "./match-timeout-scheduler.service.js";
 
 export type PlayInput = {
   userId: string;
@@ -32,11 +34,6 @@ export class PlayValidationError extends Error {
   }
 }
 
-type ActiveTimer = {
-  timeout: ReturnType<typeof setTimeout>;
-  roundNumber: number;
-};
-
 type RoundResolution = {
   moveA: Move;
   moveB: Move;
@@ -44,22 +41,14 @@ type RoundResolution = {
 };
 
 @Injectable()
-export class MatchPlayService implements OnModuleDestroy {
-  private readonly timers = new Map<string, ActiveTimer>();
-
+export class MatchPlayService {
   constructor(
     private readonly matchSessionService: MatchSessionService,
     private readonly eventBus: MatchEventBus,
     private readonly matchEndedPublisher: MatchEndedPublisher,
+    private readonly matchTimeoutScheduler: MatchTimeoutSchedulerService,
     private readonly logger: Logger,
   ) {}
-
-  onModuleDestroy(): void {
-    for (const timer of this.timers.values()) {
-      clearTimeout(timer.timeout);
-    }
-    this.timers.clear();
-  }
 
   async onMatchStarted(state: MatchState): Promise<void> {
     this.scheduleRoundTimeout(state.matchId, state.currentRound, state.roundDeadline);
@@ -157,6 +146,20 @@ export class MatchPlayService implements OnModuleDestroy {
     }
 
     return { state: nextState, resolution };
+  }
+
+  async handleMatchTimeout(
+    matchId: string,
+    roundNumber: number,
+    expectedState: MatchTimeoutExpectedState,
+  ): Promise<void> {
+    if (expectedState === "WAITING_PLAYS") {
+      await this.handleRoundTimeout(matchId, roundNumber);
+      return;
+    }
+
+    // Commit-reveal phases are handled once US-035 lands on develop.
+    this.logger.debug({ matchId, roundNumber, expectedState }, "unsupported timeout state");
   }
 
   async handleRoundTimeout(matchId: string, roundNumber: number): Promise<void> {
@@ -269,23 +272,17 @@ export class MatchPlayService implements OnModuleDestroy {
   }
 
   private scheduleRoundTimeout(matchId: string, roundNumber: number, deadlineIso: string): void {
-    this.clearTimer(matchId);
-
     const delayMs = Math.max(0, new Date(deadlineIso).getTime() - Date.now());
-    const timeout = setTimeout(() => {
-      void this.handleRoundTimeout(matchId, roundNumber).catch((error) => {
-        this.logger.warn({ matchId, roundNumber, error }, "round timeout handling failed");
+    void this.matchTimeoutScheduler
+      .scheduleTimeout(matchId, roundNumber, "WAITING_PLAYS", delayMs)
+      .catch((error) => {
+        this.logger.warn({ matchId, roundNumber, error }, "failed to schedule round timeout");
       });
-    }, delayMs);
-
-    this.timers.set(matchId, { timeout, roundNumber });
   }
 
   private clearTimer(matchId: string): void {
-    const active = this.timers.get(matchId);
-    if (active) {
-      clearTimeout(active.timeout);
-      this.timers.delete(matchId);
-    }
+    void this.matchTimeoutScheduler.cancelTimeout(matchId).catch((error) => {
+      this.logger.warn({ matchId, error }, "failed to cancel round timeout");
+    });
   }
 }
