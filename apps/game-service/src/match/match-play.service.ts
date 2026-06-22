@@ -15,7 +15,9 @@ import {
   type RoundResolvedPayload,
 } from "../match-session/match-session.types.js";
 import { transitionMatchState } from "../match-session/match-state-machine.js";
+import { RedisService } from "../redis/redis.service.js";
 import { isValidMove, resolveRound as resolveRps } from "../rps/resolve.js";
+import { MatchDisconnectSchedulerService } from "./match-disconnect-scheduler.service.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
 import type { MatchTimeoutExpectedState } from "./match-timeout.types.js";
 import { MatchTimeoutSchedulerService } from "./match-timeout-scheduler.service.js";
@@ -49,6 +51,8 @@ export class MatchPlayService {
     private readonly eventBus: MatchEventBus,
     private readonly matchEndedPublisher: MatchEndedPublisher,
     private readonly matchTimeoutScheduler: MatchTimeoutSchedulerService,
+    private readonly matchDisconnectScheduler: MatchDisconnectSchedulerService,
+    private readonly redisService: RedisService,
     private readonly logger: Logger,
   ) {}
 
@@ -234,6 +238,42 @@ export class MatchPlayService {
     }
   }
 
+  async handleDisconnectForfeit(userId: string, matchId: string): Promise<boolean> {
+    const activeSocket = await this.redisService.getUserSocket(userId);
+    if (activeSocket) {
+      return false;
+    }
+
+    let forfeited = false;
+
+    const nextState = await this.matchSessionService.mutateState(matchId, (state) => {
+      if (state.status === "ENDED") {
+        return state;
+      }
+
+      const index = playerIndex(state, userId);
+      if (index === null) {
+        return state;
+      }
+
+      const winnerIndex = index === 0 ? 1 : 0;
+      forfeited = true;
+      return {
+        ...state,
+        status: "ENDED",
+        winnerId: state.players[winnerIndex].userId,
+        endReason: "DISCONNECT_FORFEIT",
+      };
+    });
+
+    if (!forfeited || nextState.status !== "ENDED") {
+      return false;
+    }
+
+    await this.finalizeMatch(nextState);
+    return true;
+  }
+
   private async applyPhaseTimeout(
     matchId: string,
     roundNumber: number,
@@ -354,6 +394,9 @@ export class MatchPlayService {
 
   private async finalizeMatch(state: MatchState): Promise<void> {
     await this.clearTimer(state.matchId);
+    await this.matchDisconnectScheduler.cancelForfeitForPlayers(
+      state.players.map((player) => player.userId),
+    );
 
     const payload = {
       matchId: state.matchId,
