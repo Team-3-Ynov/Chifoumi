@@ -85,6 +85,8 @@ describe("Swagger docs (e2e)", () => {
         "/auth/login",
         "/auth/refresh",
         "/auth/logout",
+        "/auth/forgot-password",
+        "/auth/reset-password",
         "/me",
         "/me/history",
         "/users/{id}/profile",
