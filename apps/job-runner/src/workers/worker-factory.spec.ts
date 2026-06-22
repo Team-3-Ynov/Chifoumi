@@ -5,8 +5,10 @@ import { WorkerMetricsService } from "../metrics/worker-metrics.service.js";
 
 const workerCtor = jest.fn();
 
+class MockUnrecoverableError extends Error {}
+
 jest.unstable_mockModule("bullmq", () => ({
-  UnrecoverableError: class UnrecoverableError extends Error {},
+  UnrecoverableError: MockUnrecoverableError,
   Worker: workerCtor,
 }));
 
@@ -83,6 +85,60 @@ describe("WorkerFactory", () => {
         concurrency: config.WORKER_CONCURRENCY,
       }),
     );
+  });
+
+  it("records retry vs permanent failure metrics from worker events", () => {
+    const config = createConfig({ WORKER_QUEUES: ["match-events"] });
+    const metrics = new WorkerMetricsService(config);
+    const recordSpy = jest.spyOn(metrics, "recordJobProcessed");
+    type FailedJob = {
+      attemptsMade: number;
+      opts: { attempts?: number };
+      name: string;
+      id: string;
+      data: { matchId: string };
+    };
+    const handlers = new Map<string, (job?: FailedJob, error?: Error) => void>();
+    workerCtor.mockImplementation(() => ({
+      on: jest.fn((event: string, handler: (job?: FailedJob, error?: Error) => void) => {
+        handlers.set(event, handler);
+      }),
+      close: jest.fn(async () => undefined),
+    }));
+
+    const factory = new WorkerFactoryClass(
+      config,
+      metrics,
+      createMatchPersistence() as never,
+      createRedisInvalidation() as never,
+      createMailService() as never,
+      { log: jest.fn(), error: jest.fn() } as unknown as Logger,
+    );
+
+    factory.createWorkers();
+
+    const failedJob = {
+      attemptsMade: 1,
+      opts: { attempts: 3 },
+      name: "match-ended",
+      id: "job-1",
+      data: { matchId: "33333333-3333-4333-8333-333333333333" },
+    };
+    const permanentFailedJob = { ...failedJob, attemptsMade: 3 };
+
+    handlers.get("failed")?.(failedJob, new Error("transient"));
+    handlers.get("failed")?.(permanentFailedJob, new Error("permanent"));
+    handlers.get("completed")?.();
+
+    expect(recordSpy).toHaveBeenCalledWith("match-events", "retry");
+    expect(recordSpy).toHaveBeenCalledWith("match-events", "failed_permanent");
+    expect(recordSpy).toHaveBeenCalledWith("match-events", "completed");
+
+    recordSpy.mockClear();
+    handlers.get("failed")?.(failedJob, new MockUnrecoverableError("invalid payload"));
+
+    expect(recordSpy).toHaveBeenCalledWith("match-events", "failed_permanent");
+    expect(recordSpy).not.toHaveBeenCalledWith("match-events", "retry");
   });
 
   it("instantiates multiple workers for multiple queues", () => {

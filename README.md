@@ -187,6 +187,29 @@ pnpm --filter @chifoumi/job-runner dev
 pnpm --filter @chifoumi/front dev
 ```
 
+### Job-runner (deploiement)
+
+Le job-runner persiste les matchs termines et envoie les notifications. Il utilise la **meme base PostgreSQL que l'API** via Prisma.
+
+| Variable | Role |
+|---|---|
+| `DATABASE_URL` | Connexion PostgreSQL (obligatoire) — persistance des matchs, rounds, ELO et historique |
+| `REDIS_URL` | Redis pour BullMQ et publication `leaderboard:invalidate` |
+| `WORKER_QUEUES` | Queues a ecouter, ex. `match-events,notifications` |
+| `WORKER_CONCURRENCY` | Nombre de jobs traites en parallele par worker |
+| `WORKER_ROLE` | Role logique du processus (`match-processor`, `notifier`, etc.) |
+| `BULLMQ_PREFIX` | Prefixe des queues BullMQ (isole les environnements) |
+
+En local, copier `.env.example` vers `.env` : `DATABASE_URL` est partagee entre l'API et le job-runner. En production, pointer `DATABASE_URL` vers la base applicative et `REDIS_URL` vers le cluster Redis partage avec l'API et le game-service.
+
+Tests d'integration du worker match-events (Postgres + Redis requis) :
+
+```bash
+docker compose up -d
+pnpm --filter @chifoumi/db migrate:deploy
+pnpm --filter @chifoumi/job-runner test:integration
+```
+
 ## Liens utiles
 
 | Outil | URL | Statut |
