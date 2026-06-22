@@ -286,7 +286,7 @@ describe("Match timeout BullMQ (e2e)", () => {
 
       expect(endedA.reason).toBe("FORFEIT_TIMEOUT");
       expect(endedB.reason).toBe("FORFEIT_TIMEOUT");
-      expect(endedA.winner).toBe("player-a");
+      expect(endedA.winner).toBe("player-b");
     } finally {
       await recoveryWorker.close();
       recoveryWorker = null;

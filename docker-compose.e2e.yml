@@ -46,6 +46,7 @@ services:
       DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
       REDIS_URL: redis://redis:6379
       API_PORT: 3000
+      API_GRPC_PORT: 50051
       BULLMQ_PREFIX: rps
       JWT_PRIVATE_KEY_PATH: /app/infra/keys/jwt-private.pem
       JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
@@ -75,13 +76,15 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      api:
+        condition: service_healthy
     environment:
       REDIS_URL: redis://redis:6379
       GAME_SERVICE_PORT: 3001
       INSTANCE_ID: game-1
       BULLMQ_PREFIX: rps
       MATCHMAKING_WORKER_ENABLED: "true"
-      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+      API_GRPC_URL: api:50051
       CORS_ORIGINS: http://localhost:5173
     volumes:
       - ./infra/keys:/app/infra/keys:ro
@@ -108,13 +111,15 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      api:
+        condition: service_healthy
     environment:
       REDIS_URL: redis://redis:6379
       GAME_SERVICE_PORT: 3001
       INSTANCE_ID: game-2
       BULLMQ_PREFIX: rps
       MATCHMAKING_WORKER_ENABLED: "true"
-      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+      API_GRPC_URL: api:50051
       CORS_ORIGINS: http://localhost:5173
     volumes:
       - ./infra/keys:/app/infra/keys:ro

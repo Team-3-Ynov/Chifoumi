@@ -9,6 +9,7 @@
     "prebuild": "pnpm --filter @chifoumi/proto build",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretypecheck": "pnpm --filter @chifoumi/proto build",
     "pretest": "pnpm --filter @chifoumi/proto build",
     "pretest:e2e": "pnpm --filter @chifoumi/proto build",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
