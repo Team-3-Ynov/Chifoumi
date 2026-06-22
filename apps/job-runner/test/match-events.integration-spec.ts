@@ -222,8 +222,16 @@ describe("match-events worker (integration)", () => {
     const job = await queue.add("match-ended", { invalid: true }, { attempts: 3 });
     const failedJob = await waitForJobState(queue, job, "failed");
 
-    expect(failedJob.attemptsMade).toBeGreaterThanOrEqual(1);
     expect(failedJob.failedReason).toContain("Invalid match-ended job payload");
+    // UnrecoverableError fails immediately without consuming retry attempts.
+    expect(failedJob.attemptsMade).toBeLessThan(3);
+
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
+    const stillFailed = await Job.fromId(queue, job.id as string);
+    expect(stillFailed && (await stillFailed.getState())).toBe("failed");
+
+    const renderedMetrics = await metrics.getMetrics();
+    expect(renderedMetrics).toContain('outcome="failed_permanent"');
   });
 
   it("retries transient persistence failures and records retry metrics", async () => {

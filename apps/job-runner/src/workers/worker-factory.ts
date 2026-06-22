@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { Worker, type WorkerOptions } from "bullmq";
+import { UnrecoverableError, Worker, type WorkerOptions } from "bullmq";
 import { Logger } from "nestjs-pino";
 import { JOB_RUNNER_CONFIG, type JobRunnerConfig, type WorkerQueueName } from "../config/env.js";
 import { WorkerMetricsService } from "../metrics/worker-metrics.service.js";
@@ -51,10 +51,15 @@ export class WorkerFactory {
 
     worker.on("failed", (job, error) => {
       const maxAttempts = job?.opts.attempts ?? 1;
-      const isPermanentFailure = !job || job.attemptsMade >= maxAttempts;
+      const isPermanentFailure =
+        !job || error instanceof UnrecoverableError || job.attemptsMade >= maxAttempts;
       this.metrics.recordJobProcessed(queue, isPermanentFailure ? "failed_permanent" : "retry");
 
-      if (queue === "match-events" && job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+      if (
+        queue === "match-events" &&
+        job &&
+        (error instanceof UnrecoverableError || job.attemptsMade >= (job.opts.attempts ?? 1))
+      ) {
         this.logger.error(
           {
             worker_role: this.config.WORKER_ROLE,

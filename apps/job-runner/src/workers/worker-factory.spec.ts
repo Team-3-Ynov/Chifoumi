@@ -5,8 +5,10 @@ import { WorkerMetricsService } from "../metrics/worker-metrics.service.js";
 
 const workerCtor = jest.fn();
 
+class MockUnrecoverableError extends Error {}
+
 jest.unstable_mockModule("bullmq", () => ({
-  UnrecoverableError: class UnrecoverableError extends Error {},
+  UnrecoverableError: MockUnrecoverableError,
   Worker: workerCtor,
 }));
 
@@ -131,6 +133,12 @@ describe("WorkerFactory", () => {
     expect(recordSpy).toHaveBeenCalledWith("match-events", "retry");
     expect(recordSpy).toHaveBeenCalledWith("match-events", "failed_permanent");
     expect(recordSpy).toHaveBeenCalledWith("match-events", "completed");
+
+    recordSpy.mockClear();
+    handlers.get("failed")?.(failedJob, new MockUnrecoverableError("invalid payload"));
+
+    expect(recordSpy).toHaveBeenCalledWith("match-events", "failed_permanent");
+    expect(recordSpy).not.toHaveBeenCalledWith("match-events", "retry");
   });
 
   it("instantiates multiple workers for multiple queues", () => {
