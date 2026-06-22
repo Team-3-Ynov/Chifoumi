@@ -1,19 +1,19 @@
 import { Global, Module } from "@nestjs/common";
-import { JWT_CONFIG, loadJwtConfig } from "./jwt.config.js";
+import { GRPC_CLIENT_CONFIG, loadGrpcClientConfig } from "./grpc-client.config.js";
 import { loadRedisConfig, REDIS_CONFIG } from "./redis.config.js";
 
 @Global()
 @Module({
   providers: [
     {
-      provide: JWT_CONFIG,
-      useFactory: () => loadJwtConfig(),
-    },
-    {
       provide: REDIS_CONFIG,
       useFactory: () => loadRedisConfig(),
     },
+    {
+      provide: GRPC_CLIENT_CONFIG,
+      useFactory: () => loadGrpcClientConfig(),
+    },
   ],
-  exports: [JWT_CONFIG, REDIS_CONFIG],
+  exports: [REDIS_CONFIG, GRPC_CLIENT_CONFIG],
 })
 export class AppConfigModule {}

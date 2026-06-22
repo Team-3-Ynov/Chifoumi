@@ -1,18 +1,16 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { INestApplication } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
 import { Queue, Worker } from "bullmq";
 import { config } from "dotenv";
 import { io, type Socket } from "socket.io-client";
-import { AppModule } from "../src/app.module.js";
-import { JWT_CONFIG } from "../src/config/jwt.config.js";
 import { MatchPlayService } from "../src/match/match-play.service.js";
 import { MATCH_TIMEOUT_QUEUE, matchTimeoutJobKey } from "../src/match/match-timeout.constants.js";
 import { MatchTimeoutSchedulerService } from "../src/match/match-timeout-scheduler.service.js";
 import { MatchSessionService } from "../src/match-session/match-session.service.js";
 import { MatchmakingWorkerService } from "../src/matchmaking/matchmaking-worker.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
+import { createGameServiceTestModule } from "../src/testing/create-game-service-test-module.js";
 import { issueTestAccessToken, testJwtKeys } from "../src/testing/issue-test-access-token.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -115,12 +113,7 @@ describe("Match timeout BullMQ (e2e)", () => {
   let recoveryWorker: Worker | null = null;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(JWT_CONFIG)
-      .useValue({ publicKey: testJwtKeys.publicKey })
-      .compile();
+    const moduleRef = await createGameServiceTestModule().compile();
 
     app = moduleRef.createNestApplication();
     await app.init();

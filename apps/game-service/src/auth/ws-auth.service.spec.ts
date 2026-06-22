@@ -1,72 +1,42 @@
-import { generateKeyPairSync } from "node:crypto";
 import { jest } from "@jest/globals";
-import { JwtModule, JwtService } from "@nestjs/jwt";
 import { Test } from "@nestjs/testing";
-import { RedisService } from "../redis/redis.service.js";
+import { API_AUTH_CLIENT, type ApiAuthClient } from "../grpc/api-auth.client.js";
+import { AuthUnavailableError } from "../grpc/auth-unavailable.error.js";
 import {
   WS_AUTH_INVALID_TOKEN_CODE,
   WS_AUTH_TOKEN_REVOKED_CODE,
-  WsAuthError,
+  WS_AUTH_UNAVAILABLE_CODE,
 } from "./ws-auth.error.js";
 import { WsAuthService } from "./ws-auth.service.js";
 
-const { privateKey, publicKey } = generateKeyPairSync("rsa", {
-  modulusLength: 2048,
-  privateKeyEncoding: { type: "pkcs8", format: "pem" },
-  publicKeyEncoding: { type: "spki", format: "pem" },
-});
-
 describe("WsAuthService", () => {
   let wsAuthService: WsAuthService;
-  let jwtService: JwtService;
-  const redisService = {
-    isAccessTokenRevoked: jest.fn<RedisService["isAccessTokenRevoked"]>(),
+  const apiAuthClient = {
+    verifyToken: jest.fn<ApiAuthClient["verifyToken"]>(),
   };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [
-        JwtModule.register({
-          privateKey,
-          publicKey,
-          signOptions: { algorithm: "RS256", expiresIn: 60 },
-        }),
-      ],
-      providers: [WsAuthService, { provide: RedisService, useValue: redisService }],
+      providers: [WsAuthService, { provide: API_AUTH_CLIENT, useValue: apiAuthClient }],
     }).compile();
 
     wsAuthService = moduleRef.get(WsAuthService);
-    jwtService = moduleRef.get(JwtService);
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
-    redisService.isAccessTokenRevoked.mockResolvedValue(false);
   });
 
-  async function signToken(overrides?: {
-    sub?: string;
-    displayName?: string;
-    jti?: string;
-    expiresIn?: number;
-  }): Promise<string> {
-    return jwtService.signAsync(
-      {
-        sub: overrides?.sub ?? "user-1",
-        role: "player",
-        jti: overrides?.jti ?? "jti-1",
-        displayName: overrides?.displayName ?? "player1",
-      },
-      {
-        algorithm: "RS256",
-        expiresIn: overrides?.expiresIn ?? 60,
-      },
-    );
-  }
+  it("accepts a valid token from the API client", async () => {
+    apiAuthClient.verifyToken.mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+      displayName: "player1",
+      role: "player",
+      jti: "jti-1",
+    });
 
-  it("accepts a valid non-revoked token", async () => {
-    const token = await signToken();
-    await expect(wsAuthService.verifyToken(token)).resolves.toEqual({
+    await expect(wsAuthService.verifyToken("token")).resolves.toEqual({
       userId: "user-1",
       displayName: "player1",
       jti: "jti-1",
@@ -80,24 +50,27 @@ describe("WsAuthService", () => {
     });
   });
 
-  it("rejects malformed tokens", async () => {
-    await expect(wsAuthService.verifyToken("not-a-jwt")).rejects.toBeInstanceOf(WsAuthError);
-  });
-
-  it("rejects expired tokens", async () => {
-    const token = await signToken({ expiresIn: -1 });
-    await expect(wsAuthService.verifyToken(token)).rejects.toMatchObject({
+  it("rejects invalid tokens", async () => {
+    apiAuthClient.verifyToken.mockResolvedValue({ valid: false, reason: "INVALID" });
+    await expect(wsAuthService.verifyToken("bad-token")).rejects.toMatchObject({
       message: "INVALID_TOKEN",
       code: WS_AUTH_INVALID_TOKEN_CODE,
     });
   });
 
-  it("rejects blacklisted tokens", async () => {
-    redisService.isAccessTokenRevoked.mockResolvedValue(true);
-    const token = await signToken();
-    await expect(wsAuthService.verifyToken(token)).rejects.toMatchObject({
+  it("rejects revoked tokens", async () => {
+    apiAuthClient.verifyToken.mockResolvedValue({ valid: false, reason: "REVOKED" });
+    await expect(wsAuthService.verifyToken("revoked-token")).rejects.toMatchObject({
       message: "TOKEN_REVOKED",
       code: WS_AUTH_TOKEN_REVOKED_CODE,
+    });
+  });
+
+  it("fails closed when the API client is unavailable", async () => {
+    apiAuthClient.verifyToken.mockRejectedValue(new AuthUnavailableError());
+    await expect(wsAuthService.verifyToken("token")).rejects.toMatchObject({
+      message: "AUTH_UNAVAILABLE",
+      code: WS_AUTH_UNAVAILABLE_CODE,
     });
   });
 });
