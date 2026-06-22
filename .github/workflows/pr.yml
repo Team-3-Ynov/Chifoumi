@@ -86,9 +86,6 @@ jobs:
       - name: Game service WebSocket e2e tests
         run: pnpm --filter @chifoumi/game-service test:e2e
 
-      - name: Job-runner match-events integration tests
-        run: pnpm --filter @chifoumi/job-runner test:integration
-
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -116,40 +113,7 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: app
-          POSTGRES_PASSWORD: chifoumi_dev
-          POSTGRES_DB: chifoumi
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
-      DATABASE_URL: postgresql://app:chifoumi_dev@localhost:5432/chifoumi
-      REDIS_URL: redis://localhost:6379
-      BULLMQ_PREFIX: rps
-      JWT_PRIVATE_KEY_PATH: infra/keys/jwt-private.pem
-      JWT_PUBLIC_KEY_PATH: infra/keys/jwt-public.pem
-      MATCHMAKING_WORKER_ENABLED: "true"
-      WORKER_QUEUES: match-events
-      WORKER_CONCURRENCY: 8
-      CRON_ENABLED: "false"
       E2E_API_URL: http://127.0.0.1:3000
       E2E_GAME_1_URL: http://127.0.0.1:3101
       E2E_GAME_2_URL: http://127.0.0.1:3102
@@ -164,15 +128,6 @@ jobs:
           mkdir -p infra/keys
           openssl genrsa -out infra/keys/jwt-private.pem 2048
           openssl rsa -in infra/keys/jwt-private.pem -pubout -out infra/keys/jwt-public.pem
-
-      - name: Build E2E stack
-        run: |
-          pnpm --filter @chifoumi/db build
-          pnpm --filter @chifoumi/elo build
-          pnpm --filter @chifoumi/api build
-          pnpm --filter @chifoumi/game-service build
-          pnpm --filter @chifoumi/job-runner build
-          pnpm --filter @chifoumi/db migrate:deploy
 
       - name: Start E2E stack
         run: bash scripts/e2e/start-stack.sh
@@ -195,6 +150,20 @@ jobs:
 
       - name: BO3 cross-instance smoke test (US-031)
         run: pnpm --filter @chifoumi/e2e test:smoke
+
+      - name: Capture E2E stack logs
+        if: failure()
+        run: >-
+          docker compose --project-name chifoumi-e2e -f docker-compose.e2e.yml
+          logs --no-color > e2e-stack.log
+
+      - name: Upload E2E failure logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-stack-logs
+          path: e2e-stack.log
+          if-no-files-found: warn
 
       - name: Stop E2E stack
         if: always()

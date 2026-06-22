@@ -9,6 +9,7 @@ Plateforme web competitive Pierre-Feuille-Ciseaux avec matchmaking ELO, parties 
 - [Pre-requis](#pre-requis)
 - [Demarrage rapide](#demarrage-rapide)
 - [Stack multi-replicas (US-030)](#stack-multi-replicas-us-030)
+- [Demo multi-instances (US-032)](#demo-multi-instances-us-032)
 - [Tech stack](#tech-stack)
 - [Architecture](#architecture)
 - [Commandes utiles](#commandes-utiles)
@@ -121,6 +122,20 @@ Arreter la stack :
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.scale.yml down
 ```
+
+## Demo multi-instances (US-032)
+
+Procedure de soutenance (~5 min) : deux joueurs sur des replicas Game Service differents, crash d'instance, Grafana live.
+
+```bash
+# Linux / macOS / Git Bash
+bash scripts/demo/run-demo.sh
+
+# Windows
+.\scripts\demo\run-demo.ps1
+```
+
+Guide detaille avec captures : [`docs/demo/multi-instances.md`](docs/demo/multi-instances.md).
 
 ## Tech stack
 

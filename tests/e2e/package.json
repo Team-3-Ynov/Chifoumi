@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:smoke": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=bo3-cross-instance --forceExit"
+    "test:smoke": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=bo3-cross-instance"
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",

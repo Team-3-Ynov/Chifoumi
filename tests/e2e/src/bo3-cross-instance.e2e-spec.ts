@@ -1,6 +1,8 @@
 /**
  * @e2e US-031 — BO3 smoke test across two Game Service replicas.
  */
+
+import type { Socket } from "socket.io-client";
 import {
   createPlayer,
   getMe,
@@ -33,69 +35,74 @@ describe("US-031 BO3 cross-instance smoke @e2e", () => {
   }, 90_000);
 
   it("plays a full BO3 on different game replicas and persists results", async () => {
-    const { socket: socketA } = await connectAuthenticated(game1Url, playerA.tokens.access);
-    const { socket: socketB } = await connectAuthenticated(game2Url, playerB.tokens.access);
+    let socketA: Socket | undefined;
+    let socketB: Socket | undefined;
 
-    const baselineA = await getMe(apiUrl, playerA.tokens.access);
+    try {
+      ({ socket: socketA } = await connectAuthenticated(game1Url, playerA.tokens.access));
+      ({ socket: socketB } = await connectAuthenticated(game2Url, playerB.tokens.access));
 
-    const matchFoundA = waitForEvent<MatchFoundPayload>(socketA, "matchFound");
-    const matchFoundB = waitForEvent<MatchFoundPayload>(socketB, "matchFound");
-    const roundStartA = waitForEvent<RoundStartPayload>(socketA, "roundStart");
-    const roundStartB = waitForEvent<RoundStartPayload>(socketB, "roundStart");
+      const baselineA = await getMe(apiUrl, playerA.tokens.access);
 
-    await joinQueue(socketA);
-    await joinQueue(socketB);
+      const matchFoundA = waitForEvent<MatchFoundPayload>(socketA, "matchFound");
+      const matchFoundB = waitForEvent<MatchFoundPayload>(socketB, "matchFound");
+      const roundStartA = waitForEvent<RoundStartPayload>(socketA, "roundStart");
+      const roundStartB = waitForEvent<RoundStartPayload>(socketB, "roundStart");
 
-    const [payloadA, payloadB, roundStart] = await Promise.all([
-      matchFoundA,
-      matchFoundB,
-      roundStartA,
-      roundStartB,
-    ]);
+      await joinQueue(socketA);
+      await joinQueue(socketB);
 
-    expect(payloadA.matchId).toBe(payloadB.matchId);
-    expect(payloadA.bestOf).toBe(3);
+      const [payloadA, payloadB, roundStart] = await Promise.all([
+        matchFoundA,
+        matchFoundB,
+        roundStartA,
+        roundStartB,
+      ]);
 
-    const { matchEndedA, matchEndedB } = await playBo3Win(
-      socketA,
-      socketB,
-      payloadA.matchId,
-      roundStart,
-    );
+      expect(payloadA.matchId).toBe(payloadB.matchId);
+      expect(payloadA.bestOf).toBe(3);
 
-    expect(matchEndedA.winner).toBe(playerA.userId);
-    expect(matchEndedB.winner).toBe(playerA.userId);
-    expect(matchEndedA.finalScore).toEqual({ a: 2, b: 0 });
+      const { matchEndedA, matchEndedB } = await playBo3Win(
+        socketA,
+        socketB,
+        payloadA.matchId,
+        roundStart,
+      );
 
-    const profileA = await pollMe(
-      apiUrl,
-      playerA.tokens.access,
-      (profile) => profile.gamesPlayed === 1 && profile.rating > baselineA.rating,
-    );
-    expect(profileA.gamesPlayed).toBe(1);
+      expect(matchEndedA.winner).toBe(playerA.userId);
+      expect(matchEndedB.winner).toBe(playerA.userId);
+      expect(matchEndedA.finalScore).toEqual({ a: 2, b: 0 });
 
-    const leaderboardResponse = await fetch(`${apiUrl}/leaderboard?limit=10`);
-    expect(leaderboardResponse.ok).toBe(true);
-    const leaderboard = (await leaderboardResponse.json()) as {
-      items: Array<{ userId: string; rating: number }>;
-    };
-    expect(leaderboard.items[0]?.userId).toBe(playerA.userId);
-    expect(leaderboard.items[0]?.rating).toBeGreaterThan(
-      leaderboard.items.find((entry) => entry.userId === playerB.userId)?.rating ?? 0,
-    );
+      const profileA = await pollMe(
+        apiUrl,
+        playerA.tokens.access,
+        (profile) => profile.gamesPlayed === 1 && profile.rating > baselineA.rating,
+      );
+      expect(profileA.gamesPlayed).toBe(1);
 
-    const historyResponse = await fetch(`${apiUrl}/me/history?limit=10`, {
-      headers: { authorization: `Bearer ${playerB.tokens.access}` },
-    });
-    expect(historyResponse.ok).toBe(true);
-    const history = (await historyResponse.json()) as {
-      items: Array<{ matchId: string; isWinner: boolean }>;
-    };
-    const historyItem = history.items.find((item) => item.matchId === payloadA.matchId);
-    expect(historyItem).toBeDefined();
-    expect(historyItem?.isWinner).toBe(false);
+      const leaderboardResponse = await fetch(`${apiUrl}/leaderboard?limit=10`);
+      expect(leaderboardResponse.ok).toBe(true);
+      const leaderboard = (await leaderboardResponse.json()) as {
+        items: Array<{ userId: string; rating: number }>;
+      };
+      expect(leaderboard.items[0]?.userId).toBe(playerA.userId);
+      expect(leaderboard.items[0]?.rating).toBeGreaterThan(
+        leaderboard.items.find((entry) => entry.userId === playerB.userId)?.rating ?? 0,
+      );
 
-    socketA.disconnect();
-    socketB.disconnect();
+      const historyResponse = await fetch(`${apiUrl}/me/history?limit=10`, {
+        headers: { authorization: `Bearer ${playerB.tokens.access}` },
+      });
+      expect(historyResponse.ok).toBe(true);
+      const history = (await historyResponse.json()) as {
+        items: Array<{ matchId: string; isWinner: boolean }>;
+      };
+      const historyItem = history.items.find((item) => item.matchId === payloadA.matchId);
+      expect(historyItem).toBeDefined();
+      expect(historyItem?.isWinner).toBe(false);
+    } finally {
+      socketA?.disconnect();
+      socketB?.disconnect();
+    }
   }, 30_000);
 });

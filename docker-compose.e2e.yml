@@ -1,13 +1,45 @@
 services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: chifoumi_dev
+      POSTGRES_DB: chifoumi
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d chifoumi"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+    entrypoint: ["pnpm", "--filter", "@chifoumi/db", "migrate:deploy"]
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     ports:
-      - "3000:3000"
+      - "${E2E_API_PORT:-3000}:3000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     environment:
@@ -39,7 +71,7 @@ services:
       context: .
       dockerfile: apps/game-service/Dockerfile
     ports:
-      - "3101:3001"
+      - "${E2E_GAME_1_PORT:-3101}:3001"
     depends_on:
       redis:
         condition: service_healthy
@@ -72,7 +104,7 @@ services:
       context: .
       dockerfile: apps/game-service/Dockerfile
     ports:
-      - "3102:3001"
+      - "${E2E_GAME_2_PORT:-3102}:3001"
     depends_on:
       redis:
         condition: service_healthy
@@ -105,8 +137,8 @@ services:
       context: .
       dockerfile: apps/job-runner/Dockerfile
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       api:
