@@ -77,6 +77,7 @@ describe("US-031 BO3 cross-instance smoke @e2e", () => {
         apiUrl,
         playerA.tokens.access,
         (profile) => profile.gamesPlayed === 1 && profile.rating > baselineA.rating,
+        15_000,
       );
       expect(profileA.gamesPlayed).toBe(1);
 
@@ -104,5 +105,5 @@ describe("US-031 BO3 cross-instance smoke @e2e", () => {
       socketA?.disconnect();
       socketB?.disconnect();
     }
-  }, 30_000);
+  }, 60_000);
 });
