@@ -4,7 +4,7 @@ pre-commit:
   parallel: false
   commands:
     biome:
-      glob: "{*.{js,jsx,ts,tsx,json,jsonc,css,wasm,mjs,mts,cjs,cts},.github/**/*.{js,jsx,ts,tsx,json,jsonc,css,wasm,mjs,mts,cjs,cts},{apps,packages,tests}/**/*.{js,jsx,ts,tsx,json,jsonc,css,wasm,mjs,mts,cjs,cts}}"
+      glob: "{*.{js,jsx,ts,tsx,json,jsonc,css,wasm,mjs,mts,cjs,cts},{.devcontainer,.github}/**/*.{js,jsx,ts,tsx,json,jsonc,css,wasm,mjs,mts,cjs,cts},{apps,packages,tests}/**/*.{js,jsx,ts,tsx,json,jsonc,css,wasm,mjs,mts,cjs,cts}}"
       run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
       stage_fixed: true
     typecheck:
