@@ -426,6 +426,9 @@ importers:
 
   packages/proto:
     devDependencies:
+      '@types/node':
+        specifier: ^24.12.4
+        version: 24.12.4
       typescript:
         specifier: ~5.7.3
         version: 5.7.3
