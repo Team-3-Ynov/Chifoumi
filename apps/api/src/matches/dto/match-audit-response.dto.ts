@@ -1,5 +1,38 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { AuditRoundDto } from "./audit-round.dto.js";
+
+export class HashCheckDto {
+  @ApiProperty({ enum: ["match", "mismatch"], example: "match" })
+  a!: "match" | "mismatch";
+
+  @ApiProperty({ enum: ["match", "mismatch"], example: "match" })
+  b!: "match" | "mismatch";
+}
+
+export class AuditRoundDto {
+  @ApiProperty({ example: 1 })
+  roundNumber!: number;
+
+  @ApiProperty({ nullable: true, example: "a1b2c3..." })
+  commitA!: string | null;
+
+  @ApiProperty({ nullable: true, example: "d4e5f6..." })
+  commitB!: string | null;
+
+  @ApiProperty({ enum: ["rock", "paper", "scissors"], nullable: true, example: "rock" })
+  moveA!: string | null;
+
+  @ApiProperty({ enum: ["rock", "paper", "scissors"], nullable: true, example: "paper" })
+  moveB!: string | null;
+
+  @ApiProperty({ nullable: true, example: "deadbeef..." })
+  nonceA!: string | null;
+
+  @ApiProperty({ nullable: true, example: "cafebabe..." })
+  nonceB!: string | null;
+
+  @ApiProperty({ type: HashCheckDto })
+  hashCheck!: HashCheckDto;
+}
 
 export class MatchPlayerDto {
   @ApiProperty({
