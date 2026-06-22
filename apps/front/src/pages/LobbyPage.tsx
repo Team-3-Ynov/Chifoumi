@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useGameSession } from "../auth/GameSessionContext.js";
+import { useAuth } from "../auth/AuthContext.js";
 import { GameErrorNotice } from "../components/GameErrorNotice.js";
 import { useGame } from "../game/GameSocketContext.js";
 
@@ -8,9 +8,9 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
 export function LobbyPage() {
   const navigate = useNavigate();
-  const session = useGameSession();
+  const { accessToken } = useAuth();
   const game = useGame();
-  const [profileRating, setProfileRating] = useState<number | null>(session?.user.rating ?? null);
+  const [profileRating, setProfileRating] = useState<number | null>(null);
   const elapsed = useQueueElapsed(game.queue.status === "queued" ? game.queue.queuedAt : undefined);
 
   useEffect(() => {
@@ -21,12 +21,12 @@ export function LobbyPage() {
   }, [game.acknowledgeMatchFound, game.activeMatch, game.matchFoundVersion, navigate]);
 
   useEffect(() => {
-    if (!session?.accessToken || profileRating !== null) {
+    if (!accessToken || profileRating !== null) {
       return;
     }
     const controller = new AbortController();
     void fetch(`${apiBaseUrl}/me`, {
-      headers: { authorization: `Bearer ${session.accessToken}` },
+      headers: { authorization: `Bearer ${accessToken}` },
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -40,7 +40,7 @@ export function LobbyPage() {
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [profileRating, session?.accessToken]);
+  }, [accessToken, profileRating]);
 
   const rating =
     game.queue.status === "queued" ? game.queue.currentRating : (profileRating ?? undefined);

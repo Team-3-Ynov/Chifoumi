@@ -1,6 +1,6 @@
 import type { Move } from "@chifoumi/schemas/game-events";
 import { useNavigate, useParams } from "react-router-dom";
-import { useGameSession } from "../auth/GameSessionContext.js";
+import { useAuth } from "../auth/AuthContext.js";
 import { FinalScreen } from "../components/FinalScreen.js";
 import { GameErrorNotice } from "../components/GameErrorNotice.js";
 import { MatchHeader } from "../components/MatchHeader.js";
@@ -12,11 +12,11 @@ import { useDeadlineCountdown } from "../hooks/useDeadlineCountdown.js";
 export function MatchPage() {
   const { matchId } = useParams();
   const navigate = useNavigate();
-  const session = useGameSession();
+  const { user } = useAuth();
   const game = useGame();
   const countdown = useDeadlineCountdown(game.round?.deadline);
 
-  if (!session) {
+  if (!user) {
     return null;
   }
 
@@ -42,7 +42,7 @@ export function MatchPage() {
   if (game.matchEnded) {
     return (
       <main className="game-shell">
-        <FinalScreen result={game.matchEnded} userId={session.user.id} onReturn={returnToLobby} />
+        <FinalScreen result={game.matchEnded} userId={user.id} onReturn={returnToLobby} />
       </main>
     );
   }
@@ -61,11 +61,7 @@ export function MatchPage() {
   return (
     <main className="game-shell">
       <section className="match-card" aria-labelledby="match-title">
-        <MatchHeader
-          opponent={game.activeMatch.opponent}
-          player={session.user}
-          score={game.score}
-        />
+        <MatchHeader opponent={game.activeMatch.opponent} player={user} score={game.score} />
 
         <div className="round-panel">
           <span className="eyebrow">Round {game.round?.roundNumber ?? 1}</span>
@@ -75,7 +71,7 @@ export function MatchPage() {
             <span>avant le forfait</span>
           </div>
 
-          <MoveButtons disabled={!canPlay} onPlay={play} />
+          <MoveButtons key={game.round?.roundNumber ?? 0} disabled={!canPlay} onPlay={play} />
 
           {game.awaitingOpponent ? (
             <output className="waiting-message">En attente de l’adversaire...</output>

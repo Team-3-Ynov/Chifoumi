@@ -1,10 +1,12 @@
 import { createContext, type ReactNode, useContext } from "react";
+import { useAuth } from "../auth/AuthContext.js";
 import { type UseGameSocketResult, useGameSocket } from "../hooks/useGameSocket.js";
 
 const GameSocketContext = createContext<UseGameSocketResult | null>(null);
 
 export function GameSocketProvider({ children }: { children: ReactNode }) {
-  const game = useGameSocket();
+  const { accessToken, user } = useAuth();
+  const game = useGameSocket(accessToken, user?.id);
   return <GameSocketContext.Provider value={game}>{children}</GameSocketContext.Provider>;
 }
 

@@ -17,10 +17,27 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import type { ZodType } from "zod";
-import { useGameSession } from "../auth/GameSessionContext.js";
+import type { CreateGameSocket, GameSocketClient } from "./gameSocketTypes.js";
 
 const activeMatchStoragePrefix = "chifoumi.activeMatch";
 const gameServiceUrl = import.meta.env.VITE_GAME_SERVICE_URL ?? "http://localhost:3001";
+
+const createSocketIoClient: CreateGameSocket = ({ token }) =>
+  io(`${gameServiceUrl.replace(/\/$/, "")}/game`, {
+    query: { token },
+    transports: ["websocket"],
+    reconnection: true,
+  }) as Socket as GameSocketClient;
+
+let createGameSocketImpl: CreateGameSocket = createSocketIoClient;
+
+export function configureGameSocketFactory(factory: CreateGameSocket): void {
+  createGameSocketImpl = factory;
+}
+
+export function resetGameSocketFactory(): void {
+  createGameSocketImpl = createSocketIoClient;
+}
 
 export type GameConnectionState = "disconnected" | "connecting" | "connected";
 export type QueueState =
@@ -53,14 +70,15 @@ export type GameSocketActions = {
 
 export type UseGameSocketResult = GameSocketState & GameSocketActions;
 
-export function useGameSocket(_matchId?: string): UseGameSocketResult {
-  const session = useGameSession();
-  const socketRef = useRef<Socket | null>(null);
+export function useGameSocket(
+  token: string | null,
+  userId?: string,
+  matchId?: string,
+): UseGameSocketResult {
+  const socketRef = useRef<GameSocketClient | null>(null);
   const [connectionState, setConnectionState] = useState<GameConnectionState>("disconnected");
   const [queue, setQueue] = useState<QueueState>({ status: "idle" });
-  const [activeMatch, setActiveMatch] = useState<ActiveMatch | null>(() =>
-    readStoredMatch(session?.user.id),
-  );
+  const [activeMatch, setActiveMatch] = useState<ActiveMatch | null>(() => readStoredMatch(userId));
   const [round, setRound] = useState<RoundStartPayload | null>(null);
   const [roundResult, setRoundResult] = useState<RoundResolvedPayload | null>(null);
   const [matchEnded, setMatchEnded] = useState<MatchEndedPayload | null>(null);
@@ -70,19 +88,15 @@ export function useGameSocket(_matchId?: string): UseGameSocketResult {
   const [matchFoundVersion, setMatchFoundVersion] = useState(0);
 
   useEffect(() => {
-    if (!session?.accessToken) {
+    if (!token || !userId) {
       setConnectionState("disconnected");
       setActiveMatch(null);
       return;
     }
 
-    setActiveMatch(readStoredMatch(session.user.id));
+    setActiveMatch(readStoredMatch(userId));
     setConnectionState("connecting");
-    const socket = io(`${gameServiceUrl.replace(/\/$/, "")}/game`, {
-      query: { token: session.accessToken },
-      transports: ["websocket"],
-      reconnection: true,
-    });
+    const socket = createGameSocketImpl({ token, matchId });
     socketRef.current = socket;
 
     socket.on("connect", () => {
@@ -114,7 +128,7 @@ export function useGameSocket(_matchId?: string): UseGameSocketResult {
     socket.on("matchFound", (payload: unknown) => {
       const parsed = parsePayload(matchFoundPayloadSchema, payload, "matchFound", setError);
       if (parsed) {
-        storeMatch(session.user.id, parsed);
+        storeMatch(userId, parsed);
         setActiveMatch(parsed);
         setQueue({ status: "idle" });
         setMatchEnded(null);
@@ -152,7 +166,7 @@ export function useGameSocket(_matchId?: string): UseGameSocketResult {
     socket.on("matchResumed", (payload: unknown) => {
       const parsed = parsePayload(matchResumedPayloadSchema, payload, "matchResumed", setError);
       if (parsed) {
-        restoreResumedMatch(session.user.id, parsed, setActiveMatch);
+        restoreResumedMatch(userId, parsed, setActiveMatch);
         setRound({
           matchId: parsed.matchId,
           roundNumber: parsed.currentRound,
@@ -175,13 +189,15 @@ export function useGameSocket(_matchId?: string): UseGameSocketResult {
       setAwaitingOpponent(false);
     });
 
+    socket.connect();
+
     return () => {
-      socket.removeAllListeners();
+      socket.removeAllListeners?.();
       socket.disconnect();
       socketRef.current = null;
       setConnectionState("disconnected");
     };
-  }, [session?.accessToken, session?.user.id]);
+  }, [matchId, token, userId]);
 
   const joinQueue = useCallback(() => {
     const socket = socketRef.current;
@@ -209,8 +225,8 @@ export function useGameSocket(_matchId?: string): UseGameSocketResult {
   }, []);
 
   const clearMatch = useCallback(() => {
-    if (session?.user.id) {
-      sessionStorage.removeItem(activeMatchStorageKey(session.user.id));
+    if (userId) {
+      sessionStorage.removeItem(activeMatchStorageKey(userId));
     }
     setActiveMatch(null);
     setRound(null);
@@ -218,7 +234,7 @@ export function useGameSocket(_matchId?: string): UseGameSocketResult {
     setMatchEnded(null);
     setScore({ a: 0, b: 0 });
     setAwaitingOpponent(false);
-  }, [session?.user.id]);
+  }, [userId]);
 
   const clearError = useCallback(() => setError(null), []);
   const acknowledgeMatchFound = useCallback(() => setMatchFoundVersion(0), []);

@@ -1,61 +1,57 @@
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
-import "./App.css";
-import {
-  type GameSession,
-  GameSessionProvider,
-  useGameSession,
-} from "./auth/GameSessionContext.js";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { useAuth } from "./auth/AuthContext.js";
+import { Header } from "./components/Header.js";
+import { GuestRoute, ProtectedRoute } from "./components/ProtectedRoute.js";
 import { GameSocketProvider } from "./game/GameSocketContext.js";
+import { LeaderboardPage } from "./pages/LeaderboardPage.js";
 import { LobbyPage } from "./pages/LobbyPage.js";
+import { LoginPage } from "./pages/LoginPage.js";
 import { MatchPage } from "./pages/MatchPage.js";
+import { ProfilePage } from "./pages/ProfilePage.js";
+import { RegisterPage } from "./pages/RegisterPage.js";
+import "./App.css";
 
-export type AppProps = {
-  session?: GameSession | null;
-};
+function CatchAllRedirect() {
+  const { isAuthenticated, isBootstrapping } = useAuth();
 
-export function App({ session = null }: AppProps) {
-  return (
-    <GameSessionProvider session={session}>
-      <BrowserRouter>
-        <GameSocketProvider>
-          <Routes>
-            <Route element={<RequireGameSession />}>
-              <Route path="/lobby" element={<LobbyPage />} />
-              <Route path="/match/:matchId" element={<MatchPage />} />
-            </Route>
-            <Route path="/login" element={<AuthIntegrationPage />} />
-            <Route path="*" element={<Navigate replace to="/lobby" />} />
-          </Routes>
-        </GameSocketProvider>
-      </BrowserRouter>
-    </GameSessionProvider>
-  );
+  if (isBootstrapping) {
+    return (
+      <div className="page">
+        <div className="panel">
+          <p className="muted">Chargement…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <Navigate to={isAuthenticated ? "/lobby" : "/login"} replace />;
 }
 
-function RequireGameSession() {
-  const session = useGameSession();
-  const location = useLocation();
-  if (!session) {
-    return <Navigate replace state={{ from: location.pathname }} to="/login" />;
-  }
-  return <Outlet />;
-}
-
-function AuthIntegrationPage() {
-  const session = useGameSession();
-  if (session) {
-    return <Navigate replace to="/lobby" />;
-  }
+export function App() {
   return (
-    <main className="game-shell">
-      <section className="auth-bridge-card">
-        <span className="eyebrow">Session requise</span>
-        <h1>Connectez-vous pour jouer</h1>
-        <p>
-          Les écrans d’authentification sont fournis par l’US-040. Son AuthContext devra passer la
-          session en mémoire à la propriété <code>session</code> de l’application.
-        </p>
-      </section>
-    </main>
+    <GameSocketProvider>
+      <div className="layout">
+        <Header />
+        <Routes>
+          <Route path="/" element={<Navigate to="/lobby" replace />} />
+
+          <Route element={<GuestRoute />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+          </Route>
+
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/lobby" element={<LobbyPage />} />
+            <Route path="/match/:matchId" element={<MatchPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/profile/:id" element={<ProfilePage />} />
+          </Route>
+
+          <Route path="*" element={<CatchAllRedirect />} />
+        </Routes>
+      </div>
+    </GameSocketProvider>
   );
 }

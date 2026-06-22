@@ -15,6 +15,7 @@ import {
   type RoundResolvedPayload,
 } from "../match-session/match-session.types.js";
 import { transitionMatchState } from "../match-session/match-state-machine.js";
+import { MatchmakingMetricsService } from "../matchmaking/matchmaking-metrics.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { isValidMove, resolveRound as resolveRps } from "../rps/resolve.js";
 import { MatchDisconnectSchedulerService } from "./match-disconnect-scheduler.service.js";
@@ -51,6 +52,7 @@ export class MatchPlayService {
     private readonly eventBus: MatchEventBus,
     private readonly matchEndedPublisher: MatchEndedPublisher,
     private readonly matchTimeoutScheduler: MatchTimeoutSchedulerService,
+    private readonly metrics: MatchmakingMetricsService,
     private readonly matchDisconnectScheduler: MatchDisconnectSchedulerService,
     private readonly redisService: RedisService,
     private readonly logger: Logger,
@@ -394,6 +396,7 @@ export class MatchPlayService {
 
   private async finalizeMatch(state: MatchState): Promise<void> {
     await this.clearTimer(state.matchId);
+    this.metrics.recordMatchPlayed(this.resolveMatchOutcome(state));
     await this.matchDisconnectScheduler.cancelForfeitForPlayers(
       state.players.map((player) => player.userId),
     );
@@ -417,6 +420,14 @@ export class MatchPlayService {
 
     await this.matchSessionService.cleanupUserMappings(state);
     await this.matchEndedPublisher.publishMatchEnded(state);
+  }
+
+  private resolveMatchOutcome(state: MatchState): "win" | "draw" | "forfeit" {
+    if (state.endReason === "FORFEIT_TIMEOUT" || state.endReason === "DISCONNECT_FORFEIT") {
+      return "forfeit";
+    }
+
+    return state.winnerId ? "win" : "draw";
   }
 
   private async schedulePhaseTimeout(

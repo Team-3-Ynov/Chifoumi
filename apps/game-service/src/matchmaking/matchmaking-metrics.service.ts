@@ -1,11 +1,14 @@
 import { Injectable } from "@nestjs/common";
-import { collectDefaultMetrics, Gauge, Histogram, Registry } from "prom-client";
+import { Counter, collectDefaultMetrics, Gauge, Histogram, Registry } from "prom-client";
+
+export type MatchPlayedOutcome = "win" | "draw" | "forfeit";
 
 @Injectable()
 export class MatchmakingMetricsService {
   readonly registry = new Registry();
   readonly queueSize: Gauge<string>;
   readonly matchDurationSeconds: Histogram<string>;
+  readonly matchPlayedTotal: Counter<string>;
 
   constructor() {
     collectDefaultMetrics({ register: this.registry });
@@ -22,6 +25,13 @@ export class MatchmakingMetricsService {
       buckets: [0.5, 1, 2, 5, 10, 30, 60, 120],
       registers: [this.registry],
     });
+
+    this.matchPlayedTotal = new Counter({
+      name: "match_played_total",
+      help: "Total completed matches by outcome",
+      labelNames: ["outcome"],
+      registers: [this.registry],
+    });
   }
 
   setQueueSize(size: number): void {
@@ -31,6 +41,10 @@ export class MatchmakingMetricsService {
   observeMatchDuration(queuedAt: number, matchedAt: number): void {
     const elapsedSeconds = (matchedAt - queuedAt) / 1000;
     this.matchDurationSeconds.observe(elapsedSeconds);
+  }
+
+  recordMatchPlayed(outcome: MatchPlayedOutcome): void {
+    this.matchPlayedTotal.inc({ outcome });
   }
 
   async getMetrics(): Promise<string> {

@@ -1,30 +1,34 @@
-# Front Chifoumi
+# @chifoumi/front
 
-## Configuration locale
+React + Vite client for Chifoumi Ranked.
 
-```env
-VITE_API_BASE_URL=http://localhost:3000
-VITE_GAME_SERVICE_URL=http://localhost:3001
+## Testing strategy
+
+Critical front logic is covered with **Vitest** and **React Testing Library**:
+
+- `useGameSocket` — Socket.io lifecycle and match events via a centralized mock in `src/test/mocks/socket.ts`
+- `useAuth` — login, logout, bootstrap refresh, and query cache cleanup
+- `MoveButtons` and `RoundResultBanner` — pure match UI components
+- `formatRatingDelta` — ELO delta formatting helper
+- `apiClient` — 401 retry and API error parsing
+
+Coverage thresholds are enforced in `vitest.config.ts` (`lines: 60`, `branches: 50`).
+
+Explicit coverage exclusions keep CRUD pages and bootstrap files out of the front threshold:
+
+- `src/main.tsx`, `src/App.tsx`
+- `src/pages/LeaderboardPage.tsx`, `src/pages/ProfilePage.tsx`
+- other basic pages and layout components (`LoginPage`, `RegisterPage`, `LobbyPage`, `Header`, etc.)
+
+Run tests locally:
+
+```bash
+pnpm --filter @chifoumi/front test
 ```
 
-Le client Socket.io ajoute automatiquement le namespace `/game` et transmet l'access token dans
-la query de connexion attendue par le game-service.
+## Game client
 
-## Intégration avec l'US-040
-
-L'US-041 ne persiste aucun token. `App` accepte une propriété `session` en mémoire :
-
-```tsx
-<App
-  session={{
-    accessToken,
-    user: { id: user.id, displayName: user.displayName, rating: user.rating },
-  }}
-/>
-```
-
-Le futur `AuthContext` de l'US-040 doit alimenter cette propriété après login, register ou refresh.
-Sans session, les routes `/lobby` et `/match/:matchId` redirigent vers `/login`.
-
-Les seules données conservées dans `sessionStorage` sont l'identifiant du match et le profil public
-de l'adversaire, afin de proposer le bouton de reprise. L'access token n'y est jamais écrit.
+The lobby and BO3 match screens use `VITE_GAME_SERVICE_URL` (default:
+`http://localhost:3001`) and connect to the `/game` Socket.io namespace. The access token comes
+from `AuthContext` memory and is never persisted by the game client. Only public active-match
+metadata is stored in `sessionStorage` to display the resume action.
