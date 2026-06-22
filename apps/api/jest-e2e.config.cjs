@@ -20,4 +20,6 @@ module.exports = {
     ],
   },
   transformIgnorePatterns: ["node_modules/(?!(@prisma/client|\\.prisma/client)/)"],
+  // BullMQ + ioredis can leave reconnect timers open after failed local runs.
+  forceExit: true,
 };
