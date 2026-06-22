@@ -42,7 +42,14 @@ export class MatchesController {
       },
     },
   })
-  @ApiNotFoundResponse({ description: "Match not found" })
+  @ApiNotFoundResponse({
+    description: "MATCH_NOT_FOUND",
+    schema: {
+      example: {
+        error: "MATCH_NOT_FOUND",
+      },
+    },
+  })
   getAudit(@Param("id", new ParseUUIDPipe()) matchId: string): Promise<MatchAuditResponseDto> {
     return this.auditService.buildAudit(matchId);
   }

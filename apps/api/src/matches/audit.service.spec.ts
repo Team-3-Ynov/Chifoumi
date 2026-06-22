@@ -1,18 +1,8 @@
 import { MatchStatus } from "@chifoumi/db";
+import { computeCommitHash } from "@chifoumi/schemas";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import type { PrismaService } from "../prisma/prisma.service.js";
 import { AuditService } from "./audit.service.js";
-import { computeCommitHash } from "./commit-hash.js";
-
-describe("computeCommitHash", () => {
-  it("hashes move and nonce with SHA256", () => {
-    const hash = computeCommitHash("rock", "abc123");
-    expect(hash).toMatch(/^[a-f0-9]{64}$/);
-    expect(hash).toBe(computeCommitHash("rock", "abc123"));
-    expect(hash).not.toBe(computeCommitHash("paper", "abc123"));
-  });
-});
 
 describe("AuditService", () => {
   let service: AuditService;
@@ -30,12 +20,12 @@ describe("AuditService", () => {
   it("throws NotFoundException when match is missing", async () => {
     prisma.match.findUnique.mockResolvedValue(null);
 
-    await expect(service.buildAudit("00000000-0000-4000-8000-000000000001")).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.buildAudit("00000000-0000-4000-8000-000000000001")).rejects.toMatchObject({
+      response: { error: "MATCH_NOT_FOUND" },
+    });
   });
 
-  it("throws ForbiddenException when match is not ended", async () => {
+  it("throws ForbiddenException when match is in progress", async () => {
     prisma.match.findUnique.mockResolvedValue({
       id: "match-1",
       status: MatchStatus.in_progress,
@@ -50,7 +40,33 @@ describe("AuditService", () => {
     await expect(service.buildAudit("match-1")).rejects.toMatchObject({
       response: { error: "MATCH_NOT_ENDED" },
     });
-    await expect(service.buildAudit("match-1")).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("throws ForbiddenException when match is aborted", async () => {
+    prisma.match.findUnique.mockResolvedValue({
+      id: "match-1",
+      status: MatchStatus.aborted,
+      playerAId: "player-a",
+      playerBId: "player-b",
+      scoreA: 0,
+      scoreB: 1,
+      winnerId: null,
+      rounds: [
+        {
+          roundNumber: 1,
+          commitA: computeCommitHash("rock", "nonce-a"),
+          commitB: null,
+          moveA: null,
+          moveB: null,
+          nonceA: null,
+          nonceB: null,
+        },
+      ],
+    });
+
+    await expect(service.buildAudit("match-1")).rejects.toMatchObject({
+      response: { error: "MATCH_NOT_ENDED" },
+    });
   });
 
   it("builds audit payload with hash verification", async () => {

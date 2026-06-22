@@ -49,7 +49,7 @@ export class MatchAuditResponseDto {
   @ApiProperty({
     type: [String],
     description: "Player A and player B user ids",
-    example: ["7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1", "8c7c06g3-40ea-5g3e-9b69-gc9691e3g8b2"],
+    example: ["7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1", "8c7c06a3-40ea-5a3e-9b69-ac9691e3a8b2"],
   })
   players!: [string, string];
 

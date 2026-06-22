@@ -2,12 +2,12 @@ import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import { MatchStatus, RoundWinner } from "@chifoumi/db";
+import { computeCommitHash } from "@chifoumi/schemas";
 import { type INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { config } from "dotenv";
 import request from "supertest";
 import { AppModule } from "../src/app.module.js";
-import { computeCommitHash } from "../src/matches/commit-hash.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
 
 const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
@@ -194,8 +194,45 @@ describe("GET /matches/:id/audit (e2e)", () => {
     expect(res.body).toEqual({ error: "MATCH_NOT_ENDED" });
   });
 
+  it("returns 403 for an aborted match without leaking commits", async () => {
+    const { playerAId, playerBId } = await seedUsers();
+    const matchId = randomUUID();
+    const nonceA = createHash("sha256").update("nonce-a").digest("hex").slice(0, 32);
+
+    await prisma.match.create({
+      data: {
+        id: matchId,
+        playerAId,
+        playerBId,
+        scoreA: 0,
+        scoreB: 1,
+        startedAt: new Date(Date.now() - 120_000),
+        endedAt: new Date(Date.now() - 60_000),
+        status: MatchStatus.aborted,
+        rounds: {
+          create: [
+            {
+              roundNumber: 1,
+              commitA: computeCommitHash("rock", nonceA),
+              winner: RoundWinner.b,
+              resolvedAt: new Date(Date.now() - 90_000),
+            },
+          ],
+        },
+      },
+    });
+
+    const res = await request(app.getHttpServer()).get(`/matches/${matchId}/audit`).expect(403);
+
+    expect(res.body).toEqual({ error: "MATCH_NOT_ENDED" });
+  });
+
   it("returns 404 for an unknown match", async () => {
-    await request(app.getHttpServer()).get(`/matches/${randomUUID()}/audit`).expect(404);
+    const res = await request(app.getHttpServer())
+      .get(`/matches/${randomUUID()}/audit`)
+      .expect(404);
+
+    expect(res.body).toEqual({ error: "MATCH_NOT_FOUND" });
   });
 
   it("reports hash mismatch when stored commit does not match reveal", async () => {

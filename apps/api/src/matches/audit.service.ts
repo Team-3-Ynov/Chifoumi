@@ -1,7 +1,7 @@
-import { MatchStatus, type Move } from "@chifoumi/db";
+import { MatchStatus } from "@chifoumi/db";
+import { verifyCommit } from "@chifoumi/schemas";
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { verifyCommit } from "./commit-hash.js";
 import type { MatchAuditResponseDto } from "./dto/match-audit-response.dto.js";
 
 @Injectable()
@@ -19,9 +19,10 @@ export class AuditService {
     });
 
     if (!match) {
-      throw new NotFoundException();
+      throw new NotFoundException({ error: "MATCH_NOT_FOUND" });
     }
 
+    // Only ended matches are auditable; in-progress/aborted must not leak partial commits.
     if (match.status !== MatchStatus.ended) {
       throw new ForbiddenException({ error: "MATCH_NOT_ENDED" });
     }
@@ -38,8 +39,8 @@ export class AuditService {
         nonceA: round.nonceA,
         nonceB: round.nonceB,
         hashCheck: {
-          a: verifyCommit(round.commitA, this.moveToString(round.moveA), round.nonceA),
-          b: verifyCommit(round.commitB, this.moveToString(round.moveB), round.nonceB),
+          a: verifyCommit(round.commitA, round.moveA, round.nonceA),
+          b: verifyCommit(round.commitB, round.moveB, round.nonceB),
         },
       })),
       finalScore: {
@@ -48,9 +49,5 @@ export class AuditService {
       },
       winner: match.winnerId,
     };
-  }
-
-  private moveToString(move: Move | null): string | null {
-    return move ?? null;
   }
 }
