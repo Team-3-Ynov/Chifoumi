@@ -8,7 +8,7 @@ import { io, type Socket } from "socket.io-client";
 import { AppModule } from "../src/app.module.js";
 import { JWT_CONFIG } from "../src/config/jwt.config.js";
 import { MatchPlayService } from "../src/match/match-play.service.js";
-import { MATCH_TIMEOUT_QUEUE } from "../src/match/match-timeout.constants.js";
+import { MATCH_TIMEOUT_QUEUE, matchTimeoutJobKey } from "../src/match/match-timeout.constants.js";
 import { MatchTimeoutSchedulerService } from "../src/match/match-timeout-scheduler.service.js";
 import { MatchmakingWorkerService } from "../src/matchmaking/matchmaking-worker.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
@@ -56,6 +56,28 @@ function waitForEvent<T>(socket: Socket, event: string): Promise<T> {
       resolvePromise(payload);
     });
   });
+}
+
+async function waitForDelayedTimeoutJob(
+  queue: Queue,
+  matchId: string,
+  roundNumber: number,
+): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const jobs = await queue.getJobs(["delayed"]);
+    const match = jobs.find(
+      (job) => job.data.matchId === matchId && job.data.roundNumber === roundNumber,
+    );
+    if (match) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  throw new Error(
+    `timed out waiting for delayed timeout job (match=${matchId}, round=${roundNumber})`,
+  );
 }
 
 async function connectAndJoin(
@@ -172,8 +194,10 @@ describe("Match timeout BullMQ (e2e)", () => {
       playerB.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "scissors" });
       await waitForEvent(playerA, "roundResolved");
       await waitForEvent(playerB, "roundResolved");
-      await waitForEvent<RoundStartPayload>(playerA, "roundStart");
-      await waitForEvent<RoundStartPayload>(playerB, "roundStart");
+      await waitForDelayedTimeoutJob(queue, matchId, 2);
+
+      const timeoutJobId = await redisService.get(matchTimeoutJobKey(matchId));
+      expect(timeoutJobId).toBeTruthy();
 
       const delayedJobs = await queue.getJobs(["delayed"]);
       expect(delayedJobs).toHaveLength(1);

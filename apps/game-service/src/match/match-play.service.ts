@@ -243,8 +243,8 @@ export class MatchPlayService {
       return;
     }
 
-    await this.matchSessionService.broadcastRoundStart(state);
     await this.scheduleRoundTimeout(state.matchId, state.currentRound, state.roundDeadline);
+    await this.matchSessionService.broadcastRoundStart(state);
   }
 
   private async finalizeMatch(state: MatchState): Promise<void> {
