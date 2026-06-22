@@ -93,4 +93,13 @@ describe("AuthVerificationService", () => {
       reason: "REVOKED",
     });
   });
+
+  it("returns unavailable when Redis blacklist check fails", async () => {
+    redisService.isAccessTokenRevoked.mockRejectedValue(new Error("ECONNREFUSED"));
+    const token = await signToken();
+    await expect(authVerificationService.verifyToken(token)).resolves.toEqual({
+      valid: false,
+      reason: "UNAVAILABLE",
+    });
+  });
 });

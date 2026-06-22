@@ -3,7 +3,12 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { UserRole } from "@chifoumi/db";
 import { AUTH_PROTO_PACKAGE, AUTH_PROTO_PATH } from "@chifoumi/proto";
-import { credentials, loadPackageDefinition, type ServiceClientConstructor } from "@grpc/grpc-js";
+import {
+  credentials,
+  status as GrpcStatus,
+  loadPackageDefinition,
+  type ServiceClientConstructor,
+} from "@grpc/grpc-js";
 import { loadSync } from "@grpc/proto-loader";
 import type { INestApplication } from "@nestjs/common";
 import { ValidationPipe } from "@nestjs/common";
@@ -89,6 +94,18 @@ function getRating(usersClient: UsersClient, userId: string): Promise<Record<str
         return;
       }
       resolvePromise(response);
+    });
+  });
+}
+
+function getRatingExpectNotFound(usersClient: UsersClient, userId: string): Promise<number> {
+  return new Promise((resolvePromise, reject) => {
+    usersClient.getRating({ userId }, (error) => {
+      if (error && typeof error === "object" && "code" in error) {
+        resolvePromise((error as { code: number }).code);
+        return;
+      }
+      reject(error ?? new Error("Expected gRPC NOT_FOUND error"));
     });
   });
 }
@@ -199,6 +216,22 @@ describe("gRPC (e2e)", () => {
     expect(response.reason).toBe("REVOKED");
   });
 
+  it("VerifyToken rejects expired tokens", async () => {
+    const token = await jwtService.signAsync(
+      {
+        sub: "11111111-1111-1111-1111-111111111111",
+        role: UserRole.player,
+        jti: uuidv4(),
+        displayName: "expired",
+      },
+      { algorithm: "RS256", expiresIn: -1 },
+    );
+
+    const response = await verifyToken(authClient, token);
+    expect(response.valid).toBe(false);
+    expect(response.reason).toBe("EXPIRED");
+  });
+
   it("GetRating returns rating for an existing user", async () => {
     const user = await prisma.user.create({
       data: {
@@ -215,5 +248,10 @@ describe("gRPC (e2e)", () => {
     const response = await getRating(usersClient, user.id);
     expect(response.rating).toBe(1337);
     expect(response.gamesPlayed).toBe(12);
+  });
+
+  it("GetRating returns NOT_FOUND for an unknown user", async () => {
+    const code = await getRatingExpectNotFound(usersClient, "99999999-9999-9999-9999-999999999999");
+    expect(code).toBe(GrpcStatus.NOT_FOUND);
   });
 });

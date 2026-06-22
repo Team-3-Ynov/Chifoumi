@@ -1,11 +1,13 @@
 import type { VerifyTokenResponse } from "@chifoumi/proto";
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { JwtService, TokenExpiredError } from "@nestjs/jwt";
 import type { AccessTokenPayload } from "../auth/token.service.js";
 import { RedisService } from "../redis/redis.service.js";
 
 @Injectable()
 export class AuthVerificationService {
+  private readonly logger = new Logger(AuthVerificationService.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
@@ -33,8 +35,9 @@ export class AuthVerificationService {
     let revoked: boolean;
     try {
       revoked = await this.redisService.isAccessTokenRevoked(payload.jti);
-    } catch {
-      return { valid: false, reason: "INVALID" };
+    } catch (error) {
+      this.logger.error("Redis blacklist check failed during token verification", error);
+      return { valid: false, reason: "UNAVAILABLE" };
     }
 
     if (revoked) {

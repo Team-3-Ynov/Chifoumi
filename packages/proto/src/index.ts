@@ -6,7 +6,7 @@ const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const AUTH_PROTO_PATH = join(packageRoot, "proto", "auth.proto");
 export const AUTH_PROTO_PACKAGE = "chifoumi.auth.v1";
 
-export type VerifyTokenReason = "INVALID" | "EXPIRED" | "REVOKED";
+export type VerifyTokenReason = "INVALID" | "EXPIRED" | "REVOKED" | "UNAVAILABLE";
 
 export type VerifyTokenResponse = {
   valid: boolean;
