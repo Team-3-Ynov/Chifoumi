@@ -88,6 +88,7 @@ describe("Match timeout BullMQ (e2e)", () => {
   let worker: MatchmakingWorkerService;
   let scheduler: MatchTimeoutSchedulerService;
   let matchPlayService: MatchPlayService;
+  let recoveryWorker: Worker | null = null;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -108,6 +109,10 @@ describe("Match timeout BullMQ (e2e)", () => {
   });
 
   afterAll(async () => {
+    if (recoveryWorker) {
+      await recoveryWorker.close();
+      recoveryWorker = null;
+    }
     if (app) {
       await app.close();
     }
@@ -161,23 +166,27 @@ describe("Match timeout BullMQ (e2e)", () => {
       prefix: process.env.BULLMQ_PREFIX ?? "rps-test",
     });
 
-    playerA.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "rock" });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    playerB.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "scissors" });
-    await waitForEvent(playerA, "roundResolved");
-    await waitForEvent(playerB, "roundResolved");
+    try {
+      playerA.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "rock" });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      playerB.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "scissors" });
+      await waitForEvent(playerA, "roundResolved");
+      await waitForEvent(playerB, "roundResolved");
+      await waitForEvent<RoundStartPayload>(playerA, "roundStart");
+      await waitForEvent<RoundStartPayload>(playerB, "roundStart");
 
-    const delayedJobs = await queue.getJobs(["delayed"]);
-    expect(delayedJobs).toHaveLength(1);
-    expect(delayedJobs[0]?.data).toMatchObject({
-      matchId,
-      roundNumber: 2,
-      expectedState: "WAITING_PLAYS",
-    });
-
-    await queue.close();
-    playerA.disconnect();
-    playerB.disconnect();
+      const delayedJobs = await queue.getJobs(["delayed"]);
+      expect(delayedJobs).toHaveLength(1);
+      expect(delayedJobs[0]?.data).toMatchObject({
+        matchId,
+        roundNumber: 2,
+        expectedState: "WAITING_PLAYS",
+      });
+    } finally {
+      await queue.close();
+      playerA.disconnect();
+      playerB.disconnect();
+    }
   });
 
   it("applies forfeit when another instance consumes the delayed timeout job", async () => {
@@ -186,7 +195,7 @@ describe("Match timeout BullMQ (e2e)", () => {
     await scheduler.cancelTimeout(matchId);
     await scheduler.scheduleTimeout(matchId, roundStart.roundNumber, "WAITING_PLAYS", 200);
 
-    const recoveryWorker = new Worker(
+    recoveryWorker = new Worker(
       MATCH_TIMEOUT_QUEUE,
       async (job) => {
         await matchPlayService.handleMatchTimeout(
@@ -201,18 +210,21 @@ describe("Match timeout BullMQ (e2e)", () => {
       },
     );
 
-    const matchEndedA = waitForEvent<MatchEndedPayload>(playerA, "matchEnded");
-    const matchEndedB = waitForEvent<MatchEndedPayload>(playerB, "matchEnded");
+    try {
+      const matchEndedA = waitForEvent<MatchEndedPayload>(playerA, "matchEnded");
+      const matchEndedB = waitForEvent<MatchEndedPayload>(playerB, "matchEnded");
 
-    const endedA = await matchEndedA;
-    const endedB = await matchEndedB;
+      const endedA = await matchEndedA;
+      const endedB = await matchEndedB;
 
-    expect(endedA.reason).toBe("FORFEIT_TIMEOUT");
-    expect(endedB.reason).toBe("FORFEIT_TIMEOUT");
-    expect(endedA.winner).toBeTruthy();
-
-    await recoveryWorker.close();
-    playerA.disconnect();
-    playerB.disconnect();
+      expect(endedA.reason).toBe("FORFEIT_TIMEOUT");
+      expect(endedB.reason).toBe("FORFEIT_TIMEOUT");
+      expect(endedA.winner).toBeTruthy();
+    } finally {
+      await recoveryWorker.close();
+      recoveryWorker = null;
+      playerA.disconnect();
+      playerB.disconnect();
+    }
   });
 });

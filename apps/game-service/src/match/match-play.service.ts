@@ -51,7 +51,7 @@ export class MatchPlayService {
   ) {}
 
   async onMatchStarted(state: MatchState): Promise<void> {
-    this.scheduleRoundTimeout(state.matchId, state.currentRound, state.roundDeadline);
+    await this.scheduleRoundTimeout(state.matchId, state.currentRound, state.roundDeadline);
   }
 
   async submitPlay(input: PlayInput): Promise<void> {
@@ -244,11 +244,11 @@ export class MatchPlayService {
     }
 
     await this.matchSessionService.broadcastRoundStart(state);
-    this.scheduleRoundTimeout(state.matchId, state.currentRound, state.roundDeadline);
+    await this.scheduleRoundTimeout(state.matchId, state.currentRound, state.roundDeadline);
   }
 
   private async finalizeMatch(state: MatchState): Promise<void> {
-    this.clearTimer(state.matchId);
+    await this.clearTimer(state.matchId);
 
     const payload = {
       matchId: state.matchId,
@@ -271,18 +271,29 @@ export class MatchPlayService {
     await this.matchEndedPublisher.publishMatchEnded(state);
   }
 
-  private scheduleRoundTimeout(matchId: string, roundNumber: number, deadlineIso: string): void {
+  private async scheduleRoundTimeout(
+    matchId: string,
+    roundNumber: number,
+    deadlineIso: string,
+  ): Promise<void> {
     const delayMs = Math.max(0, new Date(deadlineIso).getTime() - Date.now());
-    void this.matchTimeoutScheduler
-      .scheduleTimeout(matchId, roundNumber, "WAITING_PLAYS", delayMs)
-      .catch((error) => {
-        this.logger.warn({ matchId, roundNumber, error }, "failed to schedule round timeout");
-      });
+    try {
+      await this.matchTimeoutScheduler.scheduleTimeout(
+        matchId,
+        roundNumber,
+        "WAITING_PLAYS",
+        delayMs,
+      );
+    } catch (error) {
+      this.logger.warn({ matchId, roundNumber, error }, "failed to schedule round timeout");
+    }
   }
 
-  private clearTimer(matchId: string): void {
-    void this.matchTimeoutScheduler.cancelTimeout(matchId).catch((error) => {
+  private async clearTimer(matchId: string): Promise<void> {
+    try {
+      await this.matchTimeoutScheduler.cancelTimeout(matchId);
+    } catch (error) {
       this.logger.warn({ matchId, error }, "failed to cancel round timeout");
-    });
+    }
   }
 }
