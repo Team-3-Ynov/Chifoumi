@@ -423,7 +423,7 @@ export class MatchPlayService {
   }
 
   private resolveMatchOutcome(state: MatchState): "win" | "draw" | "forfeit" {
-    if (state.endReason === "FORFEIT_TIMEOUT") {
+    if (state.endReason === "FORFEIT_TIMEOUT" || state.endReason === "DISCONNECT_FORFEIT") {
       return "forfeit";
     }
 

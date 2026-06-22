@@ -68,6 +68,10 @@ services:
       FRONTEND_URL: http://localhost:5173
       BULLMQ_PREFIX: rps
       INSTANCE_ID: api-1
+      JWT_PRIVATE_KEY_PATH: /app/infra/keys/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+    volumes:
+      - ./infra/keys:/app/infra/keys:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/metrics || exit 1"]
       interval: 10s
@@ -97,6 +101,10 @@ services:
       FRONTEND_URL: http://localhost:5173
       BULLMQ_PREFIX: rps
       INSTANCE_ID: api-2
+      JWT_PRIVATE_KEY_PATH: /app/infra/keys/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+    volumes:
+      - ./infra/keys:/app/infra/keys:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/metrics || exit 1"]
       interval: 10s

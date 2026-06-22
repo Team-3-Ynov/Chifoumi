@@ -20,6 +20,9 @@ describe("MatchPlayService", () => {
     scheduleTimeout: jest.Mock;
     cancelTimeout: jest.Mock;
   };
+  let metrics: {
+    recordMatchPlayed: jest.Mock;
+  };
 
   beforeEach(async () => {
     client = new Redis(`redis://match-play-test/${Date.now()}-${Math.random()}`);
@@ -46,16 +49,16 @@ describe("MatchPlayService", () => {
     };
 
     const logger = { warn: jest.fn(), debug: jest.fn() } as unknown as Logger;
-    const metrics = {
+    metrics = {
       recordMatchPlayed: jest.fn(),
-    } as unknown as MatchmakingMetricsService;
+    };
 
     service = new MatchPlayService(
       matchSessionService,
       eventBus,
       matchEndedPublisher,
       matchTimeoutScheduler as unknown as MatchTimeoutSchedulerService,
-      metrics,
+      metrics as unknown as MatchmakingMetricsService,
       matchDisconnectScheduler as unknown as import("./match-disconnect-scheduler.service.js").MatchDisconnectSchedulerService,
       redisService,
       logger,
@@ -267,6 +270,7 @@ describe("MatchPlayService", () => {
     expect(state?.status).toBe("ENDED");
     expect(state?.winnerId).toBe("b");
     expect(state?.endReason).toBe("DISCONNECT_FORFEIT");
+    expect(metrics.recordMatchPlayed).toHaveBeenCalledWith("forfeit");
   });
 
   it("skips disconnect forfeit when the player has an active socket", async () => {

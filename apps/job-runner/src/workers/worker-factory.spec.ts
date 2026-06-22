@@ -127,6 +127,8 @@ describe("WorkerFactory", () => {
     const permanentFailedJob = { ...failedJob, attemptsMade: 3 };
 
     handlers.get("failed")?.(failedJob, new Error("transient"));
+    expect(recordSpy).not.toHaveBeenCalledWith("match-events", "failed");
+
     handlers.get("failed")?.(permanentFailedJob, new Error("permanent"));
     handlers.get("completed")?.();
 

@@ -59,13 +59,14 @@ export class WorkerFactory {
     });
 
     worker.on("failed", (job, error) => {
-      this.metrics.recordJobProcessed(queue, "failed");
-
-      if (
-        queue === "match-events" &&
+      const isPermanentFailure =
         job &&
-        (error instanceof UnrecoverableError || job.attemptsMade >= (job.opts.attempts ?? 1))
-      ) {
+        (error instanceof UnrecoverableError || job.attemptsMade >= (job.opts.attempts ?? 1));
+      if (isPermanentFailure) {
+        this.metrics.recordJobProcessed(queue, "failed");
+      }
+
+      if (queue === "match-events" && job && isPermanentFailure) {
         this.logger.error(
           {
             worker_role: this.config.WORKER_ROLE,

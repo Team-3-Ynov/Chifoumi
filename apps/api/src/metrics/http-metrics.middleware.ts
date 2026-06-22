@@ -17,21 +17,17 @@ type MetricsResponse = {
 
 @Injectable()
 export class HttpMetricsMiddleware implements NestMiddleware {
-  readonly registry = new Registry();
-  private readonly httpRequestsTotal: Counter<string>;
-
-  constructor() {
-    this.httpRequestsTotal = new Counter({
-      name: "http_requests_total",
-      help: "Total HTTP requests handled by the API",
-      labelNames: ["method", "route", "status"],
-      registers: [this.registry],
-    });
-  }
+  private static readonly registry = new Registry();
+  private static readonly httpRequestsTotal = new Counter({
+    name: "http_requests_total",
+    help: "Total HTTP requests handled by the API",
+    labelNames: ["method", "route", "status"],
+    registers: [HttpMetricsMiddleware.registry],
+  });
 
   use(req: MetricsRequest, res: MetricsResponse, next: () => void): void {
     res.on("finish", () => {
-      this.httpRequestsTotal.inc({
+      HttpMetricsMiddleware.httpRequestsTotal.inc({
         method: req.method ?? "UNKNOWN",
         route: this.resolveRoute(req),
         status: String(res.statusCode),
@@ -42,15 +38,53 @@ export class HttpMetricsMiddleware implements NestMiddleware {
   }
 
   async getMetrics(): Promise<string> {
-    return this.registry.metrics();
+    return HttpMetricsMiddleware.registry.metrics();
   }
 
   private resolveRoute(req: MetricsRequest): string {
     const routePath = req.route?.path;
     if (routePath) {
+      if (routePath === "{*path}" || routePath === "/{*path}") {
+        return "unmatched";
+      }
       return `${req.baseUrl ?? ""}${routePath}`;
     }
 
-    return req.originalUrl?.split("?")[0] ?? "unknown";
+    return this.normalizePath(req.originalUrl?.split("?")[0]);
+  }
+
+  private normalizePath(path: string | undefined): string {
+    if (!path) {
+      return "unmatched";
+    }
+
+    if (
+      [
+        "/health",
+        "/metrics",
+        "/.well-known/jwks.json",
+        "/auth/register",
+        "/auth/login",
+        "/auth/refresh",
+        "/auth/logout",
+        "/auth/forgot-password",
+        "/auth/reset-password",
+        "/me",
+        "/me/history",
+        "/leaderboard",
+      ].includes(path)
+    ) {
+      return path;
+    }
+
+    if (/^\/users\/[^/]+\/profile$/.test(path)) {
+      return "/users/:id/profile";
+    }
+
+    if (/^\/matches\/[^/]+\/audit$/.test(path)) {
+      return "/matches/:id/audit";
+    }
+
+    return "unmatched";
   }
 }

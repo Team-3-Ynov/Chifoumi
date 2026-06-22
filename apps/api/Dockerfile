@@ -30,12 +30,7 @@ ENV NODE_ENV=production
 ENV API_PORT=3000
 COPY --from=builder --chown=node:node /app /app
 COPY --chown=node:node apps/api/docker-migrate.sh /app/apps/api/docker-migrate.sh
-RUN apk add --no-cache openssl \
-  && mkdir -p /app/infra/keys \
-  && openssl genrsa -out /app/infra/keys/jwt-private.pem 2048 \
-  && openssl rsa -in /app/infra/keys/jwt-private.pem -pubout -out /app/infra/keys/jwt-public.pem \
-  && chown -R node:node /app/infra/keys \
-  && chmod +x /app/apps/api/docker-migrate.sh
+RUN chmod +x /app/apps/api/docker-migrate.sh
 USER node
 EXPOSE 3000
 CMD ["node", "apps/api/dist/main.js"]
