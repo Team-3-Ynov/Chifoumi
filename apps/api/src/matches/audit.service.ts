@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { MatchStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { AuditRoundDto } from "./dto/audit-round.dto.js";
 import { MatchAuditResponseDto } from "./dto/match-audit-response.dto.js";
 
 @Injectable()
@@ -31,7 +32,7 @@ export class AuditService {
     });
 
     if (!match) {
-      throw new NotFoundException(`Match with id ${matchId} not found`);
+      throw new NotFoundException({ error: "MATCH_NOT_FOUND" });
     }
 
     if (match.status !== MatchStatus.ended) {
@@ -41,30 +42,23 @@ export class AuditService {
       });
     }
 
-    const auditRounds = match.rounds
-      .filter(
-        (round) =>
-          round.moveA &&
-          round.moveB &&
-          round.commitA &&
-          round.commitB &&
-          round.nonceA &&
-          round.nonceB,
-      )
-      .map((round) => ({
-        roundNumber: round.roundNumber,
-        // Non-null assertions are safe: filter above ensures all fields exist
-        commitA: round.commitA!,
-        commitB: round.commitB!,
-        moveA: round.moveA!,
-        moveB: round.moveB!,
-        nonceA: round.nonceA!,
-        nonceB: round.nonceB!,
-        hashCheck: {
-          a: this.verifyHash(round.moveA, round.nonceA, round.commitA),
-          b: this.verifyHash(round.moveB, round.nonceB, round.commitB),
-        },
-      }));
+    const auditRounds = match.rounds.map(
+      (round) =>
+        ({
+          roundNumber: round.roundNumber,
+          // Allow null values to include incomplete rounds with mismatch detection
+          commitA: round.commitA,
+          commitB: round.commitB,
+          moveA: round.moveA,
+          moveB: round.moveB,
+          nonceA: round.nonceA,
+          nonceB: round.nonceB,
+          hashCheck: {
+            a: this.verifyHash(round.moveA, round.nonceA, round.commitA),
+            b: this.verifyHash(round.moveB, round.nonceB, round.commitB),
+          },
+        }) as AuditRoundDto,
+    );
 
     return {
       matchId: match.id,
@@ -81,7 +75,7 @@ export class AuditService {
       rounds: auditRounds,
       finalScore: [match.scoreA, match.scoreB],
       winner: match.winnerId,
-      endedAt: (match.endedAt ?? new Date()).toISOString(),
+      endedAt: match.endedAt!.toISOString(),
     };
   }
 

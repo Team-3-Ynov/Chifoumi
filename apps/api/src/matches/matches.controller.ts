@@ -1,6 +1,6 @@
-import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { ThrottlerGuard } from "@nestjs/throttler";
+import { Throttle } from "@nestjs/throttler";
 import { Public } from "../auth/decorators/public.decorator.js";
 import { AuditService } from "./audit.service.js";
 import { MatchAuditResponseDto } from "./dto/match-audit-response.dto.js";
@@ -12,7 +12,7 @@ export class MatchesController {
 
   @Get(":id/audit")
   @Public()
-  @UseGuards(ThrottlerGuard)
+  @Throttle({ audit: { limit: 10, ttl: 60_000 } })
   @ApiOperation({
     summary: "Get audit trail for a completed match",
     description:
@@ -44,8 +44,7 @@ export class MatchesController {
     description: "Match not found",
     schema: {
       example: {
-        error: "Not Found",
-        message: "Match with id xxx not found",
+        error: "MATCH_NOT_FOUND",
         statusCode: 404,
       },
     },

@@ -144,7 +144,13 @@ describe("AuditService", () => {
     it("should throw NotFoundException for unknown match", async () => {
       jest.spyOn(prisma.match, "findUnique").mockResolvedValue(null);
 
-      await expect(service.buildAudit("unknown")).rejects.toThrow(NotFoundException);
+      await expect(service.buildAudit("unknown")).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            error: "MATCH_NOT_FOUND",
+          }),
+        }),
+      );
     });
 
     it("should throw ForbiddenException for in_progress match", async () => {
@@ -176,7 +182,7 @@ describe("AuditService", () => {
       expect(result.rounds[0]!.hashCheck.b).toBe("match");
     });
 
-    it("should handle null move/nonce/commit as mismatch", async () => {
+    it("should include rounds with null fields as mismatch in hashCheck", async () => {
       const nullFieldsMatch = {
         ...mockMatch,
         rounds: [
@@ -190,8 +196,9 @@ describe("AuditService", () => {
 
       const result = await service.buildAudit("123");
 
-      // Rounds with null fields are filtered out, so we should have empty rounds
-      expect(result.rounds).toHaveLength(0);
+      expect(result.rounds).toHaveLength(1);
+      expect(result.rounds[0]!.hashCheck.a).toBe("mismatch");
+      expect(result.rounds[0]!.hashCheck.b).toBe("match");
     });
   });
 });
