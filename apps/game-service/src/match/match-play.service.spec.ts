@@ -40,6 +40,10 @@ describe("MatchPlayService", () => {
       cancelTimeout: jest.fn(async () => undefined),
     };
 
+    const matchDisconnectScheduler = {
+      cancelForfeitForPlayers: jest.fn(async () => undefined),
+    };
+
     const logger = { warn: jest.fn(), debug: jest.fn() } as unknown as Logger;
 
     service = new MatchPlayService(
@@ -47,6 +51,7 @@ describe("MatchPlayService", () => {
       eventBus,
       matchEndedPublisher,
       matchTimeoutScheduler as unknown as MatchTimeoutSchedulerService,
+      matchDisconnectScheduler as unknown as import("./match-disconnect-scheduler.service.js").MatchDisconnectSchedulerService,
       logger,
     );
 

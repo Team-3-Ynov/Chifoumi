@@ -19,7 +19,13 @@ export type MatchPlayer = {
   rating: number;
 };
 
-export type MatchEndReason = "BEST_OF_3" | "FORFEIT_TIMEOUT" | "MAX_ROUNDS_DRAW";
+export type MatchEndReason =
+  | "BEST_OF_3"
+  | "FORFEIT_TIMEOUT"
+  | "DISCONNECT_FORFEIT"
+  | "MAX_ROUNDS_DRAW";
+
+export type MatchResumedCurrentState = "WAITING_PLAYS" | "WAITING_COMMITS" | "WAITING_REVEALS";
 
 export type RoundPlays = {
   a: Move | null;
@@ -94,6 +100,15 @@ export type MatchEndedPayload = {
   finalScore: { a: number; b: number };
   eloDelta: { a: number; b: number };
   reason?: MatchEndReason;
+};
+
+export type MatchResumedPayload = {
+  matchId: string;
+  currentRound: number;
+  scoreA: number;
+  scoreB: number;
+  currentState: MatchResumedCurrentState;
+  deadline: string;
 };
 
 export type MatchSessionEventPayloads = {
