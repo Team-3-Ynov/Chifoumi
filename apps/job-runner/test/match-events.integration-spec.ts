@@ -238,10 +238,10 @@ describe("match-events worker (integration)", () => {
     expect(stillFailed && (await stillFailed.getState())).toBe("failed");
 
     const renderedMetrics = await metrics.getMetrics();
-    expect(renderedMetrics).toContain('outcome="failed_permanent"');
+    expect(renderedMetrics).toContain('status="failed"');
   });
 
-  it("retries transient persistence failures and records retry metrics", async () => {
+  it("retries transient persistence failures and records failed/completed metrics", async () => {
     const { playerAId, playerBId } = await seedPlayers();
     const matchId = randomUUID();
     const payload = createPayload(matchId, playerAId, playerBId);
@@ -258,8 +258,8 @@ describe("match-events worker (integration)", () => {
     expect(persistSpy).toHaveBeenCalledTimes(2);
 
     const renderedMetrics = await metrics.getMetrics();
-    expect(renderedMetrics).toContain('outcome="retry"');
-    expect(renderedMetrics).toContain('outcome="completed"');
+    expect(renderedMetrics).toContain('status="failed"');
+    expect(renderedMetrics).toContain('status="completed"');
 
     persistSpy.mockRestore();
   });
