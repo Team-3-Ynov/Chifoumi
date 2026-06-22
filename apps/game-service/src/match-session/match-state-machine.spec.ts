@@ -115,6 +115,45 @@ describe("match state machine", () => {
     });
   });
 
+  it("ends the match by forfeit on waiting-commit timeout", () => {
+    const waitingCommits: MatchState = {
+      ...baseState,
+      status: "WAITING_COMMITS",
+      roundCommits: { a: "abc123", b: null },
+    };
+    const next = transitionMatchState(waitingCommits, {
+      type: "TIMEOUT",
+      silentPlayer: "B",
+      now: new Date("2026-06-09T10:00:06.000Z"),
+    });
+
+    expect(next).toMatchObject({
+      status: "ENDED",
+      winnerId: "a",
+      endReason: "FORFEIT_TIMEOUT",
+    });
+  });
+
+  it("ends the match by forfeit on waiting-reveal timeout", () => {
+    const waitingReveals: MatchState = {
+      ...baseState,
+      status: "WAITING_REVEALS",
+      roundReveals: { a: "rock", b: null },
+      revealDeadline: "2026-06-09T10:00:10.000Z",
+    };
+    const next = transitionMatchState(waitingReveals, {
+      type: "TIMEOUT",
+      silentPlayer: "B",
+      now: new Date("2026-06-09T10:00:10.000Z"),
+    });
+
+    expect(next).toMatchObject({
+      status: "ENDED",
+      winnerId: "a",
+      endReason: "FORFEIT_TIMEOUT",
+    });
+  });
+
   it("rejects invalid transitions", () => {
     expect(() =>
       transitionMatchState(baseState, {

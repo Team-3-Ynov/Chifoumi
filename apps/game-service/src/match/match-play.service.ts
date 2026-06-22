@@ -6,7 +6,9 @@ import {
   MatchSessionService,
 } from "../match-session/match-session.service.js";
 import {
+  emptyRoundCommits,
   emptyRoundPlays,
+  emptyRoundReveals,
   type MatchState,
   type Move,
   playerIndex,
@@ -51,7 +53,26 @@ export class MatchPlayService {
   ) {}
 
   async onMatchStarted(state: MatchState): Promise<void> {
-    await this.scheduleRoundTimeout(state.matchId, state.currentRound, state.roundDeadline);
+    await this.schedulePhaseTimeout(
+      state.matchId,
+      state.currentRound,
+      this.timeoutStateForStatus(state.status),
+      state.roundDeadline,
+    );
+  }
+
+  async onCommitPhaseStarted(state: MatchState): Promise<void> {
+    await this.schedulePhaseTimeout(
+      state.matchId,
+      state.currentRound,
+      "WAITING_COMMITS",
+      state.roundDeadline,
+    );
+  }
+
+  async onRevealPhaseStarted(state: MatchState): Promise<void> {
+    const deadline = state.revealDeadline ?? state.roundDeadline;
+    await this.schedulePhaseTimeout(state.matchId, state.currentRound, "WAITING_REVEALS", deadline);
   }
 
   async submitPlay(input: PlayInput): Promise<void> {
@@ -158,50 +179,119 @@ export class MatchPlayService {
       return;
     }
 
-    // Commit-reveal phases are handled once US-035 lands on develop.
-    this.logger.debug({ matchId, roundNumber, expectedState }, "unsupported timeout state");
+    if (expectedState === "WAITING_COMMITS") {
+      await this.handleCommitPhaseTimeout(matchId, roundNumber);
+      return;
+    }
+
+    if (expectedState === "WAITING_REVEALS") {
+      await this.handleRevealPhaseTimeout(matchId, roundNumber);
+    }
   }
 
   async handleRoundTimeout(matchId: string, roundNumber: number): Promise<void> {
-    const nextState = await this.matchSessionService.mutateState(matchId, (state) => {
-      if (state.status !== "WAITING_PLAYS" || state.currentRound !== roundNumber) {
-        return state;
-      }
-
-      const silentPlayer =
-        state.roundPlays.a === null && state.roundPlays.b !== null
-          ? "A"
-          : state.roundPlays.b === null && state.roundPlays.a !== null
-            ? "B"
-            : "A";
-      const winnerLabel = silentPlayer === "A" ? "b" : "a";
-
-      const resolvedAt = new Date();
-      return transitionMatchState(
-        {
-          ...state,
-          rounds: [
-            ...(state.rounds ?? []),
-            {
-              roundNumber,
-              moveA: state.roundPlays.a,
-              moveB: state.roundPlays.b,
-              winner: winnerLabel,
-              resolvedAt: resolvedAt.toISOString(),
-            },
-          ],
-        },
-        {
-          type: "TIMEOUT",
-          silentPlayer,
-          now: resolvedAt,
-        },
-      );
-    });
+    const nextState = await this.applyPhaseTimeout(
+      matchId,
+      roundNumber,
+      "WAITING_PLAYS",
+      () => "A",
+    );
 
     if (nextState.status === "ENDED") {
       await this.finalizeMatch(nextState);
     }
+  }
+
+  async handleCommitPhaseTimeout(matchId: string, roundNumber: number): Promise<void> {
+    const nextState = await this.applyPhaseTimeout(
+      matchId,
+      roundNumber,
+      "WAITING_COMMITS",
+      (state) => {
+        const commits = state.roundCommits ?? emptyRoundCommits();
+        return this.resolveSilentPlayer(commits.a, commits.b);
+      },
+    );
+
+    if (nextState.status === "ENDED") {
+      await this.finalizeMatch(nextState);
+    }
+  }
+
+  async handleRevealPhaseTimeout(matchId: string, roundNumber: number): Promise<void> {
+    const nextState = await this.applyPhaseTimeout(
+      matchId,
+      roundNumber,
+      "WAITING_REVEALS",
+      (state) => {
+        const reveals = state.roundReveals ?? emptyRoundReveals();
+        return this.resolveSilentPlayer(reveals.a, reveals.b);
+      },
+    );
+
+    if (nextState.status === "ENDED") {
+      await this.finalizeMatch(nextState);
+    }
+  }
+
+  private async applyPhaseTimeout(
+    matchId: string,
+    roundNumber: number,
+    expectedStatus: MatchTimeoutExpectedState,
+    resolveSilentPlayer: (state: MatchState) => "A" | "B",
+  ): Promise<MatchState> {
+    return this.matchSessionService.mutateState(matchId, (state) => {
+      if (state.status !== expectedStatus || state.currentRound !== roundNumber) {
+        return state;
+      }
+
+      const silentPlayer =
+        expectedStatus === "WAITING_PLAYS"
+          ? this.resolveSilentPlayer(state.roundPlays.a, state.roundPlays.b)
+          : resolveSilentPlayer(state);
+
+      const resolvedAt = new Date();
+      const winnerLabel = silentPlayer === "A" ? "b" : "a";
+
+      if (expectedStatus === "WAITING_PLAYS") {
+        return transitionMatchState(
+          {
+            ...state,
+            rounds: [
+              ...(state.rounds ?? []),
+              {
+                roundNumber,
+                moveA: state.roundPlays.a,
+                moveB: state.roundPlays.b,
+                winner: winnerLabel,
+                resolvedAt: resolvedAt.toISOString(),
+              },
+            ],
+          },
+          {
+            type: "TIMEOUT",
+            silentPlayer,
+            now: resolvedAt,
+          },
+        );
+      }
+
+      return transitionMatchState(state, {
+        type: "TIMEOUT",
+        silentPlayer,
+        now: resolvedAt,
+      });
+    });
+  }
+
+  private resolveSilentPlayer(slotA: string | Move | null, slotB: string | Move | null): "A" | "B" {
+    if (slotA === null && slotB !== null) {
+      return "A";
+    }
+    if (slotB === null && slotA !== null) {
+      return "B";
+    }
+    return "A";
   }
 
   private async afterRoundResolved(state: MatchState, resolution: RoundResolution): Promise<void> {
@@ -243,8 +333,23 @@ export class MatchPlayService {
       return;
     }
 
-    await this.scheduleRoundTimeout(state.matchId, state.currentRound, state.roundDeadline);
+    await this.schedulePhaseTimeout(
+      state.matchId,
+      state.currentRound,
+      this.timeoutStateForStatus(state.status),
+      state.roundDeadline,
+    );
     await this.matchSessionService.broadcastRoundStart(state);
+  }
+
+  private timeoutStateForStatus(status: MatchState["status"]): MatchTimeoutExpectedState {
+    if (status === "WAITING_COMMITS") {
+      return "WAITING_COMMITS";
+    }
+    if (status === "WAITING_REVEALS") {
+      return "WAITING_REVEALS";
+    }
+    return "WAITING_PLAYS";
   }
 
   private async finalizeMatch(state: MatchState): Promise<void> {
@@ -271,9 +376,10 @@ export class MatchPlayService {
     await this.matchEndedPublisher.publishMatchEnded(state);
   }
 
-  private async scheduleRoundTimeout(
+  private async schedulePhaseTimeout(
     matchId: string,
     roundNumber: number,
+    expectedState: MatchTimeoutExpectedState,
     deadlineIso: string,
   ): Promise<void> {
     const delayMs = Math.max(0, new Date(deadlineIso).getTime() - Date.now());
@@ -281,11 +387,14 @@ export class MatchPlayService {
       await this.matchTimeoutScheduler.scheduleTimeout(
         matchId,
         roundNumber,
-        "WAITING_PLAYS",
+        expectedState,
         delayMs,
       );
     } catch (error) {
-      this.logger.warn({ matchId, roundNumber, error }, "failed to schedule round timeout");
+      this.logger.warn(
+        { matchId, roundNumber, expectedState, error },
+        "failed to schedule timeout",
+      );
     }
   }
 
