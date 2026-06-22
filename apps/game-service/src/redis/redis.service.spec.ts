@@ -21,7 +21,7 @@ describe("RedisService", () => {
   it("removes a user socket only when the stored socket id matches", async () => {
     await service.setUserSocket("user-1", "socket-a");
 
-    await service.removeUserSocket("user-1", "socket-a");
+    expect(await service.removeUserSocket("user-1", "socket-a")).toBe(true);
 
     expect(await service.getUserSocket("user-1")).toBeNull();
   });
@@ -30,7 +30,7 @@ describe("RedisService", () => {
     await service.setUserSocket("user-1", "socket-a");
     await service.setUserSocket("user-1", "socket-b");
 
-    await service.removeUserSocket("user-1", "socket-a");
+    expect(await service.removeUserSocket("user-1", "socket-a")).toBe(false);
 
     expect(await service.getUserSocket("user-1")).toBe("socket-b");
   });

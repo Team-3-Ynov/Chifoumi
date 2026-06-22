@@ -1,0 +1,34 @@
+{
+  "name": "Chifoumi Ranked",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "workspace",
+  "workspaceFolder": "/workspaces/Chifoumi",
+  "remoteUser": "vscode",
+  "shutdownAction": "stopCompose",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "forwardPorts": [3000, 3001, 5173, 8025],
+  "portsAttributes": {
+    "3000": {
+      "label": "API"
+    },
+    "3001": {
+      "label": "Game service"
+    },
+    "5173": {
+      "label": "Front"
+    },
+    "8025": {
+      "label": "MailHog"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["biomejs.biome", "Prisma.prisma", "ms-azuretools.vscode-docker"],
+      "settings": {
+        "editor.defaultFormatter": "biomejs.biome",
+        "editor.formatOnSave": true,
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  }
+}

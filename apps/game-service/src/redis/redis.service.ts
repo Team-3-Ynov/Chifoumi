@@ -165,9 +165,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  async removeUserSocket(userId: string, socketId: string): Promise<void> {
+  async removeUserSocket(userId: string, socketId: string): Promise<boolean> {
     const key = `ws:user:${userId}:socket`;
-    await this.requireClient().eval(REMOVE_USER_SOCKET_IF_MATCH_SCRIPT, 1, key, socketId);
+    const removed = await this.requireClient().eval(
+      REMOVE_USER_SOCKET_IF_MATCH_SCRIPT,
+      1,
+      key,
+      socketId,
+    );
+    return removed === 1;
   }
 
   async getUserSocket(userId: string): Promise<string | null> {

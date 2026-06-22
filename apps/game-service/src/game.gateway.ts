@@ -12,7 +12,7 @@ import { WsAuthService } from "./auth/ws-auth.service.js";
 import { resolveCorsOrigins } from "./cors.js";
 import { scrubTokenFromUrl } from "./logging/scrub-token.js";
 import { MatchEventsRelayService } from "./match/match-events-relay.service.js";
-import { MatchmakingService } from "./matchmaking/matchmaking.service.js";
+import { MatchReconnectService } from "./match/match-reconnect.service.js";
 import { MatchmakingEventsService } from "./matchmaking/matchmaking-events.service.js";
 import { RedisService } from "./redis/redis.service.js";
 
@@ -40,9 +40,9 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   constructor(
     private readonly wsAuthService: WsAuthService,
     private readonly redisService: RedisService,
-    private readonly matchmakingService: MatchmakingService,
     private readonly matchmakingEventsService: MatchmakingEventsService,
     private readonly matchEventsRelayService: MatchEventsRelayService,
+    private readonly matchReconnectService: MatchReconnectService,
     private readonly logger: Logger,
   ) {}
 
@@ -78,6 +78,11 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     await this.redisService.setUserSocket(userId, client.id);
     client.emit("connected", { userId, displayName });
 
+    const resumed = await this.matchReconnectService.handleReconnect(userId);
+    if (resumed) {
+      client.emit("matchResumed", resumed);
+    }
+
     const requestUrl = client.request.url ?? "";
     this.logger.log(
       { userId, socketId: client.id, url: scrubTokenFromUrl(requestUrl) },
@@ -89,8 +94,7 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     const userId = client.data.userId as string | undefined;
     if (userId) {
       try {
-        await this.matchmakingService.leaveQueue(userId);
-        await this.redisService.removeUserSocket(userId, client.id);
+        await this.matchReconnectService.handleDisconnect(userId, client.id);
       } catch {
         // Redis may already be closed during app shutdown in e2e tests.
       }

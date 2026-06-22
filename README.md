@@ -8,6 +8,7 @@ Plateforme web competitive Pierre-Feuille-Ciseaux avec matchmaking ELO, parties 
 
 - [Pre-requis](#pre-requis)
 - [Demarrage rapide](#demarrage-rapide)
+- [Devcontainer](#devcontainer)
 - [Stack multi-replicas (US-030)](#stack-multi-replicas-us-030)
 - [Demo multi-instances (US-032)](#demo-multi-instances-us-032)
 - [Tech stack](#tech-stack)
@@ -68,6 +69,24 @@ Services lances par `pnpm dev` :
 | Job runner | terminal uniquement | Workers et traitements asynchrones |
 
 Si le schema Postgres evolue, relancer une base vide avec `docker compose down -v`, puis `docker compose up -d`.
+
+## Devcontainer
+
+Le devcontainer lance un workspace Node + pnpm avec Postgres, Redis et MailHog. Le dossier local du repo doit rester nomme `Chifoumi`, car le workspace est monte dans le conteneur sous `/workspaces/Chifoumi`.
+
+Au premier demarrage, `.devcontainer/post-create.sh` :
+
+- copie `.env.example` vers `.env` avec les URLs internes Docker ;
+- genere les cles JWT de developpement dans `infra/keys/` si elles n'existent pas ;
+- configure le store pnpm persistant dans `pnpm-store` ;
+- installe les dependances et genere le client Prisma.
+
+Apres ouverture dans VS Code ou Cursor, lancer les migrations puis les apps :
+
+```bash
+pnpm --filter @chifoumi/db migrate:deploy
+pnpm dev
+```
 
 ## Stack multi-replicas (US-030)
 
