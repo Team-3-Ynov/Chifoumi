@@ -15,6 +15,10 @@ describe("MatchPlayService", () => {
   let eventBus: MatchEventBus;
   let service: MatchPlayService;
   let publishedJobs: unknown[];
+  let matchTimeoutScheduler: {
+    scheduleTimeout: jest.Mock;
+    cancelTimeout: jest.Mock;
+  };
 
   beforeEach(async () => {
     client = new Redis(`redis://match-play-test/${Date.now()}-${Math.random()}`);
@@ -31,10 +35,10 @@ describe("MatchPlayService", () => {
       }),
     } as unknown as MatchEndedPublisher;
 
-    const matchTimeoutScheduler = {
+    matchTimeoutScheduler = {
       scheduleTimeout: jest.fn(async () => "job-1"),
       cancelTimeout: jest.fn(async () => undefined),
-    } as unknown as MatchTimeoutSchedulerService;
+    };
 
     const logger = { warn: jest.fn(), debug: jest.fn() } as unknown as Logger;
 
@@ -42,7 +46,7 @@ describe("MatchPlayService", () => {
       matchSessionService,
       eventBus,
       matchEndedPublisher,
-      matchTimeoutScheduler,
+      matchTimeoutScheduler as unknown as MatchTimeoutSchedulerService,
       logger,
     );
 
@@ -164,5 +168,83 @@ describe("MatchPlayService", () => {
     expect(state?.status).toBe("WAITING_PLAYS");
     expect(state?.currentRound).toBe(2);
     expect(state?.scoreA).toBe(1);
+  });
+
+  it("forfeits the match when commit phase times out", async () => {
+    await matchSessionService.mutateState("match-1", (state) => ({
+      ...state,
+      status: "WAITING_COMMITS",
+      roundCommits: { a: "abc123", b: null },
+    }));
+
+    await service.handleMatchTimeout("match-1", 1, "WAITING_COMMITS");
+
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("ENDED");
+    expect(state?.winnerId).toBe("a");
+    expect(state?.endReason).toBe("FORFEIT_TIMEOUT");
+  });
+
+  it("does not mutate state when commit timeout fires after phase advanced", async () => {
+    await matchSessionService.mutateState("match-1", (state) => ({
+      ...state,
+      status: "WAITING_REVEALS",
+      roundCommits: { a: "abc123", b: "def456" },
+      roundReveals: { a: null, b: null },
+      revealDeadline: "2026-06-09T10:00:10.000Z",
+    }));
+
+    await service.handleMatchTimeout("match-1", 1, "WAITING_COMMITS");
+
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("WAITING_REVEALS");
+  });
+
+  it("forfeits the match when reveal phase times out", async () => {
+    await matchSessionService.mutateState("match-1", (state) => ({
+      ...state,
+      status: "WAITING_REVEALS",
+      roundCommits: { a: "abc123", b: "def456" },
+      roundReveals: { a: "rock", b: null },
+      revealDeadline: "2026-06-09T10:00:10.000Z",
+    }));
+
+    await service.handleMatchTimeout("match-1", 1, "WAITING_REVEALS");
+
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("ENDED");
+    expect(state?.winnerId).toBe("a");
+    expect(state?.endReason).toBe("FORFEIT_TIMEOUT");
+  });
+
+  it("schedules commit phase timeout with expected state", async () => {
+    await service.onCommitPhaseStarted({
+      matchId: "match-1",
+      currentRound: 1,
+      roundDeadline: "2026-06-09T10:00:05.000Z",
+    } as Parameters<MatchPlayService["onCommitPhaseStarted"]>[0]);
+
+    expect(matchTimeoutScheduler.scheduleTimeout).toHaveBeenCalledWith(
+      "match-1",
+      1,
+      "WAITING_COMMITS",
+      expect.any(Number),
+    );
+  });
+
+  it("schedules reveal timeout when reveal phase starts", async () => {
+    await service.onRevealPhaseStarted({
+      matchId: "match-1",
+      currentRound: 1,
+      revealDeadline: "2026-06-09T10:00:10.000Z",
+      roundDeadline: "2026-06-09T10:00:05.000Z",
+    } as Parameters<MatchPlayService["onRevealPhaseStarted"]>[0]);
+
+    expect(matchTimeoutScheduler.scheduleTimeout).toHaveBeenCalledWith(
+      "match-1",
+      1,
+      "WAITING_REVEALS",
+      expect.any(Number),
+    );
   });
 });

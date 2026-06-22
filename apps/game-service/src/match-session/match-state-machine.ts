@@ -40,7 +40,11 @@ export function transitionMatchState(state: MatchState, event: MatchStateMachine
   }
 
   if (event.type === "TIMEOUT") {
-    if (state.status !== "WAITING_PLAYS") {
+    if (
+      state.status !== "WAITING_PLAYS" &&
+      state.status !== "WAITING_COMMITS" &&
+      state.status !== "WAITING_REVEALS"
+    ) {
       throw new InvalidMatchTransitionError(state.status, event.type);
     }
     const winnerIndex = event.silentPlayer === "A" ? 1 : 0;
