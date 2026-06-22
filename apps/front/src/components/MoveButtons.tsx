@@ -1,16 +1,15 @@
+import type { Move } from "@chifoumi/schemas/game-events";
 import { useState } from "react";
 
-export type GameMove = "ROCK" | "PAPER" | "SCISSORS";
-
-const MOVES: Array<{ move: GameMove; label: string }> = [
-  { move: "ROCK", label: "Pierre" },
-  { move: "PAPER", label: "Feuille" },
-  { move: "SCISSORS", label: "Ciseaux" },
+const moves: Array<{ move: Move; label: string }> = [
+  { move: "rock", label: "Pierre" },
+  { move: "paper", label: "Feuille" },
+  { move: "scissors", label: "Ciseaux" },
 ];
 
 type MoveButtonsProps = {
   disabled?: boolean;
-  onPlay: (move: GameMove) => void;
+  onPlay: (move: Move) => void;
 };
 
 export function MoveButtons({ disabled = false, onPlay }: MoveButtonsProps) {
@@ -19,17 +18,17 @@ export function MoveButtons({ disabled = false, onPlay }: MoveButtonsProps) {
 
   return (
     <fieldset className="move-buttons">
-      <legend className="sr-only">Choix du coup</legend>
-      {MOVES.map(({ move, label }) => (
+      <legend className="visually-hidden">Choisir un coup</legend>
+      {moves.map(({ move, label }) => (
         <button
-          key={move}
-          type="button"
-          className="button move-button"
+          className={`move-button move-${move}`}
           disabled={isDisabled}
+          key={move}
           onClick={() => {
             setHasPlayed(true);
             onPlay(move);
           }}
+          type="button"
         >
           {label}
         </button>

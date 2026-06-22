@@ -159,6 +159,9 @@ importers:
 
   apps/front:
     dependencies:
+      '@chifoumi/schemas':
+        specifier: workspace:^
+        version: link:../../packages/schemas
       '@tanstack/react-query':
         specifier: ^5.101.0
         version: 5.101.0(react@19.2.6)
@@ -171,6 +174,12 @@ importers:
       react-router-dom:
         specifier: ^7.18.0
         version: 7.18.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      socket.io-client:
+        specifier: ^4.8.3
+        version: 4.8.3
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^6.9.1
@@ -483,6 +492,9 @@ importers:
       typescript:
         specifier: ~5.7.3
         version: 5.7.3
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
 
   packages/tsconfig:
     devDependencies:

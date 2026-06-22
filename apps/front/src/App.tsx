@@ -2,9 +2,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext.js";
 import { Header } from "./components/Header.js";
 import { GuestRoute, ProtectedRoute } from "./components/ProtectedRoute.js";
+import { GameSocketProvider } from "./game/GameSocketContext.js";
 import { LeaderboardPage } from "./pages/LeaderboardPage.js";
 import { LobbyPage } from "./pages/LobbyPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
+import { MatchPage } from "./pages/MatchPage.js";
 import { ProfilePage } from "./pages/ProfilePage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import "./App.css";
@@ -27,26 +29,29 @@ function CatchAllRedirect() {
 
 export function App() {
   return (
-    <div className="layout">
-      <Header />
-      <Routes>
-        <Route path="/" element={<Navigate to="/lobby" replace />} />
+    <GameSocketProvider>
+      <div className="layout">
+        <Header />
+        <Routes>
+          <Route path="/" element={<Navigate to="/lobby" replace />} />
 
-        <Route element={<GuestRoute />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-        </Route>
+          <Route element={<GuestRoute />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+          </Route>
 
-        <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/lobby" element={<LobbyPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/profile/:id" element={<ProfilePage />} />
-        </Route>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/lobby" element={<LobbyPage />} />
+            <Route path="/match/:matchId" element={<MatchPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/profile/:id" element={<ProfilePage />} />
+          </Route>
 
-        <Route path="*" element={<CatchAllRedirect />} />
-      </Routes>
-    </div>
+          <Route path="*" element={<CatchAllRedirect />} />
+        </Routes>
+      </div>
+    </GameSocketProvider>
   );
 }

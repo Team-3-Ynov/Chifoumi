@@ -19,6 +19,7 @@ import {
 
 type AuthContextValue = {
   user: AuthUser | null;
+  accessToken: string | null;
   isAuthenticated: boolean;
   isBootstrapping: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -43,6 +44,7 @@ function clearUserQueries(): void {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const accessTokenRef = useRef<string | null>(null);
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
@@ -50,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearSession = useCallback(() => {
     accessTokenRef.current = null;
+    setAccessToken(null);
     clearStoredRefreshToken();
     setUser(null);
     clearUserQueries();
@@ -57,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const applyTokens = useCallback((access: string, refresh: string) => {
     accessTokenRef.current = access;
+    setAccessToken(access);
     setStoredRefreshToken(refresh);
   }, []);
 
@@ -166,13 +170,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      accessToken,
       isAuthenticated: user !== null,
       isBootstrapping,
       login,
       register,
       logout,
     }),
-    [user, isBootstrapping, login, register, logout],
+    [user, accessToken, isBootstrapping, login, register, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
