@@ -1,64 +1,65 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { AuditRoundDto } from "./audit-round.dto.js";
 
-export class RoundHashCheckDto {
-  @ApiProperty({ enum: ["match", "mismatch"], example: "match" })
-  a!: "match" | "mismatch";
+export class MatchPlayerDto {
+  @ApiProperty({
+    description: "Player ID (UUID)",
+    example: "550e8400-e29b-41d4-a716-446655440000",
+  })
+  id!: string;
 
-  @ApiProperty({ enum: ["match", "mismatch"], example: "match" })
-  b!: "match" | "mismatch";
-}
-
-export class MatchAuditRoundDto {
-  @ApiProperty({ example: 1 })
-  roundNumber!: number;
-
-  @ApiProperty({ nullable: true, example: "a1b2c3..." })
-  commitA!: string | null;
-
-  @ApiProperty({ nullable: true, example: "d4e5f6..." })
-  commitB!: string | null;
-
-  @ApiProperty({ enum: ["rock", "paper", "scissors"], nullable: true, example: "rock" })
-  moveA!: string | null;
-
-  @ApiProperty({ enum: ["rock", "paper", "scissors"], nullable: true, example: "paper" })
-  moveB!: string | null;
-
-  @ApiProperty({ nullable: true, example: "deadbeef..." })
-  nonceA!: string | null;
-
-  @ApiProperty({ nullable: true, example: "cafebabe..." })
-  nonceB!: string | null;
-
-  @ApiProperty({ type: RoundHashCheckDto })
-  hashCheck!: RoundHashCheckDto;
-}
-
-export class MatchAuditFinalScoreDto {
-  @ApiProperty({ example: 2 })
-  a!: number;
-
-  @ApiProperty({ example: 1 })
-  b!: number;
+  @ApiProperty({
+    description: "Player display name",
+    example: "johndoe",
+  })
+  displayName!: string;
 }
 
 export class MatchAuditResponseDto {
-  @ApiProperty({ format: "uuid" })
+  @ApiProperty({
+    description: "Match ID (UUID)",
+    example: "550e8400-e29b-41d4-a716-446655440000",
+  })
   matchId!: string;
 
   @ApiProperty({
-    type: [String],
-    description: "Player A and player B user ids",
-    example: ["7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1", "8c7c06a3-40ea-5a3e-9b69-ac9691e3a8b2"],
+    description: "Players involved in the match (player A and player B)",
+    type: [MatchPlayerDto],
+    example: [
+      {
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        displayName: "alice",
+      },
+      {
+        id: "660e8400-e29b-41d4-a716-446655440001",
+        displayName: "bob",
+      },
+    ],
   })
-  players!: [string, string];
+  players!: MatchPlayerDto[];
 
-  @ApiProperty({ type: [MatchAuditRoundDto] })
-  rounds!: MatchAuditRoundDto[];
+  @ApiProperty({
+    description: "All rounds of the match with cryptographic details",
+    type: [AuditRoundDto],
+  })
+  rounds!: AuditRoundDto[];
 
-  @ApiProperty({ type: MatchAuditFinalScoreDto })
-  finalScore!: MatchAuditFinalScoreDto;
+  @ApiProperty({
+    description: "Final match score: [playerA score, playerB score]",
+    example: [2, 1],
+  })
+  finalScore!: [number, number];
 
-  @ApiProperty({ format: "uuid", nullable: true })
+  @ApiProperty({
+    description: "Winner player ID or null if draw",
+    example: "550e8400-e29b-41d4-a716-446655440000",
+    nullable: true,
+  })
   winner!: string | null;
+
+  @ApiProperty({
+    description: "Match end time (ISO 8601)",
+    example: "2026-06-22T10:30:45.123Z",
+  })
+  endedAt!: string;
 }

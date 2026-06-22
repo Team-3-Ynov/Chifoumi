@@ -4,7 +4,6 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { AuthModule } from "./auth/auth.module.js";
 import { AppConfigModule } from "./config/config.module.js";
-import { GrpcModule } from "./grpc/grpc.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { JwksModule } from "./jwks/jwks.module.js";
 import { LeaderboardModule } from "./leaderboard/leaderboard.module.js";
@@ -19,25 +18,21 @@ import { UsersModule } from "./users/users.module.js";
   imports: [
     LoggerModule.forRoot({
       pinoHttp: {
-        redact: [
-          "req.headers.authorization",
-          "req.body.password",
-          "req.body.refreshToken",
-          "req.body.token",
-        ],
+        redact: ["req.headers.authorization", "req.body.password", "req.body.refreshToken"],
       },
     }),
-    ThrottlerModule.forRoot(
-      process.env.NODE_ENV === "test"
-        ? [
-            { name: "auth", ttl: 60_000, limit: 1_000_000 },
-            { name: "audit", ttl: 60_000, limit: 10 },
-          ]
-        : [
-            { name: "auth", ttl: 60_000, limit: 5 },
-            { name: "audit", ttl: 60_000, limit: 10 },
-          ],
-    ),
+    ThrottlerModule.forRoot([
+      {
+        name: "auth",
+        ttl: 60_000,
+        limit: 5,
+      },
+      {
+        name: "audit",
+        ttl: 60_000,
+        limit: 10,
+      },
+    ]),
     AppConfigModule,
     PrismaModule,
     RedisModule,
@@ -47,9 +42,8 @@ import { UsersModule } from "./users/users.module.js";
     AuthModule,
     MeModule,
     LeaderboardModule,
-    MatchesModule,
     JwksModule,
-    GrpcModule,
+    MatchesModule,
   ],
   providers: [
     {

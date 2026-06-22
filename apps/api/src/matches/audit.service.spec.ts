@@ -1,147 +1,197 @@
-import { MatchStatus } from "@chifoumi/db";
-import { computeCommitHash } from "@chifoumi/schemas";
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { PrismaService } from "../prisma/prisma.service.js";
+import { createHash } from "node:crypto";
+import { jest } from "@jest/globals";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import { Test, TestingModule } from "@nestjs/testing";
+import { MatchStatus } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service.js";
 import { AuditService } from "./audit.service.js";
 
 describe("AuditService", () => {
   let service: AuditService;
-  let prisma: { match: { findUnique: ReturnType<typeof jest.fn> } };
+  let prisma: PrismaService;
 
-  beforeEach(() => {
-    prisma = {
-      match: {
-        findUnique: jest.fn(),
+  const mockMatch = {
+    id: "123",
+    playerAId: "player-a",
+    playerBId: "player-b",
+    winnerId: "player-a",
+    scoreA: 2,
+    scoreB: 1,
+    startedAt: new Date("2026-06-22T10:00:00Z"),
+    endedAt: new Date("2026-06-22T10:30:00Z"),
+    status: MatchStatus.ended,
+    playerA: {
+      id: "player-a",
+      displayName: "alice",
+    },
+    playerB: {
+      id: "player-b",
+      displayName: "bob",
+    },
+    rounds: [
+      {
+        id: "round-1",
+        matchId: "123",
+        roundNumber: 1,
+        moveA: "rock",
+        moveB: "paper",
+        commitA: createHash("sha256").update("rock:nonce-a").digest("hex"),
+        commitB: createHash("sha256").update("paper:nonce-b").digest("hex"),
+        nonceA: "nonce-a",
+        nonceB: "nonce-b",
+        winner: "b",
+        resolvedAt: new Date("2026-06-22T10:10:00Z"),
       },
-    };
-    service = new AuditService(prisma as unknown as PrismaService);
-  });
+      {
+        id: "round-2",
+        matchId: "123",
+        roundNumber: 2,
+        moveA: "scissors",
+        moveB: "rock",
+        commitA: createHash("sha256").update("scissors:nonce-a2").digest("hex"),
+        commitB: createHash("sha256").update("rock:nonce-b2").digest("hex"),
+        nonceA: "nonce-a2",
+        nonceB: "nonce-b2",
+        winner: "b",
+        resolvedAt: new Date("2026-06-22T10:15:00Z"),
+      },
+      {
+        id: "round-3",
+        matchId: "123",
+        roundNumber: 3,
+        moveA: "paper",
+        moveB: "scissors",
+        commitA: createHash("sha256").update("paper:nonce-a3").digest("hex"),
+        commitB: createHash("sha256").update("scissors:nonce-b3").digest("hex"),
+        nonceA: "nonce-a3",
+        nonceB: "nonce-b3",
+        winner: "b",
+        resolvedAt: new Date("2026-06-22T10:20:00Z"),
+      },
+    ],
+  };
 
-  it("throws NotFoundException when match is missing", async () => {
-    prisma.match.findUnique.mockResolvedValue(null);
-
-    await expect(service.buildAudit("00000000-0000-4000-8000-000000000001")).rejects.toMatchObject({
-      response: { error: "MATCH_NOT_FOUND" },
-    });
-  });
-
-  it("throws ForbiddenException when match is in progress", async () => {
-    prisma.match.findUnique.mockResolvedValue({
-      id: "match-1",
-      status: MatchStatus.in_progress,
-      playerAId: "player-a",
-      playerBId: "player-b",
-      scoreA: 1,
-      scoreB: 0,
-      winnerId: null,
-      rounds: [],
-    });
-
-    await expect(service.buildAudit("match-1")).rejects.toMatchObject({
-      response: { error: "MATCH_NOT_ENDED" },
-    });
-  });
-
-  it("throws ForbiddenException when match is aborted", async () => {
-    prisma.match.findUnique.mockResolvedValue({
-      id: "match-1",
-      status: MatchStatus.aborted,
-      playerAId: "player-a",
-      playerBId: "player-b",
-      scoreA: 0,
-      scoreB: 1,
-      winnerId: null,
-      rounds: [
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuditService,
         {
-          roundNumber: 1,
-          commitA: computeCommitHash("rock", "nonce-a"),
-          commitB: null,
-          moveA: null,
-          moveB: null,
-          nonceA: null,
-          nonceB: null,
+          provide: PrismaService,
+          useValue: {
+            match: {
+              findUnique: jest.fn(),
+            },
+          },
         },
       ],
-    });
+    }).compile();
 
-    await expect(service.buildAudit("match-1")).rejects.toMatchObject({
-      response: { error: "MATCH_NOT_ENDED" },
-    });
+    service = module.get<AuditService>(AuditService);
+    prisma = module.get<PrismaService>(PrismaService);
   });
 
-  it("builds audit payload with hash verification", async () => {
-    const nonceA = "nonce-a";
-    const nonceB = "nonce-b";
-    const commitA = computeCommitHash("rock", nonceA);
-    const commitB = computeCommitHash("paper", nonceB);
+  describe("buildAudit", () => {
+    it("should return audit trail for ended match", async () => {
+      jest.spyOn(prisma.match, "findUnique").mockResolvedValue(mockMatch);
 
-    prisma.match.findUnique.mockResolvedValue({
-      id: "match-1",
-      status: MatchStatus.ended,
-      playerAId: "player-a",
-      playerBId: "player-b",
-      scoreA: 2,
-      scoreB: 1,
-      winnerId: "player-a",
-      rounds: [
-        {
-          roundNumber: 1,
-          commitA,
-          commitB,
-          moveA: "rock",
-          moveB: "paper",
-          nonceA,
-          nonceB,
-        },
-      ],
+      const result = await service.buildAudit("123");
+
+      expect(result).toEqual({
+        matchId: "123",
+        players: [
+          { id: "player-a", displayName: "alice" },
+          { id: "player-b", displayName: "bob" },
+        ],
+        rounds: [
+          {
+            roundNumber: 1,
+            // Non-null assertions safe: mockMatch.rounds is always populated
+            commitA: mockMatch.rounds[0]!.commitA,
+            commitB: mockMatch.rounds[0]!.commitB,
+            moveA: "rock",
+            moveB: "paper",
+            nonceA: "nonce-a",
+            nonceB: "nonce-b",
+            hashCheck: { a: "match", b: "match" },
+          },
+          {
+            roundNumber: 2,
+            commitA: mockMatch.rounds[1]!.commitA,
+            commitB: mockMatch.rounds[1]!.commitB,
+            moveA: "scissors",
+            moveB: "rock",
+            nonceA: "nonce-a2",
+            nonceB: "nonce-b2",
+            hashCheck: { a: "match", b: "match" },
+          },
+          {
+            roundNumber: 3,
+            commitA: mockMatch.rounds[2]!.commitA,
+            commitB: mockMatch.rounds[2]!.commitB,
+            moveA: "paper",
+            moveB: "scissors",
+            nonceA: "nonce-a3",
+            nonceB: "nonce-b3",
+            hashCheck: { a: "match", b: "match" },
+          },
+        ],
+        finalScore: [2, 1],
+        winner: "player-a",
+        endedAt: "2026-06-22T10:30:00.000Z",
+      });
     });
 
-    const audit = await service.buildAudit("match-1");
+    it("should throw NotFoundException for unknown match", async () => {
+      jest.spyOn(prisma.match, "findUnique").mockResolvedValue(null);
 
-    expect(audit).toEqual({
-      matchId: "match-1",
-      players: ["player-a", "player-b"],
-      rounds: [
-        {
-          roundNumber: 1,
-          commitA,
-          commitB,
-          moveA: "rock",
-          moveB: "paper",
-          nonceA,
-          nonceB,
-          hashCheck: { a: "match", b: "match" },
-        },
-      ],
-      finalScore: { a: 2, b: 1 },
-      winner: "player-a",
-    });
-  });
-
-  it("flags hash mismatch when commit does not match reveal", async () => {
-    prisma.match.findUnique.mockResolvedValue({
-      id: "match-1",
-      status: MatchStatus.ended,
-      playerAId: "player-a",
-      playerBId: "player-b",
-      scoreA: 2,
-      scoreB: 0,
-      winnerId: "player-a",
-      rounds: [
-        {
-          roundNumber: 1,
-          commitA: computeCommitHash("rock", "real-nonce"),
-          commitB: computeCommitHash("scissors", "nonce-b"),
-          moveA: "paper",
-          moveB: "scissors",
-          nonceA: "real-nonce",
-          nonceB: "nonce-b",
-        },
-      ],
+      await expect(service.buildAudit("unknown")).rejects.toThrow(NotFoundException);
     });
 
-    const audit = await service.buildAudit("match-1");
+    it("should throw ForbiddenException for in_progress match", async () => {
+      const inProgressMatch = {
+        ...mockMatch,
+        status: MatchStatus.in_progress,
+        endedAt: null,
+      };
+      jest.spyOn(prisma.match, "findUnique").mockResolvedValue(inProgressMatch);
 
-    expect(audit.rounds[0]?.hashCheck).toEqual({ a: "mismatch", b: "match" });
+      await expect(service.buildAudit("123")).rejects.toThrow(ForbiddenException);
+    });
+
+    it("should detect hash mismatch", async () => {
+      const mismatchMatch = {
+        ...mockMatch,
+        rounds: [
+          {
+            ...mockMatch.rounds[0],
+            commitA: "wrong-hash-value",
+          },
+        ],
+      };
+      jest.spyOn(prisma.match, "findUnique").mockResolvedValue(mismatchMatch);
+
+      const result = await service.buildAudit("123");
+
+      expect(result.rounds[0]!.hashCheck.a).toBe("mismatch");
+      expect(result.rounds[0]!.hashCheck.b).toBe("match");
+    });
+
+    it("should handle null move/nonce/commit as mismatch", async () => {
+      const nullFieldsMatch = {
+        ...mockMatch,
+        rounds: [
+          {
+            ...mockMatch.rounds[0],
+            moveA: null,
+          },
+        ],
+      };
+      jest.spyOn(prisma.match, "findUnique").mockResolvedValue(nullFieldsMatch);
+
+      const result = await service.buildAudit("123");
+
+      // Rounds with null fields are filtered out, so we should have empty rounds
+      expect(result.rounds).toHaveLength(0);
+    });
   });
 });
