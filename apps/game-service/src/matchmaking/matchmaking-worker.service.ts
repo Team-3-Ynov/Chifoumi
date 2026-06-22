@@ -198,8 +198,8 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
     this.metricsService.observeMatchDuration(playerA.queuedAt, now);
     this.metricsService.observeMatchDuration(playerB.queuedAt, now);
 
-    await this.matchSessionService.broadcastInitialEvents(matchState);
     await this.matchPlayService.onMatchStarted(matchState);
+    await this.matchSessionService.broadcastInitialEvents(matchState);
 
     this.logger.log(
       { matchId, playerA: playerA.userId, playerB: playerB.userId },

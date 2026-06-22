@@ -6,6 +6,7 @@ import { MatchSessionService } from "../match-session/match-session.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
 import { MatchPlayService, PlayValidationError } from "./match-play.service.js";
+import { MatchTimeoutSchedulerService } from "./match-timeout-scheduler.service.js";
 
 describe("MatchPlayService", () => {
   let client: InstanceType<typeof Redis>;
@@ -30,9 +31,20 @@ describe("MatchPlayService", () => {
       }),
     } as unknown as MatchEndedPublisher;
 
-    const logger = { warn: jest.fn() } as unknown as Logger;
+    const matchTimeoutScheduler = {
+      scheduleTimeout: jest.fn(async () => "job-1"),
+      cancelTimeout: jest.fn(async () => undefined),
+    } as unknown as MatchTimeoutSchedulerService;
 
-    service = new MatchPlayService(matchSessionService, eventBus, matchEndedPublisher, logger);
+    const logger = { warn: jest.fn(), debug: jest.fn() } as unknown as Logger;
+
+    service = new MatchPlayService(
+      matchSessionService,
+      eventBus,
+      matchEndedPublisher,
+      matchTimeoutScheduler,
+      logger,
+    );
 
     await matchSessionService.create({
       matchId: "match-1",
@@ -140,5 +152,17 @@ describe("MatchPlayService", () => {
     expect(state?.scoreA).toBe(0);
     expect(state?.scoreB).toBe(0);
     expect(state?.currentRound).toBe(2);
+  });
+
+  it("does not mutate state when timeout fires after the round advanced", async () => {
+    await service.submitPlay({ userId: "a", matchId: "match-1", roundNumber: 1, move: "rock" });
+    await service.submitPlay({ userId: "b", matchId: "match-1", roundNumber: 1, move: "scissors" });
+
+    await service.handleMatchTimeout("match-1", 1, "WAITING_PLAYS");
+
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("WAITING_PLAYS");
+    expect(state?.currentRound).toBe(2);
+    expect(state?.scoreA).toBe(1);
   });
 });
