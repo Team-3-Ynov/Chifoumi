@@ -5,6 +5,7 @@ import { GuestRoute, ProtectedRoute } from "./components/ProtectedRoute.js";
 import { LeaderboardPage } from "./pages/LeaderboardPage.js";
 import { LobbyPage } from "./pages/LobbyPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
+import { MatchPage } from "./pages/MatchPage.js";
 import { ProfilePage } from "./pages/ProfilePage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import "./App.css";
@@ -41,6 +42,7 @@ export function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route path="/lobby" element={<LobbyPage />} />
+          <Route path="/match/:matchId" element={<MatchPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/:id" element={<ProfilePage />} />
         </Route>
