@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter @chifoumi/db build",
-    "pretypecheck": "pnpm --filter @chifoumi/db typecheck",
+    "predev": "pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/schemas build",
+    "pretypecheck": "pnpm --filter @chifoumi/db typecheck && pnpm --filter @chifoumi/schemas build",
+    "pretest": "pnpm --filter @chifoumi/schemas build",
+    "pretest:e2e": "pnpm --filter @chifoumi/schemas build",
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
@@ -16,6 +18,7 @@
   },
   "dependencies": {
     "@chifoumi/db": "workspace:*",
+    "@chifoumi/schemas": "workspace:*",
     "@nestjs/common": "^11.1.21",
     "@nestjs/core": "^11.1.21",
     "@nestjs/jwt": "11.0.0",

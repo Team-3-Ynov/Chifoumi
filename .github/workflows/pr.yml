@@ -76,6 +76,7 @@ jobs:
         run: |
           pnpm --filter @chifoumi/db build
           pnpm --filter @chifoumi/elo build
+          pnpm --filter @chifoumi/schemas build
 
       - name: Apply database migrations
         run: pnpm --filter @chifoumi/db migrate:deploy
