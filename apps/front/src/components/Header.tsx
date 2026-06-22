@@ -2,7 +2,7 @@ import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.js";
 
 export function Header() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isBootstrapping, logout } = useAuth();
 
   return (
     <header className="header">
@@ -11,7 +11,9 @@ export function Header() {
       </Link>
 
       <nav className="nav" aria-label="Main navigation">
-        {isAuthenticated ? (
+        {isBootstrapping ? (
+          <span className="nav-user muted">Chargement…</span>
+        ) : isAuthenticated ? (
           <>
             <NavLink to="/lobby" className="nav-link">
               Lobby

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { useAuth } from "./auth/AuthContext.js";
 import { Header } from "./components/Header.js";
 import { GuestRoute, ProtectedRoute } from "./components/ProtectedRoute.js";
 import { LeaderboardPage } from "./pages/LeaderboardPage.js";
@@ -7,6 +8,22 @@ import { LoginPage } from "./pages/LoginPage.js";
 import { ProfilePage } from "./pages/ProfilePage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import "./App.css";
+
+function CatchAllRedirect() {
+  const { isAuthenticated, isBootstrapping } = useAuth();
+
+  if (isBootstrapping) {
+    return (
+      <div className="page">
+        <div className="panel">
+          <p className="muted">Chargement…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <Navigate to={isAuthenticated ? "/lobby" : "/login"} replace />;
+}
 
 export function App() {
   return (
@@ -28,7 +45,7 @@ export function App() {
           <Route path="/profile/:id" element={<ProfilePage />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/lobby" replace />} />
+        <Route path="*" element={<CatchAllRedirect />} />
       </Routes>
     </div>
   );

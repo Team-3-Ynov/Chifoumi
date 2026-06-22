@@ -20,9 +20,9 @@ export function ProfileHeader({ profile }: ProfileHeaderProps) {
 
   return (
     <section className="profile-header" aria-labelledby="profile-title">
-      <h1 id="profile-title" className="title">
+      <h2 id="profile-title" className="title">
         {stats.displayName}
-      </h1>
+      </h2>
 
       <dl className="profile-stats">
         {email ? (

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { apiRequest, configureApiClient, refreshTokens } from "../api/apiClient.js";
 import type { AuthResponse, AuthUser, MeProfile } from "../api/types.js";
+import { queryClient } from "../queryClient.js";
 import {
   clearStoredRefreshToken,
   getStoredRefreshToken,
@@ -36,16 +37,22 @@ function toAuthUser(profile: MeProfile): AuthUser {
   };
 }
 
+function clearUserQueries(): void {
+  queryClient.clear();
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const accessTokenRef = useRef<string | null>(null);
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
+  const hasBootstrappedRef = useRef(false);
 
   const clearSession = useCallback(() => {
     accessTokenRef.current = null;
     clearStoredRefreshToken();
     setUser(null);
+    clearUserQueries();
   }, []);
 
   const applyTokens = useCallback((access: string, refresh: string) => {
@@ -109,6 +116,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshAccessToken,
       onAuthFailure: clearSession,
     });
+
+    if (hasBootstrappedRef.current) {
+      return;
+    }
+
+    hasBootstrappedRef.current = true;
     void bootstrapSession();
   }, [bootstrapSession, clearSession, refreshAccessToken]);
 
@@ -119,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
 
+      clearUserQueries();
       applyTokens(result.tokens.access, result.tokens.refresh);
       setUser(result.user);
     },
@@ -132,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password, displayName }),
       });
 
+      clearUserQueries();
       applyTokens(result.tokens.access, result.tokens.refresh);
       setUser(result.user);
     },

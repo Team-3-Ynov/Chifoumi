@@ -30,15 +30,41 @@ export class ApiError extends Error {
   }
 }
 
+export function formatApiError(body: unknown, status: number): string {
+  if (typeof body === "object" && body !== null) {
+    const record = body as {
+      message?: string | string[] | { error?: string };
+      error?: string;
+    };
+
+    if (typeof record.error === "string") {
+      return record.error;
+    }
+
+    if (Array.isArray(record.message)) {
+      return record.message.join(", ");
+    }
+
+    if (typeof record.message === "string") {
+      return record.message;
+    }
+
+    if (
+      typeof record.message === "object" &&
+      record.message !== null &&
+      typeof record.message.error === "string"
+    ) {
+      return record.message.error;
+    }
+  }
+
+  return `Request failed with status ${status}`;
+}
+
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
-    const body = (await response.json()) as { message?: string | string[] };
-    if (Array.isArray(body.message)) {
-      return body.message.join(", ");
-    }
-    if (typeof body.message === "string") {
-      return body.message;
-    }
+    const body: unknown = await response.json();
+    return formatApiError(body, response.status);
   } catch {
     // ignore parse errors
   }
