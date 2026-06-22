@@ -8,10 +8,11 @@ import { createGameServiceTestModule } from "../src/testing/create-game-service-
 import { issueTestAccessToken } from "../src/testing/issue-test-access-token.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-config({ path: resolve(repoRoot, ".env") });
-
 process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.MATCHMAKING_WORKER_ENABLED = "false";
+process.env.MATCH_TIMEOUT_WORKER_ENABLED = "false";
+process.env.BULLMQ_PREFIX ??= "rps-test";
+config({ path: resolve(repoRoot, ".env") });
 
 type ConnectedPayload = { userId: string; displayName: string };
 

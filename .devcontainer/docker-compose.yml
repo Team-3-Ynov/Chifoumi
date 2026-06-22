@@ -1,0 +1,101 @@
+services:
+  workspace:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    command: sleep infinity
+    init: true
+    user: vscode
+    volumes:
+      - ..:/workspaces/Chifoumi:cached
+      - chifoumi_node_modules:/workspaces/Chifoumi/node_modules
+      - chifoumi_pnpm_store:/workspaces/Chifoumi/pnpm-store
+    environment:
+      PNPM_HOME: /usr/local/node/bin
+      CHIFOUMI_DEVCONTAINER: "true"
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+      REDIS_URL: redis://redis:6379
+      MAIL_TRANSPORT: mailhog
+      MAIL_HOST: mailhog
+      MAIL_PORT: "1025"
+      MAIL_FROM: noreply@chifoumi.local
+      API_PORT: "3000"
+      GAME_SERVICE_PORT: "3001"
+      CORS_ORIGINS: http://localhost:5173
+      FRONTEND_URL: http://localhost:5173
+      VITE_API_BASE_URL: http://localhost:3000
+      BULLMQ_PREFIX: rps
+      WORKER_QUEUES: match-events,notifications
+      WORKER_CONCURRENCY: "4"
+      WORKER_ROLE: match-processor
+      CRON_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_healthy
+    networks:
+      - chifoumi_dev
+
+  postgres:
+    image: bitnamilegacy/postgresql:16
+    container_name: chifoumi-devcontainer-postgres
+    environment:
+      POSTGRESQL_PASSWORD: postgres_dev
+    ports:
+      - "127.0.0.1:${CHIFOUMI_DEVCONTAINER_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - chifoumi_pg_data:/bitnami/postgresql
+      - ../infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1 -p 5432"]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    networks:
+      - chifoumi_dev
+
+  redis:
+    image: bitnamilegacy/redis:7.4
+    container_name: chifoumi-devcontainer-redis
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+    ports:
+      - "127.0.0.1:${CHIFOUMI_DEVCONTAINER_REDIS_PORT:-6379}:6379"
+    volumes:
+      - chifoumi_redis_data:/bitnami/redis/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - chifoumi_dev
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: chifoumi-devcontainer-mailhog
+    ports:
+      - "127.0.0.1:${CHIFOUMI_DEVCONTAINER_MAILHOG_HTTP_PORT:-8025}:8025"
+      - "127.0.0.1:${CHIFOUMI_DEVCONTAINER_MAILHOG_SMTP_PORT:-1025}:1025"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8025/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - chifoumi_dev
+
+volumes:
+  chifoumi_node_modules:
+  chifoumi_pg_data:
+  chifoumi_pnpm_store:
+  chifoumi_redis_data:
+
+networks:
+  chifoumi_dev:
+    name: chifoumi-devcontainer
