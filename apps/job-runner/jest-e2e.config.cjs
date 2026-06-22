@@ -9,7 +9,6 @@ module.exports = {
   testEnvironment: "node",
   maxWorkers: 1,
   testTimeout: 30_000,
-  forceExit: true,
   rootDir: ".",
   testRegex: "test/.*\\.integration-spec\\.ts$",
   transform: {

@@ -11,7 +11,6 @@ import { WorkerMetricsService } from "../src/metrics/worker-metrics.service.js";
 import { MatchPersistenceService } from "../src/persistence/match-persistence.service.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
 import { LEADERBOARD_INVALIDATE_CHANNEL } from "../src/redis/redis-invalidation.service.js";
-import { RunnerService } from "../src/runner.service.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 config({ path: resolve(repoRoot, ".env") });
@@ -97,7 +96,6 @@ function createPayload(matchId: string, playerAId: string, playerBId: string): M
 
 describe("match-events worker (integration)", () => {
   let moduleRef: TestingModule;
-  let runnerService: RunnerService;
   let prisma: PrismaService;
   let persistence: MatchPersistenceService;
   let metrics: WorkerMetricsService;
@@ -110,7 +108,6 @@ describe("match-events worker (integration)", () => {
     }).compile();
     await moduleRef.init();
 
-    runnerService = moduleRef.get(RunnerService);
     prisma = moduleRef.get(PrismaService);
     persistence = moduleRef.get(MatchPersistenceService);
     metrics = moduleRef.get(WorkerMetricsService);
@@ -132,7 +129,6 @@ describe("match-events worker (integration)", () => {
   });
 
   afterAll(async () => {
-    await runnerService.onModuleDestroy();
     await queue.close();
     await redisSubscriber.quit();
     await moduleRef.close();
