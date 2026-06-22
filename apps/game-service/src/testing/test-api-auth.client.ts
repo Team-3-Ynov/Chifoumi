@@ -43,7 +43,7 @@ export class TestApiAuthClient {
     try {
       revoked = await this.redisService.isAccessTokenRevoked(payload.jti);
     } catch {
-      return { valid: false, reason: "INVALID" };
+      return { valid: false, reason: "UNAVAILABLE" };
     }
 
     if (revoked) {

@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",
+    "@nestjs/jwt": "11.0.0",
     "@nestjs/testing": "11.1.21",
     "@types/ioredis-mock": "^8.2.7",
     "@types/jest": "29.5.14",
@@ -34,7 +35,6 @@
     "@nestjs/common": "^11.1.21",
     "bullmq": "^5.49.2",
     "@nestjs/core": "^11.1.21",
-    "@nestjs/jwt": "11.0.0",
     "@nestjs/microservices": "^11.1.21",
     "@nestjs/platform-express": "^11.1.21",
     "@nestjs/platform-socket.io": "^11.1.21",

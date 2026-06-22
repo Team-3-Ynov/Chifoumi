@@ -42,6 +42,10 @@ export class WsAuthService {
         throw new WsAuthError("TOKEN_REVOKED", WS_AUTH_TOKEN_REVOKED_CODE);
       }
 
+      if (result.reason === "UNAVAILABLE") {
+        throw new WsAuthError("AUTH_UNAVAILABLE", WS_AUTH_UNAVAILABLE_CODE);
+      }
+
       throw new WsAuthError("INVALID_TOKEN", WS_AUTH_INVALID_TOKEN_CODE);
     } catch (error) {
       if (error instanceof WsAuthError) {

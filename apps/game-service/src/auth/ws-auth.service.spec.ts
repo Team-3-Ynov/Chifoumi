@@ -66,6 +66,14 @@ describe("WsAuthService", () => {
     });
   });
 
+  it("fails closed when the API reports auth unavailable", async () => {
+    apiAuthClient.verifyToken.mockResolvedValue({ valid: false, reason: "UNAVAILABLE" });
+    await expect(wsAuthService.verifyToken("token")).rejects.toMatchObject({
+      message: "AUTH_UNAVAILABLE",
+      code: WS_AUTH_UNAVAILABLE_CODE,
+    });
+  });
+
   it("fails closed when the API client is unavailable", async () => {
     apiAuthClient.verifyToken.mockRejectedValue(new AuthUnavailableError());
     await expect(wsAuthService.verifyToken("token")).rejects.toMatchObject({

@@ -7,12 +7,11 @@ import { io, type Socket } from "socket.io-client";
 import { MatchmakingWorkerService } from "../src/matchmaking/matchmaking-worker.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
 import { createGameServiceTestModule } from "../src/testing/create-game-service-test-module.js";
-import { issueTestAccessToken, testJwtKeys } from "../src/testing/issue-test-access-token.js";
+import { issueTestAccessToken } from "../src/testing/issue-test-access-token.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 config({ path: resolve(repoRoot, ".env") });
 
-process.env.JWT_PUBLIC_KEY = testJwtKeys.publicKey;
 process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.MATCHMAKING_WORKER_ENABLED = "false";
 process.env.BULLMQ_PREFIX ??= "rps-test";

@@ -86,8 +86,6 @@ services:
       MATCHMAKING_WORKER_ENABLED: "true"
       API_GRPC_URL: api:50051
       CORS_ORIGINS: http://localhost:5173
-    volumes:
-      - ./infra/keys:/app/infra/keys:ro
     healthcheck:
       test:
         [
@@ -121,8 +119,6 @@ services:
       MATCHMAKING_WORKER_ENABLED: "true"
       API_GRPC_URL: api:50051
       CORS_ORIGINS: http://localhost:5173
-    volumes:
-      - ./infra/keys:/app/infra/keys:ro
     healthcheck:
       test:
         [

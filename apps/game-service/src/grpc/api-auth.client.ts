@@ -31,7 +31,8 @@ function mapVerifyTokenResponse(response: {
     const reason =
       response.reason === "REVOKED" ||
       response.reason === "EXPIRED" ||
-      response.reason === "INVALID"
+      response.reason === "INVALID" ||
+      response.reason === "UNAVAILABLE"
         ? response.reason
         : "INVALID";
     return { valid: false, reason };
