@@ -10,6 +10,7 @@ Ce dossier regroupe la documentation projet : consignes, backlog, specs d'archit
 | [`consignes/`](consignes/) | Sujet, grille de notation et contraintes d'oral. |
 | [`superpowers/specs/`](superpowers/specs/) | Specs de design et decisions structurantes. |
 | [`superpowers/plans/`](superpowers/plans/) | Plans d'execution issus des specs et des tickets. |
+| [`demo/`](demo/) | Script et procedure de demonstration multi-instances (US-032). |
 
 ## Entrees principales
 
@@ -20,6 +21,7 @@ Ce dossier regroupe la documentation projet : consignes, backlog, specs d'archit
 - [`backlog/sprint-1-data.md`](backlog/sprint-1-data.md) : stories data et Prisma.
 - [`backlog/sprint-1-job-runner.md`](backlog/sprint-1-job-runner.md) : workers et jobs asynchrones.
 - [`backlog/sprint-1-devops-demo.md`](backlog/sprint-1-devops-demo.md) : devops, demo et observabilite.
+- [`demo/multi-instances.md`](demo/multi-instances.md) : demo soutenance multi-replicas (US-032).
 
 ## Futures sections
 
@@ -28,4 +30,3 @@ Ces emplacements pourront etre ajoutes au fil des sprints :
 - `docs/adr/` pour les Architecture Decision Records.
 - `docs/openapi.json` pour l'export Swagger.
 - `docs/runbooks/` pour les procedures d'exploitation.
-- `docs/demo/` pour le script de demonstration jury.

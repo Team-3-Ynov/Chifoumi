@@ -35,11 +35,16 @@ export function connectWs(gameUrl: string, accessToken: string): Socket {
 
 export function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 20_000): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`${event} timeout`)), timeoutMs);
-    socket.once(event, (payload: T) => {
+    const onEvent = (payload: T) => {
       clearTimeout(timeout);
       resolve(payload);
-    });
+    };
+    const timeout = setTimeout(() => {
+      socket.off(event, onEvent);
+      reject(new Error(`${event} timeout`));
+    }, timeoutMs);
+
+    socket.once(event, onEvent);
   });
 }
 
@@ -48,20 +53,41 @@ export async function connectAuthenticated(
   accessToken: string,
 ): Promise<{ socket: Socket; connected: ConnectedPayload }> {
   const socket = connectWs(gameUrl, accessToken);
-  const connectedPromise = waitForEvent<ConnectedPayload>(socket, "connected");
+  try {
+    const connected = await new Promise<ConnectedPayload>((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timeout);
+        socket.off("connected", onConnected);
+        socket.off("connect_error", onConnectError);
+      };
+      const onConnected = (payload: ConnectedPayload) => {
+        cleanup();
+        resolve(payload);
+      };
+      const onConnectError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error("connected timeout"));
+      }, 20_000);
 
-  await new Promise<void>((resolve, reject) => {
-    socket.once("connect", () => resolve());
-    socket.once("connect_error", reject);
-  });
+      socket.once("connected", onConnected);
+      socket.once("connect_error", onConnectError);
+    });
 
-  const connected = await connectedPromise;
-  return { socket, connected };
+    return { socket, connected };
+  } catch (error) {
+    socket.disconnect();
+    throw error;
+  }
 }
 
 export async function joinQueue(socket: Socket): Promise<void> {
+  const queueJoined = waitForEvent(socket, "queueJoined");
   socket.emit("joinQueue", {});
-  await waitForEvent(socket, "queueJoined");
+  await queueJoined;
 }
 
 export async function playBo3Win(
@@ -72,21 +98,22 @@ export async function playBo3Win(
 ): Promise<{ matchEndedA: MatchEndedPayload; matchEndedB: MatchEndedPayload }> {
   const round1ResolvedA = waitForEvent<RoundResolvedPayload>(socketA, "roundResolved");
   const round1ResolvedB = waitForEvent<RoundResolvedPayload>(socketB, "roundResolved");
+  const round2StartA = waitForEvent<RoundStartPayload>(socketA, "roundStart");
+  const round2StartB = waitForEvent<RoundStartPayload>(socketB, "roundStart");
 
   socketA.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "rock" });
-  await new Promise((resolve) => setTimeout(resolve, 50));
   socketB.emit("play", { matchId, roundNumber: roundStart.roundNumber, move: "scissors" });
-  await round1ResolvedA;
-  await round1ResolvedB;
-
-  const round2Start = await waitForEvent<RoundStartPayload>(socketA, "roundStart");
-  await waitForEvent<RoundStartPayload>(socketB, "roundStart");
+  const [, , round2Start] = await Promise.all([
+    round1ResolvedA,
+    round1ResolvedB,
+    round2StartA,
+    round2StartB,
+  ]);
 
   const matchEndedA = waitForEvent<MatchEndedPayload>(socketA, "matchEnded");
   const matchEndedB = waitForEvent<MatchEndedPayload>(socketB, "matchEnded");
 
   socketA.emit("play", { matchId, roundNumber: round2Start.roundNumber, move: "paper" });
-  await new Promise((resolve) => setTimeout(resolve, 50));
   socketB.emit("play", { matchId, roundNumber: round2Start.roundNumber, move: "rock" });
 
   return {

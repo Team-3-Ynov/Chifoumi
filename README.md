@@ -8,6 +8,8 @@ Plateforme web competitive Pierre-Feuille-Ciseaux avec matchmaking ELO, parties 
 
 - [Pre-requis](#pre-requis)
 - [Demarrage rapide](#demarrage-rapide)
+- [Stack multi-replicas (US-030)](#stack-multi-replicas-us-030)
+- [Demo multi-instances (US-032)](#demo-multi-instances-us-032)
 - [Tech stack](#tech-stack)
 - [Architecture](#architecture)
 - [Commandes utiles](#commandes-utiles)
@@ -29,8 +31,32 @@ pnpm install
 cp .env.example .env
 docker compose up -d
 pnpm --filter @chifoumi/db generate
+pnpm --filter @chifoumi/db migrate:deploy
 pnpm dev
 ```
+
+## Premier lancement
+
+Au premier demarrage (base Postgres vide), appliquer les migrations puis le seed :
+
+```bash
+docker compose up -d postgres
+pnpm --filter @chifoumi/db migrate:deploy
+pnpm db:seed
+```
+
+Le seed cree un compte admin par defaut :
+
+| Champ | Valeur dev |
+|---|---|
+| Email | `admin@chifoumi.local` |
+| Mot de passe | `admin-CHANGE-ME!` |
+| Role | `admin` |
+| ELO initial | `1000` |
+
+**En production**, definir obligatoirement `ADMIN_DEFAULT_EMAIL` et `ADMIN_DEFAULT_PASSWORD` dans l'environnement — ne jamais conserver les valeurs par defaut.
+
+Le seed est idempotent : relance sur une base deja initialisee, il ne duplique rien. En stack Docker scale, le job one-shot `db-migrate` execute `migrate deploy` puis `db:seed` avant le demarrage des replicas API (skip si l'admin existe deja).
 
 Services lances par `pnpm dev` :
 
@@ -42,6 +68,74 @@ Services lances par `pnpm dev` :
 | Job runner | terminal uniquement | Workers et traitements asynchrones |
 
 Si le schema Postgres evolue, relancer une base vide avec `docker compose down -v`, puis `docker compose up -d`.
+
+## Stack multi-replicas (US-030)
+
+Stack containerisee complete avec Traefik, 2 replicas API, 2 replicas Game Service et observabilite.
+
+### Pre-requis supplementaires
+
+Generer les cles JWT de dev (une seule fois) :
+
+```bash
+mkdir -p infra/keys
+openssl genrsa -out infra/keys/jwt-private.pem 2048
+openssl rsa -in infra/keys/jwt-private.pem -pubout -out infra/keys/jwt-public.pem
+```
+
+Ajouter les entrees suivantes au fichier hosts local (`C:\Windows\System32\drivers\etc\hosts` ou `/etc/hosts`) :
+
+```text
+127.0.0.1 api.localhost front.localhost game.localhost traefik.localhost grafana.localhost prometheus.localhost
+```
+
+### Lancer la stack
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --build
+```
+
+Services demarres : `postgres` x1, `redis` x1, `db-migrate` (one-shot), `api-1` + `api-2`, `game-1` + `game-2`, `job-runner-match` x1, `job-runner-misc` x1, `front` x1, `traefik` x1, `mailhog` x1, `prometheus` x1, `grafana` x1.
+
+| Service | URL via Traefik | Port direct |
+|---|---:|---|
+| Front | `http://front.localhost` | — |
+| API (round-robin) | `http://api.localhost/health` | — |
+| Game WS (sticky) | `ws://game.localhost/game` | — |
+| Traefik dashboard | `http://traefik.localhost` | — |
+| Grafana | `http://grafana.localhost` | `http://localhost:3002` |
+| Prometheus | `http://prometheus.localhost` | `http://localhost:9090` |
+| MailHog | — | `http://localhost:8025` |
+
+Verifier le round-robin API : `curl http://api.localhost/health` plusieurs fois et comparer le champ `instance` (`api-1` / `api-2`) dans les logs ou la reponse JSON.
+
+Demo de resilience : arreter une instance API puis verifier que `/health` repond toujours :
+
+```bash
+docker stop chifoumi-api-1
+curl http://api.localhost/health
+docker start chifoumi-api-1
+```
+
+Arreter la stack :
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.scale.yml down
+```
+
+## Demo multi-instances (US-032)
+
+Procedure de soutenance (~5 min) : deux joueurs sur des replicas Game Service differents, crash d'instance, Grafana live.
+
+```bash
+# Linux / macOS / Git Bash
+bash scripts/demo/run-demo.sh
+
+# Windows
+.\scripts\demo\run-demo.ps1
+```
+
+Guide detaille avec captures : [`docs/demo/multi-instances.md`](docs/demo/multi-instances.md).
 
 ## Tech stack
 
@@ -103,7 +197,7 @@ pnpm --filter @chifoumi/front dev
 | Swagger | `http://localhost:3000/api/docs` | disponible |
 | OpenAPI JSON | `http://localhost:3000/api/docs-json` | disponible |
 | MailHog | `http://localhost:8025` | disponible apres `docker compose up -d` |
-| Grafana | `http://localhost:3002` | prevu avec la stack observabilite |
+| Grafana | `http://localhost:3002` | disponible avec `docker-compose.scale.yml` |
 
 En production, la documentation Swagger est protegee par Basic Auth via `SWAGGER_USER` et `SWAGGER_PASSWORD`.
 Sans ces deux variables en production, les routes `/api/docs` et `/api/docs-json` ne sont pas exposees.
