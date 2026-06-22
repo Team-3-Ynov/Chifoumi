@@ -45,11 +45,20 @@ async function waitForJobState(
   job: Job,
   expected: string,
   timeoutMs = 15_000,
+  options?: { failedReasonContains?: string },
 ): Promise<Job> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const current = await Job.fromId(bullQueue, job.id as string);
     if (current && (await current.getState()) === expected) {
+      if (
+        expected === "failed" &&
+        options?.failedReasonContains &&
+        !current.failedReason?.includes(options.failedReasonContains)
+      ) {
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+        continue;
+      }
       return current;
     }
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
@@ -220,7 +229,9 @@ describe("match-events worker (integration)", () => {
 
   it("rejects invalid payloads permanently without retry", async () => {
     const job = await queue.add("match-ended", { invalid: true }, { attempts: 3 });
-    const failedJob = await waitForJobState(queue, job, "failed");
+    const failedJob = await waitForJobState(queue, job, "failed", 15_000, {
+      failedReasonContains: "Invalid match-ended job payload",
+    });
 
     expect(failedJob.failedReason).toContain("Invalid match-ended job payload");
     // UnrecoverableError fails immediately without consuming retry attempts.
