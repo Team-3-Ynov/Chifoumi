@@ -5,6 +5,7 @@ import type { MatchEndedPayload, MatchState } from "../match-session/match-sessi
 
 export type MatchEndedJobPayload = MatchEndedPayload & {
   players: MatchState["players"];
+  rounds: NonNullable<MatchState["rounds"]>;
   endReason: MatchState["endReason"];
   startedAt: string;
 };
@@ -44,11 +45,17 @@ export class MatchEndedPublisher implements OnModuleInit, OnModuleDestroy {
       eloDelta: { a: 0, b: 0 },
       reason: state.endReason,
       players: state.players,
+      rounds: state.rounds ?? [],
       endReason: state.endReason,
       startedAt: state.startedAt,
     };
 
     await this.queue.add("match-ended", payload, {
+      attempts: 3,
+      backoff: {
+        type: "exponential",
+        delay: 1000,
+      },
       removeOnComplete: true,
       removeOnFail: 100,
     });

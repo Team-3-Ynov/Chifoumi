@@ -4,6 +4,8 @@ dist
 **/dist
 coverage
 **/coverage
+*.tsbuildinfo
+**/*.tsbuildinfo
 .git
 .env
 .env.*

@@ -19,9 +19,10 @@ COPY packages/tsconfig/package.json packages/tsconfig/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder
+ENV DATABASE_URL=postgresql://app:chifoumi_dev@localhost:5432/chifoumi
 COPY apps ./apps
 COPY packages ./packages
-RUN pnpm --filter @chifoumi/job-runner build
+RUN pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/elo build && pnpm --filter @chifoumi/job-runner build
 
 FROM base AS runner
 ENV NODE_ENV=production

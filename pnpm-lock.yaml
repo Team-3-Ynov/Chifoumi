@@ -251,12 +251,24 @@ importers:
 
   apps/job-runner:
     dependencies:
+      '@chifoumi/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@chifoumi/elo':
+        specifier: workspace:*
+        version: link:../../packages/elo
       '@nestjs/common':
         specifier: ^11.1.21
         version: 11.1.21(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core':
         specifier: ^11.1.21
         version: 11.1.21(@nestjs/common@11.1.21(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.21)(@nestjs/websockets@11.1.21)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@prisma/adapter-pg':
+        specifier: ^7.8.0
+        version: 7.8.0
+      '@prisma/client':
+        specifier: ^7.8.0
+        version: 7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.7.3))(typescript@5.7.3)
       bullmq:
         specifier: ^5.49.2
         version: 5.78.0
@@ -272,6 +284,9 @@ importers:
       nodemailer:
         specifier: ^6.10.1
         version: 6.10.1
+      pg:
+        specifier: ^8.16.3
+        version: 8.21.0
       pino-http:
         specifier: 10.4.0
         version: 10.4.0
@@ -396,6 +411,30 @@ importers:
 
   packages/tsconfig:
     devDependencies:
+      typescript:
+        specifier: ~5.7.3
+        version: 5.7.3
+
+  tests/e2e:
+    devDependencies:
+      '@jest/globals':
+        specifier: 29.7.0
+        version: 29.7.0
+      '@types/jest':
+        specifier: 29.5.14
+        version: 29.5.14
+      '@types/node':
+        specifier: ^24.12.4
+        version: 24.12.4
+      jest:
+        specifier: 29.7.0
+        version: 29.7.0(@types/node@24.12.4)
+      socket.io-client:
+        specifier: ^4.8.3
+        version: 4.8.3
+      ts-jest:
+        specifier: 29.2.5
+        version: 29.2.5(@babel/core@7.29.0)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.29.0))(jest@29.7.0(@types/node@24.12.4))(typescript@5.7.3)
       typescript:
         specifier: ~5.7.3
         version: 5.7.3

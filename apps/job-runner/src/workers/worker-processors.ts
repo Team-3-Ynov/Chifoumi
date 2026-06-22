@@ -1,20 +1,21 @@
 import type { Job } from "bullmq";
 import type { WorkerQueueName } from "../config/env.js";
+import {
+  createMatchEndedProcessor,
+  type MatchEventsProcessorDependencies,
+} from "../match-events/match-ended.processor.js";
 import type { MailService } from "../notifications/mail.service.js";
 import { createNotificationsProcessor } from "../notifications/notifications.processor.js";
 
 export type WorkerProcessor = (job: Job) => Promise<void>;
-
-export type ProcessorDependencies = {
+export type ProcessorDependencies = MatchEventsProcessorDependencies & {
   mailService: MailService;
 };
 
-const STUB_PROCESSORS: Record<Exclude<WorkerQueueName, "notifications">, WorkerProcessor> = {
-  "match-events": async (job) => {
-    if (job.name !== "match-ended") {
-      throw new Error(`Unsupported job name on match-events: ${job.name}`);
-    }
-  },
+const STUB_PROCESSORS: Record<
+  Exclude<WorkerQueueName, "match-events" | "notifications">,
+  WorkerProcessor
+> = {
   seasons: async (job) => {
     if (job.name !== "season-reset") {
       throw new Error(`Unsupported job name on seasons: ${job.name}`);
@@ -31,6 +32,10 @@ export function getProcessorForQueue(
   queue: WorkerQueueName,
   deps: ProcessorDependencies,
 ): WorkerProcessor {
+  if (queue === "match-events") {
+    return createMatchEndedProcessor(deps);
+  }
+
   if (queue === "notifications") {
     return createNotificationsProcessor(deps.mailService);
   }

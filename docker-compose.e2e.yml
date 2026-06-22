@@ -1,0 +1,154 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: chifoumi_dev
+      POSTGRES_DB: chifoumi
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d chifoumi"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+    entrypoint: ["pnpm", "--filter", "@chifoumi/db", "migrate:deploy"]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "${E2E_API_PORT:-3000}:3000"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+      REDIS_URL: redis://redis:6379
+      API_PORT: 3000
+      BULLMQ_PREFIX: rps
+      JWT_PRIVATE_KEY_PATH: /app/infra/keys/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+      CORS_ORIGINS: http://localhost:5173
+    volumes:
+      - ./infra/keys:/app/infra/keys:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  game-service-1:
+    build:
+      context: .
+      dockerfile: apps/game-service/Dockerfile
+    ports:
+      - "${E2E_GAME_1_PORT:-3101}:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379
+      GAME_SERVICE_PORT: 3001
+      INSTANCE_ID: game-1
+      BULLMQ_PREFIX: rps
+      MATCHMAKING_WORKER_ENABLED: "true"
+      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+      CORS_ORIGINS: http://localhost:5173
+    volumes:
+      - ./infra/keys:/app/infra/keys:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  game-service-2:
+    build:
+      context: .
+      dockerfile: apps/game-service/Dockerfile
+    ports:
+      - "${E2E_GAME_2_PORT:-3102}:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379
+      GAME_SERVICE_PORT: 3001
+      INSTANCE_ID: game-2
+      BULLMQ_PREFIX: rps
+      MATCHMAKING_WORKER_ENABLED: "true"
+      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+      CORS_ORIGINS: http://localhost:5173
+    volumes:
+      - ./infra/keys:/app/infra/keys:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  job-runner-match:
+    build:
+      context: .
+      dockerfile: apps/job-runner/Dockerfile
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+      REDIS_URL: redis://redis:6379
+      WORKER_QUEUES: match-events
+      WORKER_CONCURRENCY: 8
+      WORKER_ROLE: match-processor
+      CRON_ENABLED: "false"
+      BULLMQ_PREFIX: rps
+    restart: unless-stopped
