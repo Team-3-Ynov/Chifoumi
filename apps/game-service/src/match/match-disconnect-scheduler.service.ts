@@ -3,6 +3,9 @@ import { Queue } from "bullmq";
 import { REDIS_CONFIG, type RedisConfig } from "../config/redis.config.js";
 import { RedisService } from "../redis/redis.service.js";
 import {
+  MATCH_DISCONNECT_FORFEIT_FAILED_JOBS_RETAINED,
+  MATCH_DISCONNECT_FORFEIT_JOB_ATTEMPTS,
+  MATCH_DISCONNECT_FORFEIT_JOB_BACKOFF_MS,
   MATCH_DISCONNECT_FORFEIT_JOB_NAME,
   MATCH_DISCONNECT_FORFEIT_JOB_TTL_SECONDS,
   MATCH_DISCONNECT_FORFEIT_QUEUE,
@@ -52,8 +55,13 @@ export class MatchDisconnectSchedulerService implements OnModuleInit, OnModuleDe
       { userId, matchId },
       {
         delay: Math.max(0, delayMs),
+        attempts: MATCH_DISCONNECT_FORFEIT_JOB_ATTEMPTS,
+        backoff: {
+          type: "exponential",
+          delay: MATCH_DISCONNECT_FORFEIT_JOB_BACKOFF_MS,
+        },
         removeOnComplete: true,
-        removeOnFail: true,
+        removeOnFail: MATCH_DISCONNECT_FORFEIT_FAILED_JOBS_RETAINED,
       },
     );
 
