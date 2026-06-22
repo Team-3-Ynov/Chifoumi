@@ -3,6 +3,7 @@ import Redis from "ioredis-mock";
 import { Logger } from "nestjs-pino";
 import { MatchEventBus } from "../match-session/match-event-bus.js";
 import { MatchSessionService } from "../match-session/match-session.service.js";
+import { MatchmakingMetricsService } from "../matchmaking/matchmaking-metrics.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
 import { MatchPlayService, PlayValidationError } from "./match-play.service.js";
@@ -41,12 +42,16 @@ describe("MatchPlayService", () => {
     };
 
     const logger = { warn: jest.fn(), debug: jest.fn() } as unknown as Logger;
+    const metrics = {
+      recordMatchPlayed: jest.fn(),
+    } as unknown as MatchmakingMetricsService;
 
     service = new MatchPlayService(
       matchSessionService,
       eventBus,
       matchEndedPublisher,
       matchTimeoutScheduler as unknown as MatchTimeoutSchedulerService,
+      metrics,
       logger,
     );
 

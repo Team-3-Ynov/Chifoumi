@@ -60,7 +60,7 @@ describe("WorkerFactory", () => {
 
   it("instantiates only the requested queues", () => {
     const config = createConfig({ WORKER_QUEUES: ["match-events"] });
-    const metrics = new WorkerMetricsService(config);
+    const metrics = new WorkerMetricsService();
     const logger = { log: jest.fn() } as unknown as Logger;
     const factory = new WorkerFactoryClass(
       config,
@@ -87,9 +87,9 @@ describe("WorkerFactory", () => {
     );
   });
 
-  it("records retry vs permanent failure metrics from worker events", () => {
+  it("records completed and failed metrics from worker events", () => {
     const config = createConfig({ WORKER_QUEUES: ["match-events"] });
-    const metrics = new WorkerMetricsService(config);
+    const metrics = new WorkerMetricsService();
     const recordSpy = jest.spyOn(metrics, "recordJobProcessed");
     type FailedJob = {
       attemptsMade: number;
@@ -130,15 +130,13 @@ describe("WorkerFactory", () => {
     handlers.get("failed")?.(permanentFailedJob, new Error("permanent"));
     handlers.get("completed")?.();
 
-    expect(recordSpy).toHaveBeenCalledWith("match-events", "retry");
-    expect(recordSpy).toHaveBeenCalledWith("match-events", "failed_permanent");
+    expect(recordSpy).toHaveBeenCalledWith("match-events", "failed");
     expect(recordSpy).toHaveBeenCalledWith("match-events", "completed");
 
     recordSpy.mockClear();
     handlers.get("failed")?.(failedJob, new MockUnrecoverableError("invalid payload"));
 
-    expect(recordSpy).toHaveBeenCalledWith("match-events", "failed_permanent");
-    expect(recordSpy).not.toHaveBeenCalledWith("match-events", "retry");
+    expect(recordSpy).toHaveBeenCalledWith("match-events", "failed");
   });
 
   it("instantiates multiple workers for multiple queues", () => {
@@ -147,7 +145,7 @@ describe("WorkerFactory", () => {
       WORKER_CONCURRENCY: 8,
       BULLMQ_PREFIX: "rps-staging",
     });
-    const metrics = new WorkerMetricsService(config);
+    const metrics = new WorkerMetricsService();
     const logger = { log: jest.fn() } as unknown as Logger;
     const factory = new WorkerFactoryClass(
       config,

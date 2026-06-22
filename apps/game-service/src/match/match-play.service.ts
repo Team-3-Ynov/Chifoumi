@@ -15,6 +15,7 @@ import {
   type RoundResolvedPayload,
 } from "../match-session/match-session.types.js";
 import { transitionMatchState } from "../match-session/match-state-machine.js";
+import { MatchmakingMetricsService } from "../matchmaking/matchmaking-metrics.service.js";
 import { isValidMove, resolveRound as resolveRps } from "../rps/resolve.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
 import type { MatchTimeoutExpectedState } from "./match-timeout.types.js";
@@ -49,6 +50,7 @@ export class MatchPlayService {
     private readonly eventBus: MatchEventBus,
     private readonly matchEndedPublisher: MatchEndedPublisher,
     private readonly matchTimeoutScheduler: MatchTimeoutSchedulerService,
+    private readonly metrics: MatchmakingMetricsService,
     private readonly logger: Logger,
   ) {}
 
@@ -354,6 +356,7 @@ export class MatchPlayService {
 
   private async finalizeMatch(state: MatchState): Promise<void> {
     await this.clearTimer(state.matchId);
+    this.metrics.recordMatchPlayed(this.resolveMatchOutcome(state));
 
     const payload = {
       matchId: state.matchId,
@@ -374,6 +377,14 @@ export class MatchPlayService {
 
     await this.matchSessionService.cleanupUserMappings(state);
     await this.matchEndedPublisher.publishMatchEnded(state);
+  }
+
+  private resolveMatchOutcome(state: MatchState): "win" | "draw" | "forfeit" {
+    if (state.endReason === "FORFEIT_TIMEOUT") {
+      return "forfeit";
+    }
+
+    return state.winnerId ? "win" : "draw";
   }
 
   private async schedulePhaseTimeout(
