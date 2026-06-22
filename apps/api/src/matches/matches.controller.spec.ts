@@ -10,10 +10,7 @@ describe("MatchesController", () => {
 
   const mockAuditResponse: MatchAuditResponseDto = {
     matchId: "123",
-    players: [
-      { id: "player-a", displayName: "alice" },
-      { id: "player-b", displayName: "bob" },
-    ],
+    players: ["player-a", "player-b"],
     rounds: [
       {
         roundNumber: 1,
@@ -26,9 +23,8 @@ describe("MatchesController", () => {
         hashCheck: { a: "match" as const, b: "match" as const },
       },
     ],
-    finalScore: [2, 1],
+    finalScore: { a: 2, b: 1 },
     winner: "player-a",
-    endedAt: "2026-06-22T10:30:00.000Z",
   };
 
   beforeEach(() => {
