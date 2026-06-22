@@ -63,7 +63,10 @@ async function waitForDelayedTimeoutJob(
 ): Promise<void> {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
-    const jobs = await queue.getJobs(["delayed"]);
+    const rawJobs = await queue.getJobs(["delayed"]);
+    const jobs = rawJobs.filter(
+      (job): job is NonNullable<(typeof rawJobs)[number]> => job?.data != null,
+    );
     const match = jobs.find(
       (job) => job.data.matchId === matchId && job.data.roundNumber === roundNumber,
     );
@@ -194,7 +197,10 @@ describe("Match timeout BullMQ (e2e)", () => {
       const timeoutJobId = await redisService.get(matchTimeoutJobKey(matchId));
       expect(timeoutJobId).toBeTruthy();
 
-      const delayedJobs = await queue.getJobs(["delayed"]);
+      const rawDelayedJobs = await queue.getJobs(["delayed"]);
+      const delayedJobs = rawDelayedJobs.filter(
+        (job): job is NonNullable<(typeof rawDelayedJobs)[number]> => job?.data != null,
+      );
       expect(delayedJobs).toHaveLength(1);
       expect(delayedJobs[0]?.data).toMatchObject({
         matchId,
