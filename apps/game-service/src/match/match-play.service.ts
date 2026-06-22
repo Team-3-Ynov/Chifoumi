@@ -15,6 +15,7 @@ import {
   type RoundResolvedPayload,
 } from "../match-session/match-session.types.js";
 import { transitionMatchState } from "../match-session/match-state-machine.js";
+import { RedisService } from "../redis/redis.service.js";
 import { isValidMove, resolveRound as resolveRps } from "../rps/resolve.js";
 import { MatchDisconnectSchedulerService } from "./match-disconnect-scheduler.service.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
@@ -51,6 +52,7 @@ export class MatchPlayService {
     private readonly matchEndedPublisher: MatchEndedPublisher,
     private readonly matchTimeoutScheduler: MatchTimeoutSchedulerService,
     private readonly matchDisconnectScheduler: MatchDisconnectSchedulerService,
+    private readonly redisService: RedisService,
     private readonly logger: Logger,
   ) {}
 
@@ -237,6 +239,11 @@ export class MatchPlayService {
   }
 
   async handleDisconnectForfeit(userId: string, matchId: string): Promise<boolean> {
+    const activeSocket = await this.redisService.getUserSocket(userId);
+    if (activeSocket) {
+      return false;
+    }
+
     let forfeited = false;
 
     const nextState = await this.matchSessionService.mutateState(matchId, (state) => {

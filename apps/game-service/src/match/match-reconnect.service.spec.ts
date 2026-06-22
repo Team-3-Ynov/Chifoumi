@@ -66,6 +66,16 @@ describe("MatchReconnectService", () => {
     expect(await matchmakingService.isInMatch("player-a")).toBe(true);
   });
 
+  it("does not schedule forfeit when a stale socket disconnects after reconnect", async () => {
+    await redisService.setUserSocket("player-a", "socket-a");
+    await redisService.setUserSocket("player-a", "socket-b");
+
+    await service.handleDisconnect("player-a", "socket-a");
+
+    expect(disconnectScheduler.scheduleForfeit).not.toHaveBeenCalled();
+    expect(await redisService.getUserSocket("player-a")).toBe("socket-b");
+  });
+
   it("removes the player from the queue on disconnect when not in match", async () => {
     await matchmakingService.joinQueue("queue-user", "Queue");
     await redisService.setUserSocket("queue-user", "socket-q");

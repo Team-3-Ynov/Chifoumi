@@ -24,8 +24,10 @@ export class MatchReconnectService {
     if (await this.matchmakingService.isInMatch(userId)) {
       const matchId = await this.matchmakingService.getMatchIdForUser(userId);
       if (matchId) {
-        await this.redisService.removeUserSocket(userId, socketId);
-        await this.matchDisconnectScheduler.scheduleForfeit(userId, matchId);
+        const removedActiveSocket = await this.redisService.removeUserSocket(userId, socketId);
+        if (removedActiveSocket) {
+          await this.matchDisconnectScheduler.scheduleForfeit(userId, matchId);
+        }
       }
       return;
     }

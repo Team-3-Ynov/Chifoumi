@@ -52,6 +52,7 @@ describe("MatchPlayService", () => {
       matchEndedPublisher,
       matchTimeoutScheduler as unknown as MatchTimeoutSchedulerService,
       matchDisconnectScheduler as unknown as import("./match-disconnect-scheduler.service.js").MatchDisconnectSchedulerService,
+      redisService,
       logger,
     );
 
@@ -251,5 +252,25 @@ describe("MatchPlayService", () => {
       "WAITING_REVEALS",
       expect.any(Number),
     );
+  });
+
+  it("forfeits the match when a disconnected player does not reconnect", async () => {
+    const forfeited = await service.handleDisconnectForfeit("a", "match-1");
+
+    expect(forfeited).toBe(true);
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("ENDED");
+    expect(state?.winnerId).toBe("b");
+    expect(state?.endReason).toBe("DISCONNECT_FORFEIT");
+  });
+
+  it("skips disconnect forfeit when the player has an active socket", async () => {
+    await redisService.setUserSocket("a", "socket-a");
+
+    const forfeited = await service.handleDisconnectForfeit("a", "match-1");
+
+    expect(forfeited).toBe(false);
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("WAITING_PLAYS");
   });
 });
