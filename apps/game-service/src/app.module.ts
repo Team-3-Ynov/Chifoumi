@@ -3,6 +3,7 @@ import { LoggerModule } from "nestjs-pino";
 import { AuthModule } from "./auth/auth.module.js";
 import { AppConfigModule } from "./config/config.module.js";
 import { GameGateway } from "./game.gateway.js";
+import { GrpcClientModule } from "./grpc/grpc-client.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { MatchModule } from "./match/match.module.js";
 import { MatchSessionModule } from "./match-session/match-session.module.js";
@@ -17,6 +18,7 @@ import { RedisModule } from "./redis/redis.module.js";
       },
     }),
     AppConfigModule,
+    GrpcClientModule,
     RedisModule,
     AuthModule,
     HealthModule,

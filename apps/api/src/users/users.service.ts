@@ -22,6 +22,26 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  async getRating(userId: string): Promise<{ rating: number; gamesPlayed: number }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { eloRating: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException({ error: "USER_NOT_FOUND" });
+    }
+
+    return {
+      rating: user.eloRating?.rating ?? 1000,
+      gamesPlayed: user.eloRating?.gamesPlayed ?? 0,
+    };
+  }
+
+  isNotFoundError(error: unknown): boolean {
+    return error instanceof NotFoundException;
+  }
+
   async getPublicProfile(userId: string): Promise<PublicProfileDto> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
