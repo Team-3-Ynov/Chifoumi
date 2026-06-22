@@ -43,7 +43,6 @@ import { UsersModule } from "./users/users.module.js";
     MeModule,
     LeaderboardModule,
     JwksModule,
-    MatchesModule,
   ],
   providers: [
     {
