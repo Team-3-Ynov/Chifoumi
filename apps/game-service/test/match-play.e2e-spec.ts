@@ -10,11 +10,11 @@ import { createGameServiceTestModule } from "../src/testing/create-game-service-
 import { issueTestAccessToken } from "../src/testing/issue-test-access-token.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-config({ path: resolve(repoRoot, ".env") });
-
 process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.MATCHMAKING_WORKER_ENABLED = "false";
+process.env.MATCH_TIMEOUT_WORKER_ENABLED = "false";
 process.env.BULLMQ_PREFIX ??= "rps-test";
+config({ path: resolve(repoRoot, ".env") });
 
 type ConnectedPayload = { userId: string; displayName: string };
 type QueueJoinedPayload = { queuedAt: string; currentRating: number };
@@ -59,6 +59,18 @@ function waitForEvent<T>(socket: Socket, event: string): Promise<T> {
       resolvePromise(payload);
     });
   });
+}
+
+async function waitForQueueJob(queue: Queue, name: string, timeoutMs = 5_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const jobs = await queue.getJobs(["wait", "active", "delayed", "prioritized", "paused"]);
+    if (jobs.some((job) => job.name === name)) {
+      return true;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+  }
+  return false;
 }
 
 async function connectAndJoin(
@@ -239,9 +251,11 @@ describe("Match play BO3 (e2e)", () => {
       connection: { url: process.env.REDIS_URL ?? "redis://localhost:6379" },
       prefix: process.env.BULLMQ_PREFIX ?? "rps-test",
     });
-    const jobs = await queue.getJobs(["completed", "waiting", "active"]);
-    expect(jobs.some((job) => job.name === "match-ended")).toBe(true);
-    await queue.close();
+    try {
+      await expect(waitForQueueJob(queue, "match-ended")).resolves.toBe(true);
+    } finally {
+      await queue.close();
+    }
 
     playerA.disconnect();
     playerB.disconnect();
