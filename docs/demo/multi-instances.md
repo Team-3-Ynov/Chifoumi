@@ -153,14 +153,18 @@ docker start chifoumi-game-1
 
 ### Etape 5 — Grafana (~30 s)
 
-Ouvrir Grafana (fenetre C). Prometheus est provisionne ; le dashboard applicatif complet arrive avec [US-039](../backlog/sprint-1-devops-demo.md).
+Ouvrir Grafana (fenetre C). Prometheus et le dashboard applicatif sont provisionnes par [US-039](../backlog/sprint-1-devops-demo.md).
 
 ![Grafana](assets/05-grafana.svg)
 
 Montrer au minimum :
 
 - Grafana accessible et datasource Prometheus configuree.
-- Prometheus targets : `http://prometheus.localhost/targets`.
+- Dashboard `Chifoumi Overview` importe automatiquement.
+- Panel `Matchmaking Queue Size` pendant les joins.
+- Panel `Match Rate` apres le BO3.
+- Panel `Job Throughput` et `Error Rate` pendant le traitement `match-ended`.
+- Prometheus targets : `http://prometheus.localhost/targets` ou `http://localhost:9090/targets`.
 
 ## Cas de recuperation
 

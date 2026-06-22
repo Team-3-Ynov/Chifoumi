@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { LoggerModule } from "nestjs-pino";
 import { ConfigModule } from "./config/config.module.js";
 import { CronSchedulerService } from "./cron/cron-scheduler.service.js";
+import { MetricsController } from "./metrics/metrics.controller.js";
 import { WorkerMetricsService } from "./metrics/worker-metrics.service.js";
 import { MailService } from "./notifications/mail.service.js";
 import { TemplateService } from "./notifications/template.service.js";
@@ -21,6 +22,7 @@ import { WorkerFactory } from "./workers/worker-factory.js";
     ConfigModule,
     PrismaModule,
   ],
+  controllers: [MetricsController],
   providers: [
     WorkerMetricsService,
     TemplateService,

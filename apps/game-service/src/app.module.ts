@@ -8,6 +8,7 @@ import { HealthModule } from "./health/health.module.js";
 import { MatchModule } from "./match/match.module.js";
 import { MatchSessionModule } from "./match-session/match-session.module.js";
 import { MatchmakingModule } from "./matchmaking/matchmaking.module.js";
+import { MetricsModule } from "./metrics/metrics.module.js";
 import { RedisModule } from "./redis/redis.module.js";
 
 @Module({
@@ -22,6 +23,7 @@ import { RedisModule } from "./redis/redis.module.js";
     RedisModule,
     AuthModule,
     HealthModule,
+    MetricsModule,
     MatchSessionModule,
     MatchModule,
     MatchmakingModule,
