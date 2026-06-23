@@ -8,6 +8,23 @@ module.exports = {
   testEnvironment: "node",
   roots: ["<rootDir>/src"],
   testRegex: ".*\\.spec\\.ts$",
+  collectCoverageFrom: [
+    "src/**/*.ts",
+    "!src/**/*.spec.ts",
+    "!src/**/*.module.ts",
+    "!src/**/*.types.ts",
+    "!src/main.ts",
+    "!src/config/**",
+    "!src/prisma/**",
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 55,
+      functions: 65,
+      lines: 65,
+      statements: 65,
+    },
+  },
   transform: {
     "^.+\\.tsx?$": [
       "ts-jest",
