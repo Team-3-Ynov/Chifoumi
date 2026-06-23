@@ -36,8 +36,8 @@ graph LR
   API1 -->|BullMQ notifications| Redis
   API2 -->|BullMQ notifications| Redis
 
-  Game1 -->|gRPC Auth.VerifyToken + Users.GetRating| API1
-  Game2 -->|gRPC Auth.VerifyToken + Users.GetRating| API2
+  Game1 -->|gRPC Auth.VerifyToken| API1
+  Game2 -->|gRPC Auth.VerifyToken| API2
   Game1 -->|Redis matchmaking, sessions, pub/sub| Redis
   Game2 -->|Redis matchmaking, sessions, pub/sub| Redis
   Game1 -->|BullMQ match-events| Redis
@@ -95,7 +95,7 @@ sequenceDiagram
   Game-->>Front: matchFound
   Game-->>Front: roundStart
 
-  Front->>Game: commit/reveal round move
+  Front->>Game: play {matchId, roundNumber, move}
   Game->>Redis: lock match + store round state
   Game-->>Front: roundResolved
   alt best of 3 not finished
@@ -159,8 +159,10 @@ sequenceDiagram
 | Front | Interface React/Vite servie en HTTP | `5173` en dev, `80` en conteneur | `http://front.localhost` | API REST, Game WS |
 | API `api-1` | API REST NestJS, Swagger, metrics, gRPC auth interne | `3000:3000`, gRPC `50051` interne | `http://api.localhost/health` | PostgreSQL, Redis, BullMQ, cles JWT |
 | API `api-2` | Replica API REST pour round-robin | `3002:3000`, gRPC `50051` interne | `http://api.localhost/health` | PostgreSQL, Redis, BullMQ, cles JWT |
-| Game Service `game-1` | Socket.io `/game`, matchmaking, sessions BO3 | `3001:3001` | `ws://game.localhost/game` | Redis, API gRPC, BullMQ |
-| Game Service `game-2` | Replica temps reel avec sticky routing Traefik | `3003:3001` | `ws://game.localhost/game` | Redis, API gRPC, BullMQ |
+| Game Service `game-service-1` | Socket.io `/game`, matchmaking, sessions BO3 en compose de base | `3001:3001` | Non route par Traefik | Redis, API gRPC `api-1:50051`, BullMQ |
+| Game Service `game-service-2` | Replica temps reel en compose de base | `3003:3001` | Non route par Traefik | Redis, API gRPC `api-2:50051`, BullMQ |
+| Game Service `game-1` | Replica temps reel avec sticky routing Traefik | Pas de port direct en scale | `ws://game.localhost/game` | Redis, API gRPC, BullMQ |
+| Game Service `game-2` | Replica temps reel avec sticky routing Traefik | Pas de port direct en scale | `ws://game.localhost/game` | Redis, API gRPC, BullMQ |
 | Job Runner `match-events` | Persistance des matchs termines, recalcul ELO, invalidation leaderboard | metrics `3002` interne | Non expose | Redis BullMQ, PostgreSQL |
 | Job Runner `notifications` / `tournaments` | Emails, notifications et jobs planifies | metrics `3002` interne | Non expose | Redis BullMQ, PostgreSQL, MailHog |
 | PostgreSQL | Stockage users, refresh tokens, matchs, rounds, ELO | `5432` | Non expose via Traefik | Volume `pg_data` |
@@ -172,6 +174,8 @@ sequenceDiagram
 ## Notes de lecture
 
 - La stack scale passe par Traefik pour `front.localhost`, `api.localhost`, `game.localhost`, `prometheus.localhost` et `grafana.localhost`.
+- L'override de demo `docker-compose.demo.yml` expose seulement `game-1` et `game-2` sur `3101:3001` et `3102:3001` pour forcer un joueur sur chaque replica.
 - Le Game Service ne lit pas directement la base applicative pour l'authentification en temps reel : il delegue la verification JWT a l'API via gRPC.
+- Le protocole WebSocket public de jeu utilise l'evenement `play`; les champs commit/reveal appartiennent a l'etat interne des phases avancees.
 - Redis porte a la fois les files BullMQ, la file de matchmaking, les sessions de match, le pub/sub inter-instances et la blacklist des JWT deconnectes.
 - Les jobs `match-events` terminent le flux metier apres `matchEnded` : persistance, calcul ELO et invalidation du cache leaderboard.
