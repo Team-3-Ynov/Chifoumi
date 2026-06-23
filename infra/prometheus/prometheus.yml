@@ -1,6 +1,3 @@
-# Prometheus self-scrape only for US-030 stack bootstrap.
-# Application targets (API, game-service, job-runner) are planned in US-039.
-
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -9,3 +6,24 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+
+  - job_name: chifoumi-api
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - api-1:3000
+          - api-2:3000
+
+  - job_name: chifoumi-game-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - game-service-1:3001
+          - game-service-2:3001
+
+  - job_name: chifoumi-job-runner
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - job-runner-match:3002
+          - job-runner-misc:3002

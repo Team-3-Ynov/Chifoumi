@@ -35,13 +35,22 @@ export class WorkerFactory {
       concurrency: this.config.WORKER_CONCURRENCY,
     };
 
+    const processor = getProcessorForQueue(queue, {
+      matchPersistence: this.matchPersistence,
+      redisInvalidation: this.redisInvalidation,
+      mailService: this.mailService,
+    });
+
     const worker = new Worker(
       queue,
-      getProcessorForQueue(queue, {
-        matchPersistence: this.matchPersistence,
-        redisInvalidation: this.redisInvalidation,
-        mailService: this.mailService,
-      }),
+      async (job) => {
+        const stopTimer = this.metrics.startJobTimer(queue);
+        try {
+          await processor(job);
+        } finally {
+          stopTimer();
+        }
+      },
       workerOptions,
     );
 
@@ -50,16 +59,14 @@ export class WorkerFactory {
     });
 
     worker.on("failed", (job, error) => {
-      const maxAttempts = job?.opts.attempts ?? 1;
       const isPermanentFailure =
-        !job || error instanceof UnrecoverableError || job.attemptsMade >= maxAttempts;
-      this.metrics.recordJobProcessed(queue, isPermanentFailure ? "failed_permanent" : "retry");
-
-      if (
-        queue === "match-events" &&
         job &&
-        (error instanceof UnrecoverableError || job.attemptsMade >= (job.opts.attempts ?? 1))
-      ) {
+        (error instanceof UnrecoverableError || job.attemptsMade >= (job.opts.attempts ?? 1));
+      if (isPermanentFailure) {
+        this.metrics.recordJobProcessed(queue, "failed");
+      }
+
+      if (queue === "match-events" && job && isPermanentFailure) {
         this.logger.error(
           {
             worker_role: this.config.WORKER_ROLE,

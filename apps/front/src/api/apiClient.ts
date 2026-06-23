@@ -1,81 +1,135 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { tokenStorage } from "../auth/tokenStorage.js";
-import type { AuthTokens } from "./types.js";
+import type { RefreshResponse } from "./types.js";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
-const REFRESH_PATH = "/auth/refresh";
+type TokenProvider = () => string | null;
+type RefreshHandler = () => Promise<string | null>;
+type AuthFailureHandler = () => void;
 
-export const apiClient = axios.create({ baseURL: API_BASE_URL });
+let getAccessToken: TokenProvider = () => null;
+let refreshAccessToken: RefreshHandler = async () => null;
+let onAuthFailure: AuthFailureHandler = () => undefined;
 
-type RetriableRequest = InternalAxiosRequestConfig & { _retried?: boolean };
-
-let sessionExpiredHandler: (() => void) | null = null;
-
-// Lets the AuthProvider react (drop the session) when a background refresh fails.
-export function setSessionExpiredHandler(handler: (() => void) | null): void {
-  sessionExpiredHandler = handler;
+export function configureApiClient(config: {
+  getAccessToken: TokenProvider;
+  refreshAccessToken: RefreshHandler;
+  onAuthFailure: AuthFailureHandler;
+}): void {
+  getAccessToken = config.getAccessToken;
+  refreshAccessToken = config.refreshAccessToken;
+  onAuthFailure = config.onAuthFailure;
 }
 
-// Single-flight guard: concurrent 401s share a single refresh request.
-let refreshPromise: Promise<string | null> | null = null;
-
-async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = tokenStorage.getRefreshToken();
-  if (!refreshToken) {
-    return null;
-  }
-
-  try {
-    const { data } = await apiClient.post<{ tokens: AuthTokens }>(REFRESH_PATH, { refreshToken });
-    tokenStorage.setTokens(data.tokens);
-    return data.tokens.access;
-  } catch {
-    tokenStorage.clear();
-    return null;
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
   }
 }
 
-apiClient.interceptors.request.use((config) => {
-  const accessToken = tokenStorage.getAccessToken();
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
-  }
-  return config;
-});
+export function formatApiError(body: unknown, status: number): string {
+  if (typeof body === "object" && body !== null) {
+    const record = body as {
+      message?: string | string[] | { error?: string };
+      error?: string;
+    };
 
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const original = error.config as RetriableRequest | undefined;
+    if (typeof record.error === "string") {
+      return record.error;
+    }
 
-    // Ignore non-401s, already-retried requests, and a 401 from the refresh call
-    // itself (guards against an infinite refresh loop).
+    if (Array.isArray(record.message)) {
+      return record.message.join(", ");
+    }
+
+    if (typeof record.message === "string") {
+      return record.message;
+    }
+
     if (
-      error.response?.status !== 401 ||
-      !original ||
-      original._retried ||
-      original.url === REFRESH_PATH
+      typeof record.message === "object" &&
+      record.message !== null &&
+      typeof record.message.error === "string"
     ) {
-      return Promise.reject(error);
+      return record.message.error;
     }
+  }
 
-    original._retried = true;
+  return `Request failed with status ${status}`;
+}
 
-    if (!refreshPromise) {
-      refreshPromise = refreshAccessToken().finally(() => {
-        refreshPromise = null;
-      });
-    }
+async function parseErrorMessage(response: Response): Promise<string> {
+  try {
+    const body: unknown = await response.json();
+    return formatApiError(body, response.status);
+  } catch {
+    // ignore parse errors
+  }
 
-    const newAccessToken = await refreshPromise;
+  return `Request failed with status ${response.status}`;
+}
 
-    if (!newAccessToken) {
-      sessionExpiredHandler?.();
-      return Promise.reject(error);
-    }
+async function fetchWithAuth(
+  path: string,
+  init: RequestInit = {},
+  allowRetry = true,
+): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const accessToken = getAccessToken();
 
-    original.headers.Authorization = `Bearer ${newAccessToken}`;
-    return apiClient(original);
-  },
-);
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+  });
+
+  if (response.status !== 401 || !allowRetry || !accessToken) {
+    return response;
+  }
+
+  const newAccessToken = await refreshAccessToken();
+  if (!newAccessToken) {
+    onAuthFailure();
+    return response;
+  }
+
+  return fetchWithAuth(path, init, false);
+}
+
+export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetchWithAuth(path, init);
+
+  if (!response.ok) {
+    throw new ApiError(await parseErrorMessage(response), response.status);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+export async function refreshTokens(refreshToken: string): Promise<RefreshResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await parseErrorMessage(response), response.status);
+  }
+
+  return (await response.json()) as RefreshResponse;
+}
