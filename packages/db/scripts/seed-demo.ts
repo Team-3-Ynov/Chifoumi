@@ -375,7 +375,16 @@ async function main(): Promise<void> {
 
   if (existing) {
     console.log("Deleting existing demo data…");
-    await prisma.user.deleteMany({ where: { email: { endsWith: DEMO_DOMAIN } } });
+    // Must delete matches before users (no onDelete:Cascade on Match→User FK)
+    const demoUsers = await prisma.user.findMany({
+      where: { email: { endsWith: DEMO_DOMAIN } },
+      select: { id: true },
+    });
+    const ids = demoUsers.map((u) => u.id);
+    await prisma.match.deleteMany({
+      where: { OR: [{ playerAId: { in: ids } }, { playerBId: { in: ids } }] },
+    });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
   }
 
   console.log("Hashing demo password…");
