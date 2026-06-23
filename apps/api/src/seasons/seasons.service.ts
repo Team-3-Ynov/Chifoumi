@@ -1,7 +1,7 @@
 import { type Season, SeasonStatus } from "@chifoumi/db";
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { SeasonsQueueService } from "./seasons-queue.service.js";
+import { SeasonsQueueService } from "../queues/seasons-queue.service.js";
 
 @Injectable()
 export class SeasonsService {

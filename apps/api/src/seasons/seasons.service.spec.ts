@@ -2,8 +2,8 @@ import { SeasonStatus } from "@chifoumi/db";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import type { PrismaService } from "../prisma/prisma.service.js";
+import type { SeasonsQueueService } from "../queues/seasons-queue.service.js";
 import { SeasonsService } from "./seasons.service.js";
-import type { SeasonsQueueService } from "./seasons-queue.service.js";
 
 describe("SeasonsService", () => {
   let service: SeasonsService;
