@@ -35,6 +35,26 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Validate deploy configuration
+        env:
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+          GAME_DOMAIN: ${{ vars.GAME_DOMAIN }}
+          FRONT_DOMAIN: ${{ vars.FRONT_DOMAIN }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in DEPLOY_DOMAIN GAME_DOMAIN FRONT_DOMAIN; do
+            value="${!name:-}"
+            if [ -z "${value}" ]; then
+              missing+=("${name}")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Missing required repository variables: ${missing[*]}"
+            exit 1
+          fi
+        shell: bash
+
       - name: Set short SHA
         run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
@@ -58,18 +78,6 @@ jobs:
             ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
-
-      - name: Build and push front
-        if: matrix.service == 'front'
-        env:
-          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
-          GAME_DOMAIN: ${{ vars.GAME_DOMAIN }}
-        run: |
-          if [ -z "${DEPLOY_DOMAIN}" ] || [ -z "${GAME_DOMAIN}" ]; then
-            echo "DEPLOY_DOMAIN and GAME_DOMAIN repository variables are required for front build"
-            exit 1
-          fi
-        shell: bash
 
       - name: Build and push front image
         if: matrix.service == 'front'
@@ -99,19 +107,40 @@ jobs:
         uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f # v1.2.2
         env:
           IMAGE_TAG: sha-${{ env.SHORT_SHA }}
+          DEPLOY_GIT_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: IMAGE_TAG
+          envs: IMAGE_TAG,DEPLOY_GIT_SHA
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
+
+            if [ ! -d .git ]; then
+              echo "DEPLOY_PATH must be a git clone of the repository"
+              exit 1
+            fi
+
+            env_backup="$(mktemp)"
+            if [ -f .env.prod ]; then
+              cp .env.prod "${env_backup}"
+            fi
+
+            git fetch --prune origin main
+            git reset --hard "${DEPLOY_GIT_SHA}"
+
+            if [ -f "${env_backup}" ]; then
+              cp "${env_backup}" .env.prod
+              rm -f "${env_backup}"
+            fi
+
             if grep -q '^IMAGE_TAG=' .env.prod 2>/dev/null; then
               sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" .env.prod
             else
               echo "IMAGE_TAG=${IMAGE_TAG}" >> .env.prod
             fi
+
             bash scripts/deploy/rolling-update.sh docker-compose.prod.yml
 
   smoke:
@@ -122,12 +151,13 @@ jobs:
       - name: Post-deploy smoke tests
         env:
           DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+          FRONT_DOMAIN: ${{ vars.FRONT_DOMAIN }}
           SWAGGER_USER: ${{ secrets.SWAGGER_USER }}
           SWAGGER_PASSWORD: ${{ secrets.SWAGGER_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ -z "${DEPLOY_DOMAIN}" ]; then
-            echo "DEPLOY_DOMAIN repository variable is required for smoke tests"
+          if [ -z "${DEPLOY_DOMAIN}" ] || [ -z "${FRONT_DOMAIN}" ]; then
+            echo "DEPLOY_DOMAIN and FRONT_DOMAIN repository variables are required for smoke tests"
             exit 1
           fi
 
@@ -161,4 +191,23 @@ jobs:
           fi
 
           jq -e '.info.title == "Chifoumi API"' /tmp/docs.json >/dev/null
-          echo "Smoke tests passed for https://${DEPLOY_DOMAIN}"
+
+          front_ok=false
+          for attempt in $(seq 1 30); do
+            front_status="$(curl -sS -o /tmp/front.html -w '%{http_code}' "https://${FRONT_DOMAIN}/")"
+            if [ "${front_status}" = "200" ] && grep -q '<div id="root">' /tmp/front.html; then
+              echo "Front smoke test passed on attempt ${attempt}"
+              front_ok=true
+              break
+            fi
+            echo "Waiting for front endpoint (attempt ${attempt}/30, status=${front_status})"
+            sleep 10
+          done
+
+          if [ "${front_ok}" != "true" ]; then
+            echo "Front smoke test failed for https://${FRONT_DOMAIN}/"
+            head -n 20 /tmp/front.html || true
+            exit 1
+          fi
+
+          echo "Smoke tests passed for https://${DEPLOY_DOMAIN} and https://${FRONT_DOMAIN}"

@@ -28,10 +28,7 @@ Each successful deploy tags images with `:sha-<short>` and `:latest`.
    - `GAME_DOMAIN` → WebSocket game service (sticky sessions)
    - `FRONT_DOMAIN` → React front (nginx)
 4. Managed **PostgreSQL** and **Redis** reachable from the VPS (connection strings in `.env.prod`).
-5. Repository clone on the VPS at `DEPLOY_PATH` containing:
-   - [`docker-compose.prod.yml`](../../docker-compose.prod.yml)
-   - [`scripts/deploy/rolling-update.sh`](../../scripts/deploy/rolling-update.sh)
-   - `.env.prod` (not committed)
+5. Repository clone on the VPS at `DEPLOY_PATH` containing a **git working copy** with `origin` pointing to this repository (the CD job runs `git fetch origin main && git reset --hard <deployed-sha>` before each rolling update, preserving `.env.prod`).
 
 ### First-time VPS bootstrap
 
@@ -84,8 +81,9 @@ Configure under **Settings → Secrets and variables → Actions → Secrets**:
 
 | Variable | Description |
 |---|---|
-| `DEPLOY_DOMAIN` | Public API hostname used by smoke tests (`https://<domain>/health`) and front build (`VITE_API_BASE_URL`) |
-| `GAME_DOMAIN` | Public game WebSocket hostname (`VITE_GAME_SERVICE_URL` baked into the front image at build time) |
+| `DEPLOY_DOMAIN` | Public API hostname (`VITE_API_BASE_URL` at build time; smoke `/health` + `/api/docs-json`) |
+| `GAME_DOMAIN` | Public game WebSocket hostname (`VITE_GAME_SERVICE_URL` baked into the front image) |
+| `FRONT_DOMAIN` | Public React front hostname (post-deploy smoke on `/`) |
 
 ### Workflow permissions
 
@@ -123,10 +121,11 @@ On push to `main`:
 
 1. **Build** — matrix job builds `api`, `game-service`, `job-runner`, `front` using existing multi-stage Dockerfiles (`node:20-alpine` / nginx).
 2. **Push** — images pushed to GHCR with `:sha-<short>` and `:latest`.
-3. **Deploy** — [`appleboy/ssh-action`](https://github.com/appleboy/ssh-action) connects to the VPS, sets `IMAGE_TAG=sha-<short>` in `.env.prod`, then runs [`scripts/deploy/rolling-update.sh`](../../scripts/deploy/rolling-update.sh) for a one-by-one rolling restart.
+3. **Deploy** — SSH connects to the VPS, syncs the repo to the deployed commit (`git fetch origin main && git reset --hard <sha>`, preserving `.env.prod`), sets `IMAGE_TAG=sha-<short>`, then runs [`scripts/deploy/rolling-update.sh`](../../scripts/deploy/rolling-update.sh).
 4. **Smoke** — workflow checks:
    - `GET https://<DEPLOY_DOMAIN>/health` → `200` with `{ "status": "ok" }`
-   - `GET https://<DEPLOY_DOMAIN>/api/docs-json` → `200` (with Swagger basic auth if configured)
+   - `GET https://<DEPLOY_DOMAIN>/api/docs-json` → `200` (Swagger basic auth)
+   - `GET https://<FRONT_DOMAIN>/` → `200` with the Vite shell (`<div id="root">`)
 
 PRs and pushes to branches other than `main` do **not** trigger `deploy.yml` (`on.push.branches: [main]` only).
 

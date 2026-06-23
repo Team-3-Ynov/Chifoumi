@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { useNavigate } from "react-router-dom";
 import { apiRequest, configureApiClient, refreshTokens } from "../api/apiClient.js";
 import type { AuthResponse, AuthUser, MeProfile } from "../api/types.js";
 import { queryClient } from "../queryClient.js";
@@ -44,7 +43,6 @@ function clearUserQueries(): void {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -59,11 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     clearUserQueries();
   }, []);
-
-  const redirectToLogin = useCallback(() => {
-    clearSession();
-    navigate("/login", { replace: true });
-  }, [clearSession, navigate]);
 
   const applyTokens = useCallback((access: string, refresh: string) => {
     accessTokenRef.current = access;
@@ -125,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     configureApiClient({
       getAccessToken: () => accessTokenRef.current,
       refreshAccessToken,
-      onAuthFailure: redirectToLogin,
+      onAuthFailure: clearSession,
     });
 
     if (hasBootstrappedRef.current) {
@@ -134,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     hasBootstrappedRef.current = true;
     void bootstrapSession();
-  }, [bootstrapSession, redirectToLogin, refreshAccessToken]);
+  }, [bootstrapSession, clearSession, refreshAccessToken]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -170,9 +163,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // logout is best-effort client-side
     } finally {
-      redirectToLogin();
+      clearSession();
     }
-  }, [redirectToLogin]);
+  }, [clearSession]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

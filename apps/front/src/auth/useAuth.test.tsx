@@ -1,7 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "../queryClient.js";
 import { AuthProvider, useAuth } from "./AuthContext.js";
@@ -33,14 +32,12 @@ function AuthProbe() {
   );
 }
 
-function renderAuthProbe(initialEntries: string[] = ["/lobby"]) {
+function renderAuthProbe() {
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={initialEntries}>
-        <AuthProvider>
-          <AuthProbe />
-        </AuthProvider>
-      </MemoryRouter>
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>
     </QueryClientProvider>,
   );
 }
