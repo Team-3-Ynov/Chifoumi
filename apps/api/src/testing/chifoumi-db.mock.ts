@@ -9,6 +9,12 @@ export const MatchStatus = {
   aborted: "aborted",
 } as const;
 
+export const SeasonStatus = {
+  upcoming: "upcoming",
+  active: "active",
+  closed: "closed",
+} as const;
+
 export type User = {
   id: string;
   email: string;
@@ -17,9 +23,21 @@ export type User = {
   role: keyof typeof UserRole;
 };
 
+export type Season = {
+  id: string;
+  name: string;
+  startedAt: Date;
+  endsAt: Date | null;
+  status: keyof typeof SeasonStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 type PrismaDelegate = {
+  count: (...args: unknown[]) => Promise<number>;
   create: (...args: unknown[]) => Promise<unknown>;
   delete: (...args: unknown[]) => Promise<unknown>;
+  findFirst: (...args: unknown[]) => Promise<unknown>;
   findMany: (...args: unknown[]) => Promise<unknown[]>;
   findUnique: (...args: unknown[]) => Promise<unknown>;
   update: (...args: unknown[]) => Promise<unknown>;
@@ -30,9 +48,11 @@ const delegate = {} as PrismaDelegate;
 
 export class PrismaClient {
   readonly eloRating = delegate;
+  readonly league = delegate;
   readonly match = delegate;
   readonly passwordResetToken = delegate;
   readonly refreshToken = delegate;
+  readonly season = delegate;
   readonly user = delegate;
 
   async $queryRaw<T = unknown>(..._args: unknown[]): Promise<T> {
