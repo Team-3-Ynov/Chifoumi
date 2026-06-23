@@ -3,12 +3,14 @@ import { useAuth } from "./auth/AuthContext.js";
 import { Header } from "./components/Header.js";
 import { GuestRoute, ProtectedRoute } from "./components/ProtectedRoute.js";
 import { GameSocketProvider } from "./game/GameSocketContext.js";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage.js";
 import { LeaderboardPage } from "./pages/LeaderboardPage.js";
 import { LobbyPage } from "./pages/LobbyPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { MatchPage } from "./pages/MatchPage.js";
 import { ProfilePage } from "./pages/ProfilePage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage.js";
 import "./App.css";
 
 function CatchAllRedirect() {
@@ -38,6 +40,8 @@ export function App() {
           <Route element={<GuestRoute />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
           </Route>
 
           <Route path="/leaderboard" element={<LeaderboardPage />} />
