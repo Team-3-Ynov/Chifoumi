@@ -173,17 +173,11 @@ Biome remplace ESLint + Prettier pour ce projet, choix valide et documente dans 
 
 ## Architecture
 
-```text
-apps/front          -> React + Vite
-apps/api            -> NestJS REST, acces BDD via Prisma
-apps/game-service   -> NestJS + Socket.io, namespace /game
-apps/job-runner     -> NestJS standalone pour jobs async
-packages/db         -> Prisma schema, migrations, client
-packages/biome      -> configuration Biome partagee
-packages/tsconfig   -> configurations TypeScript partagees
-```
+La vue d'architecture versionnee est disponible dans [`docs/architecture.md`](docs/architecture.md).
 
-La vision d'architecture complete est dans [`docs/superpowers/specs/2026-04-28-rps-ranked-platform-design.md`](docs/superpowers/specs/2026-04-28-rps-ranked-platform-design.md). Les plans d'implementation sont dans [`docs/superpowers/plans/`](docs/superpowers/plans/).
+Elle couvre les replicas Front/API/Game Service/Job Runner, les dependances PostgreSQL/Redis/Prometheus/Grafana et les protocoles REST, WS Socket.io, gRPC, BullMQ et Prisma. Elle contient aussi les sequences de match complet et d'authentification utiles pour la soutenance.
+
+La vision fonctionnelle complete reste dans [`docs/superpowers/specs/2026-04-28-rps-ranked-platform-design.md`](docs/superpowers/specs/2026-04-28-rps-ranked-platform-design.md). Les plans d'implementation sont dans [`docs/superpowers/plans/`](docs/superpowers/plans/).
 
 ## Commandes utiles
 
