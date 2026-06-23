@@ -19,6 +19,11 @@ export type RefreshResponse = {
   tokens: AuthTokens;
 };
 
+export type LeagueSummary = {
+  name: string;
+  tier: number;
+};
+
 export type MeProfile = {
   id: string;
   email: string;
@@ -26,6 +31,7 @@ export type MeProfile = {
   role: "player" | "admin";
   rating: number;
   gamesPlayed: number;
+  league: LeagueSummary;
   createdAt: string;
 };
 
@@ -34,6 +40,7 @@ export type PublicProfile = {
   displayName: string;
   rating: number;
   gamesPlayed: number;
+  league: LeagueSummary;
   winRate: number;
   createdAt: string;
 };
@@ -44,6 +51,7 @@ export type LeaderboardEntry = {
   displayName: string;
   rating: number;
   gamesPlayed: number;
+  league: LeagueSummary;
 };
 
 export type LeaderboardResponse = {

@@ -14,7 +14,7 @@ import { LeaderboardResponseDto } from "./dto/leaderboard-response.dto.js";
 import { LeaderboardService } from "./leaderboard.service.js";
 
 @ApiTags("leaderboard")
-@SkipThrottle({ auth: true })
+@SkipThrottle({ auth: true, audit: true })
 @UseGuards(JwtAuthGuard)
 @Controller("leaderboard")
 export class LeaderboardController {
@@ -25,11 +25,12 @@ export class LeaderboardController {
   @Public()
   @Get()
   @ApiOperation({
-    summary: "Get global top players by rating",
+    summary: "Get top players by rating",
     description:
-      "Public leaderboard sorted by `rating DESC, gamesPlayed DESC`. Results are cached in Redis for 30 seconds.",
+      "Public leaderboard sorted by `rating DESC, gamesPlayed DESC`, optionally filtered by league. Results are cached in Redis for 30 seconds.",
   })
   @ApiQuery({ name: "limit", required: false, type: Number, example: 50, minimum: 1, maximum: 100 })
+  @ApiQuery({ name: "league", required: false, type: String, example: "gold" })
   @ApiOkResponse({
     description: "Leaderboard page",
     type: LeaderboardResponseDto,
@@ -55,7 +56,7 @@ export class LeaderboardController {
     @Query() query: LeaderboardQueryDto,
     @Res({ passthrough: true }) res: { setHeader(name: string, value: string): void },
   ): Promise<LeaderboardResponseDto> {
-    const { data, cache } = await this.leaderboardService.get(query.limit);
+    const { data, cache } = await this.leaderboardService.get(query.limit, query.league);
     res.setHeader("X-Cache", cache);
     return data;
   }

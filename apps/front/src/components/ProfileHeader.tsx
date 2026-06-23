@@ -33,6 +33,8 @@ export function ProfileHeader({ profile }: ProfileHeaderProps) {
         ) : null}
         <dt>Rating</dt>
         <dd>{stats.rating}</dd>
+        <dt>Ligue</dt>
+        <dd>{stats.league.name}</dd>
         <dt>Matchs joués</dt>
         <dd>{stats.gamesPlayed}</dd>
         <dt>Taux de victoire</dt>

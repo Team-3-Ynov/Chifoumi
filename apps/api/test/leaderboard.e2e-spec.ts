@@ -97,19 +97,66 @@ describe("GET /leaderboard (e2e)", () => {
       displayName: "top",
       rating: 1600,
       gamesPlayed: 10,
+      league: { name: "Platinum", tier: 4 },
     });
     expect(res.body.items[1]).toMatchObject({
       rank: 2,
       displayName: "tie-rating-b",
       rating: 1500,
       gamesPlayed: 50,
+      league: { name: "Platinum", tier: 4 },
     });
     expect(res.body.items[2]).toMatchObject({
       rank: 3,
       displayName: "tie-rating-a",
       rating: 1500,
       gamesPlayed: 30,
+      league: { name: "Platinum", tier: 4 },
     });
+  });
+
+  it("filters players by league and keeps cache variants isolated", async () => {
+    await seedPlayer("bronze", 1099, 4);
+    await seedPlayer("gold-top", 1349, 8);
+    await seedPlayer("gold-low", 1200, 12);
+    await seedPlayer("platinum", 1350, 2);
+
+    const gold = await request(app.getHttpServer())
+      .get("/leaderboard?limit=10&league=gold")
+      .expect(200);
+    const all = await request(app.getHttpServer()).get("/leaderboard?limit=10").expect(200);
+    const goldCached = await request(app.getHttpServer())
+      .get("/leaderboard?limit=10&league=gold")
+      .expect(200);
+
+    expect(gold.headers["x-cache"]).toBe("MISS");
+    expect(all.headers["x-cache"]).toBe("MISS");
+    expect(goldCached.headers["x-cache"]).toBe("HIT");
+    expect(gold.body.items.map((item: { displayName: string }) => item.displayName)).toEqual([
+      "gold-top",
+      "gold-low",
+    ]);
+    expect(
+      gold.body.items.every(
+        (item: { rating: number; league: { name: string; tier: number } }) =>
+          item.rating >= 1200 &&
+          item.rating <= 1349 &&
+          item.league.name === "Gold" &&
+          item.league.tier === 3,
+      ),
+    ).toBe(true);
+    expect(all.body.items.map((item: { displayName: string }) => item.displayName)).toEqual([
+      "platinum",
+      "gold-top",
+      "gold-low",
+      "bronze",
+    ]);
+  });
+
+  it("rejects an unknown league", async () => {
+    const res = await request(app.getHttpServer()).get("/leaderboard?league=diamond").expect(400);
+
+    expect(res.body).toEqual({ code: "UNKNOWN_LEAGUE" });
   });
 
   it("serves subsequent requests from Redis cache", async () => {

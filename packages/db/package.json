@@ -10,7 +10,9 @@
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
+    "prebuild": "pnpm --filter @chifoumi/leagues build",
     "build": "prisma generate && tsc -p tsconfig.json",
+    "pretypecheck": "pnpm --filter @chifoumi/leagues build",
     "typecheck": "prisma generate && tsc -p tsconfig.json",
     "seed": "tsx prisma/seed.ts",
     "seed:bench": "tsx scripts/seed-bench.ts",
@@ -24,6 +26,9 @@
   "peerDependencies": {
     "@prisma/client": "*",
     "prisma": "*"
+  },
+  "dependencies": {
+    "@chifoumi/leagues": "workspace:*"
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",

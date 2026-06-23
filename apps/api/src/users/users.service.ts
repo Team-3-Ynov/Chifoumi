@@ -1,4 +1,5 @@
 import { Prisma, type User, UserRole } from "@chifoumi/db";
+import { getLeagueSummaryForRating } from "@chifoumi/leagues";
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import type { PublicProfileDto } from "./dto/public-profile.dto.js";
@@ -70,13 +71,15 @@ export class UsersService {
     }
 
     const gamesPlayed = user.eloRating?.gamesPlayed ?? 0;
+    const rating = user.eloRating?.rating ?? 1000;
     const wins = gamesPlayed === 0 ? 0 : await this.countWins(userId);
 
     return {
       id: user.id,
       displayName: user.displayName,
-      rating: user.eloRating?.rating ?? 1000,
+      rating,
       gamesPlayed,
+      league: getLeagueSummaryForRating(rating),
       winRate: this.calculateWinRate(wins, gamesPlayed),
       createdAt: user.createdAt,
     };

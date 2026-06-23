@@ -36,6 +36,7 @@ describe("LeaderboardService", () => {
           displayName: "Alice",
           rating: 1500,
           gamesPlayed: 42,
+          league: { name: "Platinum", tier: 4 },
         },
       ],
     };
@@ -73,6 +74,7 @@ describe("LeaderboardService", () => {
         displayName: "Alice",
         rating: 1500,
         gamesPlayed: 42,
+        league: { name: "Platinum", tier: 4 },
       },
       {
         rank: 2,
@@ -80,6 +82,7 @@ describe("LeaderboardService", () => {
         displayName: "Bob",
         rating: 1400,
         gamesPlayed: 50,
+        league: { name: "Platinum", tier: 4 },
       },
     ]);
     expect(prisma.eloRating.findMany).toHaveBeenCalledWith(
@@ -89,9 +92,51 @@ describe("LeaderboardService", () => {
       }),
     );
     expect(redis.setex).toHaveBeenCalledWith(
-      "leaderboard:top:50",
+      "leaderboard:top:50:all",
       LEADERBOARD_CACHE_TTL_SECONDS,
       JSON.stringify(result.data),
     );
+  });
+
+  it("filters and caches by league variant", async () => {
+    redis.get.mockResolvedValue(null);
+    prisma.eloRating.findMany.mockResolvedValue([
+      {
+        rating: 1250,
+        gamesPlayed: 12,
+        user: { id: "user-1", displayName: "Alice" },
+      },
+    ]);
+
+    const result = await service.get(20, "gold");
+
+    expect(result.data.items).toEqual([
+      {
+        rank: 1,
+        userId: "user-1",
+        displayName: "Alice",
+        rating: 1250,
+        gamesPlayed: 12,
+        league: { name: "Gold", tier: 3 },
+      },
+    ]);
+    expect(prisma.eloRating.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { rating: { gte: 1200, lte: 1349 } },
+        take: 20,
+      }),
+    );
+    expect(redis.get).toHaveBeenCalledWith("leaderboard:top:20:gold");
+    expect(redis.setex).toHaveBeenCalledWith(
+      "leaderboard:top:20:gold",
+      LEADERBOARD_CACHE_TTL_SECONDS,
+      JSON.stringify(result.data),
+    );
+  });
+
+  it("rejects an unknown league", async () => {
+    await expect(service.get(20, "diamond")).rejects.toMatchObject({
+      response: { code: "UNKNOWN_LEAGUE" },
+    });
   });
 });
