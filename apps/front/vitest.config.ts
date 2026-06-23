@@ -16,6 +16,8 @@ export default defineConfig({
         "src/pages/ProfilePage.tsx",
         "src/pages/LoginPage.tsx",
         "src/pages/RegisterPage.tsx",
+        "src/pages/ForgotPasswordPage.tsx",
+        "src/pages/ResetPasswordPage.tsx",
         "src/pages/LobbyPage.tsx",
         "src/pages/MatchPage.tsx",
         "src/components/AsyncState.tsx",

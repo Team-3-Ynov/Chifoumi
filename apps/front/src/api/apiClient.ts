@@ -120,6 +120,20 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   return (await response.json()) as T;
 }
 
+export async function forgotPassword(email: string): Promise<void> {
+  await apiRequest<void>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  await apiRequest<void>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword }),
+  });
+}
+
 export async function refreshTokens(refreshToken: string): Promise<RefreshResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: "POST",
