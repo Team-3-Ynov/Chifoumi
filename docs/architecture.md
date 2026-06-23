@@ -178,4 +178,5 @@ sequenceDiagram
 - Le Game Service ne lit pas directement la base applicative pour l'authentification en temps reel : il delegue la verification JWT a l'API via gRPC.
 - Le protocole WebSocket public de jeu utilise l'evenement `play`; les champs commit/reveal appartiennent a l'etat interne des phases avancees.
 - Redis porte a la fois les files BullMQ, la file de matchmaking, les sessions de match, le pub/sub inter-instances et la blacklist des JWT deconnectes.
+- La table detaillee des cles Redis est disponible dans [docs/architecture/redis-keys.md](architecture/redis-keys.md).
 - Les jobs `match-events` terminent le flux metier apres `matchEnded` : persistance, calcul ELO et invalidation du cache leaderboard.
