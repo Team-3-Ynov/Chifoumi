@@ -24,6 +24,11 @@ export function Header() {
             <NavLink to="/profile" className="nav-link">
               Profil
             </NavLink>
+            {user?.role === "admin" ? (
+              <NavLink to="/admin/users" className="nav-link">
+                Admin
+              </NavLink>
+            ) : null}
             <span className="nav-user">{user?.displayName}</span>
             <button type="button" className="button button-secondary" onClick={() => void logout()}>
               Logout

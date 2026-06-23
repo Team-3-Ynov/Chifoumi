@@ -10,6 +10,23 @@ export type SafeUser = {
   role: "player" | "admin";
 };
 
+export type AdminUserSummary = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: "player" | "admin";
+  rating: number;
+  gamesPlayed: number;
+  createdAt: Date;
+};
+
+export type AdminUsersPage = {
+  items: AdminUserSummary[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
 @Injectable()
 export class UsersService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -62,6 +79,34 @@ export class UsersService {
       gamesPlayed,
       winRate: this.calculateWinRate(wins, gamesPlayed),
       createdAt: user.createdAt,
+    };
+  }
+
+  async listUsers(page: number, limit: number): Promise<AdminUsersPage> {
+    const skip = (page - 1) * limit;
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        include: { eloRating: true },
+      }),
+      this.prisma.user.count(),
+    ]);
+
+    return {
+      items: rows.map((user) => ({
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        role: user.role === UserRole.admin ? "admin" : "player",
+        rating: user.eloRating?.rating ?? 1000,
+        gamesPlayed: user.eloRating?.gamesPlayed ?? 0,
+        createdAt: user.createdAt,
+      })),
+      total,
+      page,
+      limit,
     };
   }
 

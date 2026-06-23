@@ -69,3 +69,50 @@ export type MeHistoryResponse = {
   items: MeHistoryItem[];
   nextCursor: string | null;
 };
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: "player" | "admin";
+  rating: number;
+  gamesPlayed: number;
+  createdAt: string;
+};
+
+export type AdminUsersResponse = {
+  items: AdminUser[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export type AuditHashCheck = {
+  a: "match" | "mismatch";
+  b: "match" | "mismatch";
+};
+
+export type AuditRound = {
+  roundNumber: number;
+  commitA: string | null;
+  commitB: string | null;
+  moveA: "rock" | "paper" | "scissors" | null;
+  moveB: "rock" | "paper" | "scissors" | null;
+  nonceA: string | null;
+  nonceB: string | null;
+  hashCheck: AuditHashCheck;
+};
+
+export type MatchAuditPlayer = {
+  id: string;
+  displayName: string;
+};
+
+export type MatchAuditResponse = {
+  matchId: string;
+  players: MatchAuditPlayer[];
+  rounds: AuditRound[];
+  finalScore: [number, number];
+  winner: string | null;
+  endedAt: string;
+};

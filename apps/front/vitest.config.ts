@@ -22,6 +22,8 @@ export default defineConfig({
         "src/pages/ResetPasswordPage.tsx",
         "src/pages/LobbyPage.tsx",
         "src/pages/MatchPage.tsx",
+        "src/pages/admin/AdminUsersPage.tsx",
+        "src/pages/admin/AdminMatchAuditPage.tsx",
         // Presentational shells wired in pages above
         "src/components/AsyncState.tsx",
         "src/components/FinalScreen.tsx",
@@ -32,10 +34,13 @@ export default defineConfig({
         "src/components/MatchHeader.tsx",
         "src/components/ProfileHeader.tsx",
         "src/components/ProtectedRoute.tsx",
+        "src/components/AdminRoute.tsx",
         // Data-fetch hooks colocated with CRUD pages
         "src/hooks/useLeaderboard.ts",
         "src/hooks/useMyHistory.ts",
         "src/hooks/useProfile.ts",
+        "src/hooks/useAdminUsers.ts",
+        "src/hooks/useMatchAudit.ts",
         "src/hooks/gameSocketTypes.ts",
         "src/game/GameSocketContext.tsx",
         "src/hooks/useDeadlineCountdown.ts",
