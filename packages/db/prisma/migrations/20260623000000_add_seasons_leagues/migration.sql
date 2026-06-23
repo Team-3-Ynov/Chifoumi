@@ -48,6 +48,10 @@ CREATE UNIQUE INDEX "leagues_tier_key" ON "leagues"("tier");
 CREATE INDEX "seasons_status_idx" ON "seasons"("status");
 
 -- CreateIndex
+-- Prisma schema cannot represent PostgreSQL partial indexes; this enforces AC1.
+CREATE UNIQUE INDEX "seasons_single_active_idx" ON "seasons"("status") WHERE "status" = 'active';
+
+-- CreateIndex
 CREATE UNIQUE INDEX "season_standings_season_id_user_id_key" ON "season_standings"("season_id", "user_id");
 
 -- CreateIndex
