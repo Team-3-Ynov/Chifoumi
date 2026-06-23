@@ -1,5 +1,5 @@
 import { Prisma, type User, UserRole } from "@chifoumi/db";
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import type { PublicProfileDto } from "./dto/public-profile.dto.js";
 
@@ -12,7 +12,7 @@ export type SafeUser = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   findByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { email } });
@@ -20,6 +20,26 @@ export class UsersService {
 
   findById(id: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { id } });
+  }
+
+  async getRating(userId: string): Promise<{ rating: number; gamesPlayed: number }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { eloRating: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException({ error: "USER_NOT_FOUND" });
+    }
+
+    return {
+      rating: user.eloRating?.rating ?? 1000,
+      gamesPlayed: user.eloRating?.gamesPlayed ?? 0,
+    };
+  }
+
+  isNotFoundError(error: unknown): boolean {
+    return error instanceof NotFoundException;
   }
 
   async getPublicProfile(userId: string): Promise<PublicProfileDto> {

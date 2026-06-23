@@ -1,56 +1,59 @@
-import { Controller, Get, Param, ParseUUIDPipe, UseGuards } from "@nestjs/common";
-import {
-  ApiForbiddenResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiParam,
-  ApiTags,
-} from "@nestjs/swagger";
-import { SkipThrottle, Throttle } from "@nestjs/throttler";
+import { Controller, Get, Inject, Param } from "@nestjs/common";
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { Public } from "../auth/decorators/public.decorator.js";
-import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
 import { AuditService } from "./audit.service.js";
 import { MatchAuditResponseDto } from "./dto/match-audit-response.dto.js";
 
-@ApiTags("matches")
-@SkipThrottle({ auth: true })
-@UseGuards(JwtAuthGuard)
+@ApiTags("Matches")
 @Controller("matches")
 export class MatchesController {
-  constructor(private readonly auditService: AuditService) {}
+  constructor(@Inject(AuditService) private readonly auditService: AuditService) {}
 
+  @Get(":id/audit")
   @Public()
   @Throttle({ audit: { limit: 10, ttl: 60_000 } })
-  @Get(":id/audit")
   @ApiOperation({
-    summary: "Public commit-reveal audit trail for an ended match",
+    summary: "Get audit trail for a completed match",
     description:
-      "Returns commits, reveals, nonces and server-side hash verification so anyone can replay a finished match and detect cheating.",
+      "Retrieve the cryptographic details of a completed match (commits, reveals, nonces) to verify no player cheated. Rate limited to 10 requests per minute per IP.",
   })
   @ApiParam({
     name: "id",
-    format: "uuid",
-    description: "Match id",
+    description: "Match ID (UUID)",
+    example: "550e8400-e29b-41d4-a716-446655440000",
   })
-  @ApiOkResponse({ description: "Audit trail", type: MatchAuditResponseDto })
-  @ApiForbiddenResponse({
-    description: "MATCH_NOT_ENDED",
+  @ApiResponse({
+    status: 200,
+    description: "Match audit trail with hash verification results",
+    type: MatchAuditResponseDto,
+  })
+  @ApiResponse({
+    status: 403,
+    description: "Match is still in progress (MATCH_NOT_ENDED)",
     schema: {
       example: {
         error: "MATCH_NOT_ENDED",
+        message: "Cannot view audit trail for matches that are still in progress",
+        statusCode: 403,
       },
     },
   })
-  @ApiNotFoundResponse({
-    description: "MATCH_NOT_FOUND",
+  @ApiResponse({
+    status: 404,
+    description: "Match not found",
     schema: {
       example: {
         error: "MATCH_NOT_FOUND",
+        statusCode: 404,
       },
     },
   })
-  getAudit(@Param("id", new ParseUUIDPipe()) matchId: string): Promise<MatchAuditResponseDto> {
-    return this.auditService.buildAudit(matchId);
+  @ApiResponse({
+    status: 429,
+    description: "Too many requests (10 per minute per IP)",
+  })
+  async getAudit(@Param("id") id: string): Promise<MatchAuditResponseDto> {
+    return this.auditService.buildAudit(id);
   }
 }

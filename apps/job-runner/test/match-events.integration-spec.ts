@@ -39,6 +39,13 @@ function createQueue(): Queue {
   });
 }
 
+function countMetricSamples(metricsText: string, label: string): number {
+  return metricsText
+    .split("\n")
+    .filter((line) => line.startsWith("bullmq_jobs_processed_total") && line.includes(label))
+    .reduce((sum, line) => sum + Number(line.split(" ").at(-1) ?? 0), 0);
+}
+
 async function waitForJobState(
   bullQueue: Queue,
   job: Job,
@@ -238,14 +245,15 @@ describe("match-events worker (integration)", () => {
     expect(stillFailed && (await stillFailed.getState())).toBe("failed");
 
     const renderedMetrics = await metrics.getMetrics();
-    expect(renderedMetrics).toContain('outcome="failed_permanent"');
+    expect(renderedMetrics).toContain('status="failed"');
   });
 
-  it("retries transient persistence failures and records retry metrics", async () => {
+  it("retries transient persistence failures without recording permanent failure metrics", async () => {
     const { playerAId, playerBId } = await seedPlayers();
     const matchId = randomUUID();
     const payload = createPayload(matchId, playerAId, playerBId);
     const original = persistence.persistMatchEnded.bind(persistence);
+    const metricsBefore = await metrics.getMetrics();
 
     const persistSpy = jest
       .spyOn(persistence, "persistMatchEnded")
@@ -258,8 +266,10 @@ describe("match-events worker (integration)", () => {
     expect(persistSpy).toHaveBeenCalledTimes(2);
 
     const renderedMetrics = await metrics.getMetrics();
-    expect(renderedMetrics).toContain('outcome="retry"');
-    expect(renderedMetrics).toContain('outcome="completed"');
+    expect(renderedMetrics).toContain('status="completed"');
+    expect(countMetricSamples(renderedMetrics, 'status="failed"')).toBe(
+      countMetricSamples(metricsBefore, 'status="failed"'),
+    );
 
     persistSpy.mockRestore();
   });

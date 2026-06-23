@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import { MatchEventBus } from "../match-session/match-event-bus.js";
 import {
@@ -15,7 +15,10 @@ import {
   type RoundResolvedPayload,
 } from "../match-session/match-session.types.js";
 import { transitionMatchState } from "../match-session/match-state-machine.js";
+import { MatchmakingMetricsService } from "../matchmaking/matchmaking-metrics.service.js";
+import { RedisService } from "../redis/redis.service.js";
 import { isValidMove, resolveRound as resolveRps } from "../rps/resolve.js";
+import { MatchDisconnectSchedulerService } from "./match-disconnect-scheduler.service.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
 import type { MatchTimeoutExpectedState } from "./match-timeout.types.js";
 import { MatchTimeoutSchedulerService } from "./match-timeout-scheduler.service.js";
@@ -42,14 +45,21 @@ type RoundResolution = {
   roundNumber: number;
 };
 
+type SilentPlayer = "A" | "B" | "BOTH";
+
 @Injectable()
 export class MatchPlayService {
   constructor(
-    private readonly matchSessionService: MatchSessionService,
-    private readonly eventBus: MatchEventBus,
-    private readonly matchEndedPublisher: MatchEndedPublisher,
+    @Inject(MatchSessionService) private readonly matchSessionService: MatchSessionService,
+    @Inject(MatchEventBus) private readonly eventBus: MatchEventBus,
+    @Inject(MatchEndedPublisher) private readonly matchEndedPublisher: MatchEndedPublisher,
+    @Inject(MatchTimeoutSchedulerService)
     private readonly matchTimeoutScheduler: MatchTimeoutSchedulerService,
-    private readonly logger: Logger,
+    @Inject(MatchmakingMetricsService) private readonly metrics: MatchmakingMetricsService,
+    @Inject(MatchDisconnectSchedulerService)
+    private readonly matchDisconnectScheduler: MatchDisconnectSchedulerService,
+    @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   async onMatchStarted(state: MatchState): Promise<void> {
@@ -194,7 +204,7 @@ export class MatchPlayService {
       matchId,
       roundNumber,
       "WAITING_PLAYS",
-      () => "A",
+      () => "BOTH",
     );
 
     if (nextState.status === "ENDED") {
@@ -234,11 +244,47 @@ export class MatchPlayService {
     }
   }
 
+  async handleDisconnectForfeit(userId: string, matchId: string): Promise<boolean> {
+    const activeSocket = await this.redisService.getUserSocket(userId);
+    if (activeSocket) {
+      return false;
+    }
+
+    let forfeited = false;
+
+    const nextState = await this.matchSessionService.mutateState(matchId, (state) => {
+      if (state.status === "ENDED") {
+        return state;
+      }
+
+      const index = playerIndex(state, userId);
+      if (index === null) {
+        return state;
+      }
+
+      const winnerIndex = index === 0 ? 1 : 0;
+      forfeited = true;
+      return {
+        ...state,
+        status: "ENDED",
+        winnerId: state.players[winnerIndex].userId,
+        endReason: "DISCONNECT_FORFEIT",
+      };
+    });
+
+    if (!forfeited || nextState.status !== "ENDED") {
+      return false;
+    }
+
+    await this.finalizeMatch(nextState);
+    return true;
+  }
+
   private async applyPhaseTimeout(
     matchId: string,
     roundNumber: number,
     expectedStatus: MatchTimeoutExpectedState,
-    resolveSilentPlayer: (state: MatchState) => "A" | "B",
+    resolveSilentPlayer: (state: MatchState) => SilentPlayer,
   ): Promise<MatchState> {
     return this.matchSessionService.mutateState(matchId, (state) => {
       if (state.status !== expectedStatus || state.currentRound !== roundNumber) {
@@ -251,6 +297,15 @@ export class MatchPlayService {
           : resolveSilentPlayer(state);
 
       const resolvedAt = new Date();
+
+      if (silentPlayer === "BOTH") {
+        return transitionMatchState(state, {
+          type: "TIMEOUT",
+          silentPlayer,
+          now: resolvedAt,
+        });
+      }
+
       const winnerLabel = silentPlayer === "A" ? "b" : "a";
 
       if (expectedStatus === "WAITING_PLAYS") {
@@ -284,14 +339,20 @@ export class MatchPlayService {
     });
   }
 
-  private resolveSilentPlayer(slotA: string | Move | null, slotB: string | Move | null): "A" | "B" {
+  private resolveSilentPlayer(
+    slotA: string | Move | null,
+    slotB: string | Move | null,
+  ): SilentPlayer {
+    if (slotA === null && slotB === null) {
+      return "BOTH";
+    }
     if (slotA === null && slotB !== null) {
       return "A";
     }
     if (slotB === null && slotA !== null) {
       return "B";
     }
-    return "A";
+    return "BOTH";
   }
 
   private async afterRoundResolved(state: MatchState, resolution: RoundResolution): Promise<void> {
@@ -354,6 +415,10 @@ export class MatchPlayService {
 
   private async finalizeMatch(state: MatchState): Promise<void> {
     await this.clearTimer(state.matchId);
+    this.metrics.recordMatchPlayed(this.resolveMatchOutcome(state));
+    await this.matchDisconnectScheduler.cancelForfeitForPlayers(
+      state.players.map((player) => player.userId),
+    );
 
     const payload = {
       matchId: state.matchId,
@@ -374,6 +439,14 @@ export class MatchPlayService {
 
     await this.matchSessionService.cleanupUserMappings(state);
     await this.matchEndedPublisher.publishMatchEnded(state);
+  }
+
+  private resolveMatchOutcome(state: MatchState): "win" | "draw" | "forfeit" {
+    if (state.endReason === "FORFEIT_TIMEOUT" || state.endReason === "DISCONNECT_FORFEIT") {
+      return "forfeit";
+    }
+
+    return state.winnerId ? "win" : "draw";
   }
 
   private async schedulePhaseTimeout(

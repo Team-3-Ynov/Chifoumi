@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Inject, Query, Req, UseGuards } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -24,8 +24,8 @@ type AuthenticatedRequest = { user: SafeUser };
 @Controller("me")
 export class MeController {
   constructor(
-    private readonly meService: MeService,
-    private readonly meHistoryService: MeHistoryService,
+    @Inject(MeService) private readonly meService: MeService,
+    @Inject(MeHistoryService) private readonly meHistoryService: MeHistoryService,
   ) {}
 
   @UseGuards(JwtAuthGuard)

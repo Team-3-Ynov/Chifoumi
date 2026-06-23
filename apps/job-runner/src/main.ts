@@ -8,14 +8,16 @@ import { AppModule } from "./app.module.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 dotenvConfig({ path: resolve(repoRoot, ".env") });
+const DEFAULT_METRICS_PORT = 3002;
 
 async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(AppModule, {
+  const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
   // biome-ignore lint/correctness/useHookAtTopLevel: NestJS bootstrap, not React hooks
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
+  await app.listen(Number(process.env.JOB_RUNNER_METRICS_PORT ?? DEFAULT_METRICS_PORT));
 
   let isShuttingDown = false;
   const shutdown = async () => {

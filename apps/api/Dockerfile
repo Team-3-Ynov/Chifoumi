@@ -21,8 +21,9 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS builder
 ENV DATABASE_URL=postgresql://app:chifoumi_dev@localhost:5432/chifoumi
 COPY apps ./apps
+COPY infra ./infra
 COPY packages ./packages
-RUN pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/schemas build && pnpm --filter @chifoumi/api build
+RUN pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/schemas build && pnpm --filter @chifoumi/proto build && pnpm --filter @chifoumi/api build
 
 FROM base AS runner
 ENV NODE_ENV=production

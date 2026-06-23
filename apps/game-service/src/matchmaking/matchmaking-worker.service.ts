@@ -1,4 +1,10 @@
-import { Injectable, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import { v4 as uuidv4 } from "uuid";
 import { MatchPlayService } from "../match/match-play.service.js";
@@ -6,6 +12,8 @@ import { MatchSessionService } from "../match-session/match-session.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { getEloWindow, ratingsMatch } from "./elo-window.js";
 import {
+  MATCH_BY_USER_PREFIX,
+  MATCH_STATE_TTL_SECONDS,
   MATCHMAKING_PAIR_LOCK_TTL_SECONDS,
   MATCHMAKING_QUEUE_KEY,
   MATCHMAKING_WORKER_INTERVAL_MS,
@@ -31,7 +39,10 @@ if redis.call("EXISTS", pairLockKey) == 0 then
   return 0
 end
 
-if redis.call("ZSCORE", queueKey, userA) == false or redis.call("ZSCORE", queueKey, userB) == false then
+local scoreA = redis.call("ZSCORE", queueKey, userA)
+local scoreB = redis.call("ZSCORE", queueKey, userB)
+
+if not scoreA or not scoreB then
   redis.call("DEL", pairLockKey)
   return 0
 end
@@ -52,12 +63,12 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
   private running = false;
 
   constructor(
-    private readonly redisService: RedisService,
-    private readonly matchmakingService: MatchmakingService,
-    private readonly matchSessionService: MatchSessionService,
-    private readonly matchPlayService: MatchPlayService,
-    private readonly metricsService: MatchmakingMetricsService,
-    private readonly logger: Logger,
+    @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(MatchmakingService) private readonly matchmakingService: MatchmakingService,
+    @Inject(MatchSessionService) private readonly matchSessionService: MatchSessionService,
+    @Inject(forwardRef(() => MatchPlayService)) private readonly matchPlayService: MatchPlayService,
+    @Inject(MatchmakingMetricsService) private readonly metricsService: MatchmakingMetricsService,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   onModuleInit(): void {
@@ -184,10 +195,10 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
         matchId,
         playerA.userId,
         playerB.userId,
-        "match:byUser:",
+        MATCH_BY_USER_PREFIX,
         `match:${matchId}:state`,
         JSON.stringify(matchState),
-        String(3600),
+        String(MATCH_STATE_TTL_SECONDS),
       ],
     );
 

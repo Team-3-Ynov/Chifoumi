@@ -60,8 +60,9 @@ describe("MatchmakingWorkerService", () => {
   let redisService: RedisService;
   let worker: MatchmakingWorkerService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     client = new Redis(`redis://matchmaking-worker-test/${Date.now()}-${Math.random()}`);
+    await client.flushall();
     redisService = new RedisService({ url: "redis://localhost:6379" });
     Object.assign(redisService, { client });
     worker = createWorker(redisService);
@@ -129,5 +130,27 @@ describe("MatchmakingWorkerService", () => {
     expect(first + second).toBe(1);
     expect(await client.zcard(MATCHMAKING_QUEUE_KEY)).toBe(0);
     expect(await client.exists(matchmakingPairLockKey("player-a", "player-b"))).toBe(0);
+  });
+
+  it("does not publish a match when the Lua commit rejects a stale pair", async () => {
+    const now = Date.now();
+    await seedQueueMember(client, "player-a", 1000, "Ace", now);
+    await seedQueueMember(client, "player-b", 1020, "Bob", now);
+
+    const evalScriptSpy = jest.spyOn(redisService, "evalScript").mockImplementation(async <T>() => {
+      await client.zrem(MATCHMAKING_QUEUE_KEY, "player-b");
+      await client.del(matchmakingPairLockKey("player-a", "player-b"));
+      return 0 as T;
+    });
+
+    const matches = await worker.tick(now + 100);
+
+    expect(matches).toBe(0);
+    expect(await client.get(matchByUserKey("player-a"))).toBeNull();
+    expect(await client.get(matchByUserKey("player-b"))).toBeNull();
+    expect(await client.zrange(MATCHMAKING_QUEUE_KEY, 0, -1)).toEqual(["player-a"]);
+    expect(await client.exists(matchmakingPairLockKey("player-a", "player-b"))).toBe(0);
+
+    evalScriptSpy.mockRestore();
   });
 });

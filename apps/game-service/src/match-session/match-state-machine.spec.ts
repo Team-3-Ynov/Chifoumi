@@ -154,6 +154,20 @@ describe("match state machine", () => {
     });
   });
 
+  it("ends timeout without a winner when both players are silent", () => {
+    const next = transitionMatchState(baseState, {
+      type: "TIMEOUT",
+      silentPlayer: "BOTH",
+      now: new Date("2026-06-09T10:00:06.000Z"),
+    });
+
+    expect(next).toMatchObject({
+      status: "ENDED",
+      winnerId: undefined,
+      endReason: "FORFEIT_TIMEOUT",
+    });
+  });
+
   it("rejects invalid transitions", () => {
     expect(() =>
       transitionMatchState(baseState, {

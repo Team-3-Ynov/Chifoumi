@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { NotificationsQueueService } from "../queues/notifications-queue.service.js";
 import { RedisService } from "../redis/redis.service.js";
@@ -14,14 +14,18 @@ const REFRESH_ROTATION_LOCK_SECONDS = 10;
 const REFRESH_ROTATION_WAIT_ATTEMPTS = 10;
 const REFRESH_ROTATION_WAIT_MS = 25;
 
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
+const DEFAULT_FRONTEND_URL = "http://localhost:5173";
+
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsersService,
-    private readonly passwordService: PasswordService,
-    private readonly tokenService: TokenService,
-    private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
+    @Inject(UsersService) private readonly usersService: UsersService,
+    @Inject(PasswordService) private readonly passwordService: PasswordService,
+    @Inject(TokenService) private readonly tokenService: TokenService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(NotificationsQueueService)
     private readonly notificationsQueue: NotificationsQueueService,
   ) {}
 
@@ -156,6 +160,94 @@ export class AuthService {
     }
   }
 
+  async requestPasswordReset(email: string): Promise<void> {
+    const normalizedEmail = email.toLowerCase();
+    const user = await this.usersService.findByEmail(normalizedEmail);
+    if (!user) {
+      return;
+    }
+
+    const { token, tokenHash } = this.tokenService.issuePasswordResetToken();
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+
+    // Invalidate any previously issued, still-unused reset token so only the
+    // latest reset link remains valid for a given user.
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const created = await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    const resetUrl = this.buildPasswordResetUrl(token);
+    try {
+      await this.notificationsQueue.enqueuePasswordResetMail({
+        to: normalizedEmail,
+        resetUrl,
+      });
+    } catch {
+      // Compensation: if the mail job cannot be enqueued, drop the token we just
+      // persisted so no unusable orphan reset token is left behind. The error is
+      // swallowed to preserve the anti-enumeration contract (always responds 200).
+      await this.prisma.passwordResetToken
+        .delete({ where: { id: created.id } })
+        .catch(() => undefined);
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const tokenHash = this.tokenService.hashPasswordResetToken(token);
+    const stored = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!stored) {
+      throw new UnauthorizedException();
+    }
+    if (stored.usedAt !== null) {
+      throw new UnauthorizedException();
+    }
+    if (stored.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException();
+    }
+
+    const newPasswordHash = await this.passwordService.hash(newPassword);
+
+    await this.prisma.$transaction(async (tx) => {
+      const consumed = await tx.passwordResetToken.updateMany({
+        where: {
+          id: stored.id,
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { usedAt: new Date() },
+      });
+
+      if (consumed.count === 0) {
+        throw new UnauthorizedException();
+      }
+
+      await tx.user.update({
+        where: { id: stored.userId },
+        data: { passwordHash: newPasswordHash },
+      });
+
+      // AC4: only refresh tokens are revoked here. Existing access JWTs are NOT
+      // blacklisted on reset — they remain valid until their short (15 min)
+      // expiry. This is an accepted trade-off documented for the reset flow.
+      await tx.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
+  }
+
   async logout(input: { userId: string; jti: string; expiresAt: Date }): Promise<void> {
     const ttlSeconds = Math.ceil((input.expiresAt.getTime() - Date.now()) / 1000);
     if (ttlSeconds <= 0) {
@@ -164,6 +256,11 @@ export class AuthService {
 
     await this.redisService.revokeAccessToken(input.jti, ttlSeconds);
     await this.revokeAllRefreshTokens(input.userId);
+  }
+
+  private buildPasswordResetUrl(token: string): string {
+    const frontendUrl = (process.env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL).replace(/\/+$/, "");
+    return `${frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
   }
 
   private refreshRotationCacheKey(tokenHash: string): string {

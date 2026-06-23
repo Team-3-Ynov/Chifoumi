@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { RedisService } from "../redis/redis.service.js";
 import {
   MATCH_BY_USER_PREFIX,
@@ -20,8 +20,8 @@ export type JoinQueueResult =
 @Injectable()
 export class MatchmakingService {
   constructor(
-    private readonly redisService: RedisService,
-    private readonly ratingService: RatingService,
+    @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(RatingService) private readonly ratingService: RatingService,
   ) {}
 
   async joinQueue(userId: string, displayName: string): Promise<JoinQueueResult> {

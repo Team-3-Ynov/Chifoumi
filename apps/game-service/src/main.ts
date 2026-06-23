@@ -10,11 +10,6 @@ import { resolveCorsOrigins } from "./cors.js";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 dotenvConfig({ path: resolve(repoRoot, ".env") });
 
-process.env.JWT_PUBLIC_KEY_PATH = resolve(
-  repoRoot,
-  process.env.JWT_PUBLIC_KEY_PATH ?? "infra/keys/jwt-public.pem",
-);
-
 const DEFAULT_PORT = 3001;
 
 async function bootstrap() {

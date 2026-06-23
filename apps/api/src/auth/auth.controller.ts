@@ -1,4 +1,13 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -16,10 +25,12 @@ import { SWAGGER_BEARER_AUTH } from "../swagger.js";
 import type { SafeUser } from "../users/users.service.js";
 import { AuthService } from "./auth.service.js";
 import { AuthResponseDto } from "./dto/auth-response.dto.js";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto.js";
 import { LoginDto } from "./dto/login.dto.js";
 import { RefreshDto } from "./dto/refresh.dto.js";
 import { RefreshResponseDto } from "./dto/refresh-response.dto.js";
 import { RegisterDto } from "./dto/register.dto.js";
+import { ResetPasswordDto } from "./dto/reset-password.dto.js";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard.js";
 
 type AuthenticatedRequest = {
@@ -29,11 +40,15 @@ type AuthenticatedRequest = {
   };
 };
 
+const IS_TEST_ENV = process.env.NODE_ENV === "test";
+const AUTH_THROTTLE_LIMIT = IS_TEST_ENV ? 1_000_000 : 5;
+const FORGOT_PASSWORD_THROTTLE_LIMIT = IS_TEST_ENV ? 1_000_000 : 3;
+
 @ApiTags("auth")
-@Throttle({ auth: { limit: 5, ttl: 60_000 } })
+@Throttle({ auth: { limit: AUTH_THROTTLE_LIMIT, ttl: 60_000 } })
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   @Post("register")
   @HttpCode(HttpStatus.CREATED)
@@ -183,5 +198,83 @@ export class AuthController {
       jti: req.user.tokenJti,
       expiresAt: req.user.tokenExpiresAt,
     });
+  }
+
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  // Override the shared "auth" throttler with a stricter limit for this route
+  // only (the throttler key is per-handler), instead of a global throttler that
+  // would rate-limit unrelated endpoints such as GET /me.
+  @Throttle({ auth: { limit: FORGOT_PASSWORD_THROTTLE_LIMIT, ttl: 60_000 } })
+  @ApiOperation({
+    summary: "Request a password reset email",
+    description:
+      "Sends a password reset link to the provided email if an account exists. Always responds 200 to prevent account enumeration.",
+  })
+  @ApiBody({
+    type: ForgotPasswordDto,
+    examples: {
+      player: {
+        summary: "Forgot password request",
+        value: { email: "player@example.com" },
+      },
+    },
+  })
+  @ApiOkResponse({ description: "Reset email requested (idempotent, anti-enumeration)" })
+  @ApiBadRequestResponse({
+    description: "Validation error",
+    schema: {
+      example: {
+        statusCode: 400,
+        message: ["email must be an email"],
+        error: "Bad Request",
+      },
+    },
+  })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<void> {
+    await this.authService.requestPasswordReset(dto.email);
+  }
+
+  @Post("reset-password")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: "Reset the account password using a reset token",
+    description:
+      "Validates the opaque reset token, updates the password (Argon2id) and revokes all active refresh tokens for the user. Existing access tokens are not blacklisted and stay valid until their short expiry.",
+  })
+  @ApiBody({
+    type: ResetPasswordDto,
+    examples: {
+      player: {
+        summary: "Reset password",
+        value: {
+          token: "5a7a7a8e-6c4a-4b1a-9f24-9b6f7c2a4e8c",
+          newPassword: "newPassword1234",
+        },
+      },
+    },
+  })
+  @ApiNoContentResponse({ description: "Password updated and refresh tokens revoked" })
+  @ApiBadRequestResponse({
+    description: "Validation error",
+    schema: {
+      example: {
+        statusCode: 400,
+        message: ["newPassword must be longer than or equal to 10 characters"],
+        error: "Bad Request",
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({
+    description: "Invalid, expired or already used reset token",
+    schema: {
+      example: {
+        statusCode: 401,
+        message: "Unauthorized",
+      },
+    },
+  })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
   }
 }

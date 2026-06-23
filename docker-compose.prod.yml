@@ -1,0 +1,276 @@
+# Production stack — images pulled from GHCR (see deploy.yml).
+# Configure secrets and URLs in .env.prod on the VPS before first deploy.
+
+x-image-api: &image-api
+  image: ghcr.io/team-3-ynov/chifoumi-api:${IMAGE_TAG:-latest}
+
+x-image-game: &image-game
+  image: ghcr.io/team-3-ynov/chifoumi-game-service:${IMAGE_TAG:-latest}
+
+x-image-job-runner: &image-job-runner
+  image: ghcr.io/team-3-ynov/chifoumi-job-runner:${IMAGE_TAG:-latest}
+
+x-image-front: &image-front
+  image: ghcr.io/team-3-ynov/chifoumi-front:${IMAGE_TAG:-latest}
+
+x-api-common: &api-common
+  <<: *image-api
+  depends_on:
+    db-migrate:
+      condition: service_completed_successfully
+  environment: &api-env
+    NODE_ENV: production
+    DATABASE_URL: ${DATABASE_URL}
+    REDIS_URL: ${REDIS_URL}
+    API_PORT: "3000"
+    API_GRPC_PORT: "50051"
+    CORS_ORIGINS: ${CORS_ORIGINS}
+    FRONTEND_URL: ${FRONTEND_URL}
+    JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+    JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+    JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
+    JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-604800}
+    BULLMQ_PREFIX: ${BULLMQ_PREFIX:-rps}
+    MAIL_TRANSPORT: ${MAIL_TRANSPORT:-smtp}
+    MAIL_HOST: ${MAIL_HOST}
+    MAIL_PORT: ${MAIL_PORT:-587}
+    MAIL_USER: ${MAIL_USER}
+    MAIL_PASSWORD: ${MAIL_PASSWORD}
+    MAIL_FROM: ${MAIL_FROM}
+    SWAGGER_USER: ${SWAGGER_USER}
+    SWAGGER_PASSWORD: ${SWAGGER_PASSWORD}
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+      ]
+    interval: 10s
+    timeout: 5s
+    retries: 6
+    start_period: 40s
+  restart: unless-stopped
+  networks:
+    - chifoumi
+
+x-game-common: &game-common
+  <<: *image-game
+  environment: &game-env
+    NODE_ENV: production
+    REDIS_URL: ${REDIS_URL}
+    GAME_SERVICE_PORT: "3001"
+    CORS_ORIGINS: ${CORS_ORIGINS}
+    FRONTEND_URL: ${FRONTEND_URL}
+    BULLMQ_PREFIX: ${BULLMQ_PREFIX:-rps}
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+      ]
+    interval: 10s
+    timeout: 5s
+    retries: 6
+    start_period: 30s
+  restart: unless-stopped
+  networks:
+    - chifoumi
+
+x-traefik-api-labels: &traefik-api-labels
+  traefik.enable: "true"
+  traefik.http.routers.api.rule: Host(`${DEPLOY_DOMAIN}`)
+  traefik.http.routers.api.entrypoints: websecure
+  traefik.http.routers.api.tls.certresolver: le
+  traefik.http.services.api.loadbalancer.server.port: "3000"
+
+x-traefik-game-labels: &traefik-game-labels
+  traefik.enable: "true"
+  traefik.http.routers.game.rule: Host(`${GAME_DOMAIN}`)
+  traefik.http.routers.game.entrypoints: websecure
+  traefik.http.routers.game.tls.certresolver: le
+  traefik.http.services.game.loadbalancer.server.port: "3001"
+  traefik.http.services.game.loadbalancer.sticky.cookie: "true"
+  traefik.http.services.game.loadbalancer.sticky.cookie.name: chifoumi_game
+
+services:
+  db-migrate:
+    <<: *image-api
+    container_name: chifoumi-db-migrate
+    entrypoint: ["/app/apps/api/docker-migrate.sh"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    restart: "no"
+    networks:
+      - chifoumi
+
+  traefik:
+    image: traefik:v3.3
+    container_name: chifoumi-traefik
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    restart: unless-stopped
+    networks:
+      - chifoumi
+
+  api-1:
+    <<: *api-common
+    container_name: chifoumi-api-1
+    environment:
+      <<: *api-env
+      INSTANCE_ID: api-1
+    labels:
+      <<: *traefik-api-labels
+
+  api-2:
+    <<: *api-common
+    container_name: chifoumi-api-2
+    environment:
+      <<: *api-env
+      INSTANCE_ID: api-2
+    labels:
+      <<: *traefik-api-labels
+
+  game-1:
+    <<: *game-common
+    container_name: chifoumi-game-1
+    environment:
+      <<: *game-env
+      INSTANCE_ID: game-1
+      API_GRPC_URL: api-1:50051
+    labels:
+      <<: *traefik-game-labels
+
+  game-2:
+    <<: *game-common
+    container_name: chifoumi-game-2
+    environment:
+      <<: *game-env
+      INSTANCE_ID: game-2
+      API_GRPC_URL: api-2:50051
+    labels:
+      <<: *traefik-game-labels
+
+  job-runner-match:
+    <<: *image-job-runner
+    container_name: chifoumi-job-runner-match
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      WORKER_QUEUES: match-events
+      WORKER_CONCURRENCY: ${MATCH_WORKER_CONCURRENCY:-8}
+      WORKER_ROLE: match-processor
+      JOB_RUNNER_METRICS_PORT: 3002
+      CRON_ENABLED: "false"
+      BULLMQ_PREFIX: ${BULLMQ_PREFIX:-rps}
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-smtp}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3002/metrics').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - chifoumi
+
+  job-runner-misc:
+    <<: *image-job-runner
+    container_name: chifoumi-job-runner-misc
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      WORKER_QUEUES: notifications,tournaments
+      WORKER_CONCURRENCY: ${MISC_WORKER_CONCURRENCY:-4}
+      WORKER_ROLE: notifier
+      JOB_RUNNER_METRICS_PORT: 3002
+      CRON_ENABLED: "true"
+      BULLMQ_PREFIX: ${BULLMQ_PREFIX:-rps}
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-smtp}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3002/metrics').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - chifoumi
+
+  front:
+    <<: *image-front
+    container_name: chifoumi-front
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.front.rule: Host(`${FRONT_DOMAIN}`)
+      traefik.http.routers.front.entrypoints: websecure
+      traefik.http.routers.front.tls.certresolver: le
+      traefik.http.services.front.loadbalancer.server.port: "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - chifoumi
+
+networks:
+  chifoumi:
+    name: chifoumi-prod
+
+volumes:
+  traefik_letsencrypt:

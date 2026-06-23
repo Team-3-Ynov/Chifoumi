@@ -8,6 +8,7 @@ Plateforme web competitive Pierre-Feuille-Ciseaux avec matchmaking ELO, parties 
 
 - [Pre-requis](#pre-requis)
 - [Demarrage rapide](#demarrage-rapide)
+- [Devcontainer](#devcontainer)
 - [Stack multi-replicas (US-030)](#stack-multi-replicas-us-030)
 - [Demo multi-instances (US-032)](#demo-multi-instances-us-032)
 - [Tech stack](#tech-stack)
@@ -68,6 +69,24 @@ Services lances par `pnpm dev` :
 | Job runner | terminal uniquement | Workers et traitements asynchrones |
 
 Si le schema Postgres evolue, relancer une base vide avec `docker compose down -v`, puis `docker compose up -d`.
+
+## Devcontainer
+
+Le devcontainer lance un workspace Node + pnpm avec Postgres, Redis et MailHog. Le dossier local du repo doit rester nomme `Chifoumi`, car le workspace est monte dans le conteneur sous `/workspaces/Chifoumi`.
+
+Au premier demarrage, `.devcontainer/post-create.sh` :
+
+- copie `.env.example` vers `.env` avec les URLs internes Docker ;
+- genere les cles JWT de developpement dans `infra/keys/` si elles n'existent pas ;
+- configure le store pnpm persistant dans `pnpm-store` ;
+- installe les dependances et genere le client Prisma.
+
+Apres ouverture dans VS Code ou Cursor, lancer les migrations puis les apps :
+
+```bash
+pnpm --filter @chifoumi/db migrate:deploy
+pnpm dev
+```
 
 ## Stack multi-replicas (US-030)
 
@@ -154,17 +173,11 @@ Biome remplace ESLint + Prettier pour ce projet, choix valide et documente dans 
 
 ## Architecture
 
-```text
-apps/front          -> React + Vite
-apps/api            -> NestJS REST, acces BDD via Prisma
-apps/game-service   -> NestJS + Socket.io, namespace /game
-apps/job-runner     -> NestJS standalone pour jobs async
-packages/db         -> Prisma schema, migrations, client
-packages/biome      -> configuration Biome partagee
-packages/tsconfig   -> configurations TypeScript partagees
-```
+La vue d'architecture versionnee est disponible dans [`docs/architecture.md`](docs/architecture.md).
 
-La vision d'architecture complete est dans [`docs/superpowers/specs/2026-04-28-rps-ranked-platform-design.md`](docs/superpowers/specs/2026-04-28-rps-ranked-platform-design.md). Les plans d'implementation sont dans [`docs/superpowers/plans/`](docs/superpowers/plans/).
+Elle couvre les replicas Front/API/Game Service/Job Runner, les dependances PostgreSQL/Redis/Prometheus/Grafana et les protocoles REST, WS Socket.io, gRPC, BullMQ et Prisma. Elle contient aussi les sequences de match complet et d'authentification utiles pour la soutenance.
+
+La vision fonctionnelle complete reste dans [`docs/superpowers/specs/2026-04-28-rps-ranked-platform-design.md`](docs/superpowers/specs/2026-04-28-rps-ranked-platform-design.md). Les plans d'implementation sont dans [`docs/superpowers/plans/`](docs/superpowers/plans/).
 
 ## Commandes utiles
 
@@ -174,6 +187,7 @@ pnpm -r typecheck
 pnpm -r run --if-present build
 pnpm exec biome ci .
 pnpm exec biome check --write .
+pnpm -r run --if-present test --coverage
 docker compose ps
 docker compose logs -f
 ```
@@ -186,6 +200,41 @@ pnpm --filter @chifoumi/game-service dev
 pnpm --filter @chifoumi/job-runner dev
 pnpm --filter @chifoumi/front dev
 ```
+
+### Couverture de tests (US-044)
+
+La CI echoue si la couverture descend sous les seuils definis par package :
+
+| Package | Runner | Seuils (`lines` / `branches` / `functions`) |
+|---|---|---|
+| `apps/api`, `apps/game-service`, `apps/job-runner` | Jest | 70 % / 60 % / 70 % |
+| `packages/elo` | Jest | 95 % / 95 % / 100 % |
+| `apps/front` | Vitest | 60 % / 50 % / — |
+
+Commande locale equivalente a la CI :
+
+```bash
+pnpm -r run --if-present test --coverage
+```
+
+Les rapports `lcov.info` / `coverage/` sont uploades en artefact GitHub Actions (`coverage-reports`) a chaque PR.
+
+#### Ajouter une exclusion explicite
+
+Preferer exclure un fichier ou dossier entier plutot que baisser un seuil global.
+
+**Back (Jest)** — editer `coveragePathIgnorePatterns` dans le `jest.config.cjs` du package concerne, avec un commentaire inline expliquant pourquoi (DTO, bootstrap, infra, e2e-only…) :
+
+```js
+coveragePathIgnorePatterns: [
+  "/dto/", // DTOs — validation-only
+  "main\\.ts$", // NestJS bootstrap
+],
+```
+
+**Front (Vitest)** — ajouter un glob commente dans `apps/front/vitest.config.ts` → `test.coverage.exclude`.
+
+**Packages purement fonctionnels (`packages/elo`)** — viser 95 %+ ; n'exclure que les barrels (`index.ts`) ou le code genere.
 
 ### Job-runner (deploiement)
 

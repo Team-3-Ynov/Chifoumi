@@ -1,22 +1,20 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { INestApplication } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
 import { config } from "dotenv";
 import { io, type Socket } from "socket.io-client";
-import { AppModule } from "../src/app.module.js";
-import { JWT_CONFIG } from "../src/config/jwt.config.js";
 import { MATCHMAKING_WORKER_INTERVAL_MS } from "../src/matchmaking/matchmaking.constants.js";
 import { MatchmakingWorkerService } from "../src/matchmaking/matchmaking-worker.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
-import { issueTestAccessToken, testJwtKeys } from "../src/testing/issue-test-access-token.js";
+import { createGameServiceTestModule } from "../src/testing/create-game-service-test-module.js";
+import { issueTestAccessToken } from "../src/testing/issue-test-access-token.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-config({ path: resolve(repoRoot, ".env") });
-
-process.env.JWT_PUBLIC_KEY = testJwtKeys.publicKey;
 process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.MATCHMAKING_WORKER_ENABLED = "false";
+process.env.MATCH_TIMEOUT_WORKER_ENABLED = "false";
+process.env.BULLMQ_PREFIX ??= "rps-test";
+config({ path: resolve(repoRoot, ".env") });
 
 type ConnectedPayload = { userId: string; displayName: string };
 type QueueJoinedPayload = { queuedAt: string; currentRating: number };
@@ -84,12 +82,7 @@ describe("Matchmaking (e2e)", () => {
   let worker: MatchmakingWorkerService;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(JWT_CONFIG)
-      .useValue({ publicKey: testJwtKeys.publicKey })
-      .compile();
+    const moduleRef = await createGameServiceTestModule().compile();
 
     app = moduleRef.createNestApplication();
     await app.init();

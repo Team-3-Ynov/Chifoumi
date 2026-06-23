@@ -11,6 +11,12 @@ enum UserRole {
   admin
 }
 
+enum SeasonStatus {
+  upcoming
+  active
+  closed
+}
+
 enum MatchStatus {
   in_progress
   ended
@@ -29,30 +35,38 @@ enum RoundWinner {
   draw
 }
 
-enum SeasonStatus {
-  upcoming
-  active
-  closed
-}
-
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  displayName  String   @unique @map("display_name")
-  passwordHash String   @map("password_hash")
-  role         UserRole @default(player)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  displayName  String     @unique @map("display_name")
+  passwordHash String     @map("password_hash")
+  role         UserRole   @default(player)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  eloRating        EloRating?
-  refreshTokens    RefreshToken[]
-  matchesAsPlayerA Match[]          @relation("PlayerA")
-  matchesAsPlayerB Match[]          @relation("PlayerB")
-  matchesWon       Match[]          @relation("Winner")
-  eloHistory       EloHistory[]
-  seasonStandings  SeasonStanding[]
+  eloRating           EloRating?
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  matchesAsPlayerA    Match[]          @relation("PlayerA")
+  matchesAsPlayerB    Match[]          @relation("PlayerB")
+  matchesWon          Match[]          @relation("Winner")
+  eloHistory          EloHistory[]
+  seasonStandings     SeasonStanding[]
 
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model RefreshToken {
@@ -82,15 +96,15 @@ model EloRating {
 }
 
 model Match {
-  id        String      @id @default(uuid()) @db.Uuid
-  playerAId String      @map("player_a_id") @db.Uuid
-  playerBId String      @map("player_b_id") @db.Uuid
-  winnerId  String?     @map("winner_id") @db.Uuid
-  scoreA    Int         @map("score_a")
-  scoreB    Int         @map("score_b")
-  startedAt DateTime    @map("started_at")
-  endedAt   DateTime?   @map("ended_at")
-  status    MatchStatus @default(in_progress)
+  id         String      @id @default(uuid()) @db.Uuid
+  playerAId  String      @map("player_a_id") @db.Uuid
+  playerBId  String      @map("player_b_id") @db.Uuid
+  winnerId   String?     @map("winner_id") @db.Uuid
+  scoreA     Int         @map("score_a")
+  scoreB     Int         @map("score_b")
+  startedAt  DateTime    @map("started_at")
+  endedAt    DateTime?   @map("ended_at")
+  status     MatchStatus @default(in_progress)
 
   playerA    User         @relation("PlayerA", fields: [playerAId], references: [id])
   playerB    User         @relation("PlayerB", fields: [playerBId], references: [id])
@@ -138,28 +152,31 @@ model EloHistory {
   @@map("elo_history")
 }
 
-model Season {
-  id        String       @id @default(uuid()) @db.Uuid
-  name      String
-  startedAt DateTime     @map("started_at")
-  endsAt    DateTime     @map("ends_at")
-  status    SeasonStatus
-
-  standings SeasonStanding[]
-
-  @@map("seasons")
-}
-
 model League {
   id        String @id @default(uuid()) @db.Uuid
-  name      String
+  name      String @unique
   minRating Int    @map("min_rating")
   maxRating Int?   @map("max_rating")
   tier      Int    @unique
 
-  standings SeasonStanding[]
+  seasonStandings SeasonStanding[]
 
   @@map("leagues")
+}
+
+model Season {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  startedAt DateTime     @map("started_at")
+  endsAt    DateTime?    @map("ends_at")
+  status    SeasonStatus @default(upcoming)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  standings SeasonStanding[]
+
+  @@index([status])
+  @@map("seasons")
 }
 
 model SeasonStanding {
@@ -177,5 +194,6 @@ model SeasonStanding {
 
   @@unique([seasonId, userId])
   @@index([seasonId, rank])
+  @@index([userId])
   @@map("season_standings")
 }

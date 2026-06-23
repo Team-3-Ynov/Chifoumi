@@ -49,6 +49,14 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
     });
   }
 
+  async enqueuePasswordResetMail(input: { to: string; resetUrl: string }): Promise<void> {
+    await this.enqueueSendMail({
+      to: input.to,
+      template: "reset-password",
+      data: { resetUrl: input.resetUrl },
+    });
+  }
+
   async enqueueSendMail(payload: SendMailJobData): Promise<void> {
     await this.requireQueue().add(SEND_MAIL_JOB_NAME, payload, SEND_MAIL_JOB_OPTIONS);
   }

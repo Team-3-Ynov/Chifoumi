@@ -1,28 +1,24 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { INestApplication } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
 import { Queue, Worker } from "bullmq";
 import { config } from "dotenv";
 import { io, type Socket } from "socket.io-client";
-import { AppModule } from "../src/app.module.js";
-import { JWT_CONFIG } from "../src/config/jwt.config.js";
 import { MatchPlayService } from "../src/match/match-play.service.js";
 import { MATCH_TIMEOUT_QUEUE, matchTimeoutJobKey } from "../src/match/match-timeout.constants.js";
 import { MatchTimeoutSchedulerService } from "../src/match/match-timeout-scheduler.service.js";
 import { MatchSessionService } from "../src/match-session/match-session.service.js";
 import { MatchmakingWorkerService } from "../src/matchmaking/matchmaking-worker.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
-import { issueTestAccessToken, testJwtKeys } from "../src/testing/issue-test-access-token.js";
+import { createGameServiceTestModule } from "../src/testing/create-game-service-test-module.js";
+import { issueTestAccessToken } from "../src/testing/issue-test-access-token.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-config({ path: resolve(repoRoot, ".env") });
-
-process.env.JWT_PUBLIC_KEY = testJwtKeys.publicKey;
 process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.MATCHMAKING_WORKER_ENABLED = "false";
 process.env.MATCH_TIMEOUT_WORKER_ENABLED = "false";
 process.env.BULLMQ_PREFIX ??= "rps-test";
+config({ path: resolve(repoRoot, ".env") });
 
 type ConnectedPayload = { userId: string; displayName: string };
 type QueueJoinedPayload = { queuedAt: string; currentRating: number };
@@ -66,9 +62,12 @@ async function waitForDelayedTimeoutJob(
 ): Promise<void> {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
-    const jobs = await queue.getJobs(["delayed"]);
+    const rawJobs = await queue.getJobs(["delayed"]);
+    const jobs = rawJobs.filter(
+      (job): job is NonNullable<(typeof rawJobs)[number]> => job?.data != null,
+    );
     const match = jobs.find(
-      (job) => job.data.matchId === matchId && job.data.roundNumber === roundNumber,
+      (job) => job?.data.matchId === matchId && job.data.roundNumber === roundNumber,
     );
     if (match) {
       return;
@@ -115,12 +114,7 @@ describe("Match timeout BullMQ (e2e)", () => {
   let recoveryWorker: Worker | null = null;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(JWT_CONFIG)
-      .useValue({ publicKey: testJwtKeys.publicKey })
-      .compile();
+    const moduleRef = await createGameServiceTestModule().compile();
 
     app = moduleRef.createNestApplication();
     await app.init();
@@ -202,7 +196,10 @@ describe("Match timeout BullMQ (e2e)", () => {
       const timeoutJobId = await redisService.get(matchTimeoutJobKey(matchId));
       expect(timeoutJobId).toBeTruthy();
 
-      const delayedJobs = await queue.getJobs(["delayed"]);
+      const rawDelayedJobs = await queue.getJobs(["delayed"]);
+      const delayedJobs = rawDelayedJobs.filter(
+        (job): job is NonNullable<(typeof rawDelayedJobs)[number]> => job?.data != null,
+      );
       expect(delayedJobs).toHaveLength(1);
       expect(delayedJobs[0]?.data).toMatchObject({
         matchId,
@@ -216,8 +213,13 @@ describe("Match timeout BullMQ (e2e)", () => {
     }
   });
 
-  it("applies forfeit when another instance consumes the delayed timeout job", async () => {
+  it("applies play-phase forfeit when another instance consumes the delayed timeout job", async () => {
     const { playerA, playerB, matchId, roundStart } = await pairPlayers();
+
+    await matchSessionService.mutateState(matchId, (state) => ({
+      ...state,
+      roundPlays: { a: "rock", b: null },
+    }));
 
     await scheduler.cancelTimeout(matchId);
     await scheduler.scheduleTimeout(matchId, roundStart.roundNumber, "WAITING_PLAYS", 200);
@@ -246,7 +248,8 @@ describe("Match timeout BullMQ (e2e)", () => {
 
       expect(endedA.reason).toBe("FORFEIT_TIMEOUT");
       expect(endedB.reason).toBe("FORFEIT_TIMEOUT");
-      expect(endedA.winner).toBeTruthy();
+      expect(endedA.winner).toBe("player-a");
+      expect(endedB.winner).toBe("player-a");
     } finally {
       await recoveryWorker.close();
       recoveryWorker = null;
@@ -256,6 +259,53 @@ describe("Match timeout BullMQ (e2e)", () => {
   });
 
   it("applies reveal-phase forfeit when a recovery worker consumes the delayed job", async () => {
+    const { playerA, playerB, matchId, roundStart } = await pairPlayers();
+
+    await matchSessionService.mutateState(matchId, (state) => ({
+      ...state,
+      status: "WAITING_REVEALS",
+      roundCommits: { a: "abc123", b: "def456" },
+      roundReveals: { a: "rock", b: null },
+      revealDeadline: new Date(Date.now() + 200).toISOString(),
+    }));
+
+    await scheduler.cancelTimeout(matchId);
+    await scheduler.scheduleTimeout(matchId, roundStart.roundNumber, "WAITING_REVEALS", 200);
+
+    recoveryWorker = new Worker(
+      MATCH_TIMEOUT_QUEUE,
+      async (job) => {
+        await matchPlayService.handleMatchTimeout(
+          job.data.matchId,
+          job.data.roundNumber,
+          job.data.expectedState,
+        );
+      },
+      {
+        connection: { url: process.env.REDIS_URL ?? "redis://localhost:6379" },
+        prefix: process.env.BULLMQ_PREFIX ?? "rps-test",
+      },
+    );
+
+    try {
+      const matchEndedA = waitForEvent<MatchEndedPayload>(playerA, "matchEnded");
+      const matchEndedB = waitForEvent<MatchEndedPayload>(playerB, "matchEnded");
+
+      const endedA = await matchEndedA;
+      const endedB = await matchEndedB;
+
+      expect(endedA.reason).toBe("FORFEIT_TIMEOUT");
+      expect(endedB.reason).toBe("FORFEIT_TIMEOUT");
+      expect(endedA.winner).toBe("player-a");
+    } finally {
+      await recoveryWorker.close();
+      recoveryWorker = null;
+      playerA.disconnect();
+      playerB.disconnect();
+    }
+  });
+
+  it("ends reveal-phase timeout without a winner when both players are silent", async () => {
     const { playerA, playerB, matchId, roundStart } = await pairPlayers();
 
     await matchSessionService.mutateState(matchId, (state) => ({
@@ -293,7 +343,8 @@ describe("Match timeout BullMQ (e2e)", () => {
 
       expect(endedA.reason).toBe("FORFEIT_TIMEOUT");
       expect(endedB.reason).toBe("FORFEIT_TIMEOUT");
-      expect(endedA.winner).toBe("player-a");
+      expect(endedA.winner).toBeNull();
+      expect(endedB.winner).toBeNull();
     } finally {
       await recoveryWorker.close();
       recoveryWorker = null;

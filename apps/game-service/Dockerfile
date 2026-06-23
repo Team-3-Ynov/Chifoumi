@@ -21,7 +21,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS builder
 COPY apps ./apps
 COPY packages ./packages
-RUN pnpm --filter @chifoumi/game-service build
+RUN pnpm --filter @chifoumi/proto build && pnpm --filter @chifoumi/game-service build
 
 FROM base AS runner
 ENV NODE_ENV=production

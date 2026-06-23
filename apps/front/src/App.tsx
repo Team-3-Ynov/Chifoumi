@@ -1,87 +1,61 @@
-import { useEffect, useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { useAuth } from "./auth/AuthContext.js";
+import { Header } from "./components/Header.js";
+import { GuestRoute, ProtectedRoute } from "./components/ProtectedRoute.js";
+import { GameSocketProvider } from "./game/GameSocketContext.js";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage.js";
+import { LeaderboardPage } from "./pages/LeaderboardPage.js";
+import { LobbyPage } from "./pages/LobbyPage.js";
+import { LoginPage } from "./pages/LoginPage.js";
+import { MatchPage } from "./pages/MatchPage.js";
+import { ProfilePage } from "./pages/ProfilePage.js";
+import { RegisterPage } from "./pages/RegisterPage.js";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage.js";
 import "./App.css";
 
-type HealthResponse = {
-  status: string;
-  service: string;
-  version: string;
-};
+function CatchAllRedirect() {
+  const { isAuthenticated, isBootstrapping } = useAuth();
 
-type HealthState =
-  | { state: "loading" }
-  | { state: "ready"; data: HealthResponse }
-  | { state: "error"; message: string };
+  if (isBootstrapping) {
+    return (
+      <div className="page">
+        <div className="panel">
+          <p className="muted">Chargement…</p>
+        </div>
+      </div>
+    );
+  }
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+  return <Navigate to={isAuthenticated ? "/lobby" : "/login"} replace />;
+}
 
 export function App() {
-  const [health, setHealth] = useState<HealthState>({ state: "loading" });
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function fetchHealth() {
-      try {
-        const response = await fetch(`${apiBaseUrl}/health`, {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`API returned ${response.status}`);
-        }
-
-        const data = (await response.json()) as HealthResponse;
-        setHealth({ state: "ready", data });
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        setHealth({
-          state: "error",
-          message: error instanceof Error ? error.message : "API unavailable",
-        });
-      }
-    }
-
-    void fetchHealth();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
   return (
-    <main className="app">
-      <section className="panel" aria-labelledby="app-title">
-        <h1 className="title" id="app-title">
-          Chifoumi Ranked
-        </h1>
-        <p className="subtitle">Sprint 0 application shell</p>
+    <GameSocketProvider>
+      <div className="layout">
+        <Header />
+        <Routes>
+          <Route path="/" element={<Navigate to="/lobby" replace />} />
 
-        {health.state === "loading" ? (
-          <div className="health">
-            <span className="label">API health</span>
-            <span className="value">Loading</span>
-          </div>
-        ) : null}
+          <Route element={<GuestRoute />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+          </Route>
 
-        {health.state === "ready" ? (
-          <div className="health">
-            <span className="label">API health</span>
-            <span className="value">
-              {health.data.service} {health.data.version}: {health.data.status}
-            </span>
-          </div>
-        ) : null}
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
 
-        {health.state === "error" ? (
-          <div className="health error">
-            <span className="label">API health</span>
-            <span className="value">{health.message}</span>
-          </div>
-        ) : null}
-      </section>
-    </main>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/lobby" element={<LobbyPage />} />
+            <Route path="/match/:matchId" element={<MatchPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/profile/:id" element={<ProfilePage />} />
+          </Route>
+
+          <Route path="*" element={<CatchAllRedirect />} />
+        </Routes>
+      </div>
+    </GameSocketProvider>
   );
 }

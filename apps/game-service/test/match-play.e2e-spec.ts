@@ -1,23 +1,20 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { INestApplication } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
 import { Queue } from "bullmq";
 import { config } from "dotenv";
 import { io, type Socket } from "socket.io-client";
-import { AppModule } from "../src/app.module.js";
-import { JWT_CONFIG } from "../src/config/jwt.config.js";
 import { MatchmakingWorkerService } from "../src/matchmaking/matchmaking-worker.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
-import { issueTestAccessToken, testJwtKeys } from "../src/testing/issue-test-access-token.js";
+import { createGameServiceTestModule } from "../src/testing/create-game-service-test-module.js";
+import { issueTestAccessToken } from "../src/testing/issue-test-access-token.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-config({ path: resolve(repoRoot, ".env") });
-
-process.env.JWT_PUBLIC_KEY = testJwtKeys.publicKey;
 process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.MATCHMAKING_WORKER_ENABLED = "false";
+process.env.MATCH_TIMEOUT_WORKER_ENABLED = "false";
 process.env.BULLMQ_PREFIX ??= "rps-test";
+config({ path: resolve(repoRoot, ".env") });
 
 type ConnectedPayload = { userId: string; displayName: string };
 type QueueJoinedPayload = { queuedAt: string; currentRating: number };
@@ -64,6 +61,18 @@ function waitForEvent<T>(socket: Socket, event: string): Promise<T> {
   });
 }
 
+async function waitForQueueJob(queue: Queue, name: string, timeoutMs = 5_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const jobs = await queue.getJobs(["wait", "active", "delayed", "prioritized", "paused"]);
+    if (jobs.some((job) => job.name === name)) {
+      return true;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+  }
+  return false;
+}
+
 async function connectAndJoin(
   port: number,
   input: { userId: string; displayName: string },
@@ -94,12 +103,7 @@ describe("Match play BO3 (e2e)", () => {
   let worker: MatchmakingWorkerService;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(JWT_CONFIG)
-      .useValue({ publicKey: testJwtKeys.publicKey })
-      .compile();
+    const moduleRef = await createGameServiceTestModule().compile();
 
     app = moduleRef.createNestApplication();
     await app.init();
@@ -247,9 +251,11 @@ describe("Match play BO3 (e2e)", () => {
       connection: { url: process.env.REDIS_URL ?? "redis://localhost:6379" },
       prefix: process.env.BULLMQ_PREFIX ?? "rps-test",
     });
-    const jobs = await queue.getJobs(["completed", "waiting", "active"]);
-    expect(jobs.some((job) => job.name === "match-ended")).toBe(true);
-    await queue.close();
+    try {
+      await expect(waitForQueueJob(queue, "match-ended")).resolves.toBe(true);
+    } finally {
+      await queue.close();
+    }
 
     playerA.disconnect();
     playerB.disconnect();

@@ -3,6 +3,7 @@ import Redis from "ioredis-mock";
 import { Logger } from "nestjs-pino";
 import { MatchEventBus } from "../match-session/match-event-bus.js";
 import { MatchSessionService } from "../match-session/match-session.service.js";
+import { MatchmakingMetricsService } from "../matchmaking/matchmaking-metrics.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
 import { MatchPlayService, PlayValidationError } from "./match-play.service.js";
@@ -18,6 +19,9 @@ describe("MatchPlayService", () => {
   let matchTimeoutScheduler: {
     scheduleTimeout: jest.Mock;
     cancelTimeout: jest.Mock;
+  };
+  let metrics: {
+    recordMatchPlayed: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -40,13 +44,23 @@ describe("MatchPlayService", () => {
       cancelTimeout: jest.fn(async () => undefined),
     };
 
+    const matchDisconnectScheduler = {
+      cancelForfeitForPlayers: jest.fn(async () => undefined),
+    };
+
     const logger = { warn: jest.fn(), debug: jest.fn() } as unknown as Logger;
+    metrics = {
+      recordMatchPlayed: jest.fn(),
+    };
 
     service = new MatchPlayService(
       matchSessionService,
       eventBus,
       matchEndedPublisher,
       matchTimeoutScheduler as unknown as MatchTimeoutSchedulerService,
+      metrics as unknown as MatchmakingMetricsService,
+      matchDisconnectScheduler as unknown as import("./match-disconnect-scheduler.service.js").MatchDisconnectSchedulerService,
+      redisService,
       logger,
     );
 
@@ -217,6 +231,34 @@ describe("MatchPlayService", () => {
     expect(state?.endReason).toBe("FORFEIT_TIMEOUT");
   });
 
+  it("ends the match without a winner when both players miss the play timeout", async () => {
+    await service.handleMatchTimeout("match-1", 1, "WAITING_PLAYS");
+
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("ENDED");
+    expect(state?.winnerId).toBeUndefined();
+    expect(state?.endReason).toBe("FORFEIT_TIMEOUT");
+    expect(publishedJobs).toHaveLength(1);
+  });
+
+  it("ends the match without a winner when both players miss the reveal timeout", async () => {
+    await matchSessionService.mutateState("match-1", (state) => ({
+      ...state,
+      status: "WAITING_REVEALS",
+      roundCommits: { a: "abc123", b: "def456" },
+      roundReveals: { a: null, b: null },
+      revealDeadline: "2026-06-09T10:00:10.000Z",
+    }));
+
+    await service.handleMatchTimeout("match-1", 1, "WAITING_REVEALS");
+
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("ENDED");
+    expect(state?.winnerId).toBeUndefined();
+    expect(state?.endReason).toBe("FORFEIT_TIMEOUT");
+    expect(publishedJobs).toHaveLength(1);
+  });
+
   it("schedules commit phase timeout with expected state", async () => {
     await service.onCommitPhaseStarted({
       matchId: "match-1",
@@ -246,5 +288,26 @@ describe("MatchPlayService", () => {
       "WAITING_REVEALS",
       expect.any(Number),
     );
+  });
+
+  it("forfeits the match when a disconnected player does not reconnect", async () => {
+    const forfeited = await service.handleDisconnectForfeit("a", "match-1");
+
+    expect(forfeited).toBe(true);
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("ENDED");
+    expect(state?.winnerId).toBe("b");
+    expect(state?.endReason).toBe("DISCONNECT_FORFEIT");
+    expect(metrics.recordMatchPlayed).toHaveBeenCalledWith("forfeit");
+  });
+
+  it("skips disconnect forfeit when the player has an active socket", async () => {
+    await redisService.setUserSocket("a", "socket-a");
+
+    const forfeited = await service.handleDisconnectForfeit("a", "match-1");
+
+    expect(forfeited).toBe(false);
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("WAITING_PLAYS");
   });
 });

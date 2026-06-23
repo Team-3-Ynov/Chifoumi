@@ -12,8 +12,8 @@ export class MatchTimeoutWorkerService implements OnModuleInit, OnModuleDestroy 
 
   constructor(
     @Inject(REDIS_CONFIG) private readonly redisConfig: RedisConfig,
-    private readonly matchPlayService: MatchPlayService,
-    private readonly logger: Logger,
+    @Inject(MatchPlayService) private readonly matchPlayService: MatchPlayService,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   onModuleInit(): void {

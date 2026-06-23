@@ -77,12 +77,13 @@ jobs:
           pnpm --filter @chifoumi/db build
           pnpm --filter @chifoumi/elo build
           pnpm --filter @chifoumi/schemas build
+          pnpm --filter @chifoumi/proto build
 
       - name: Apply database migrations
         run: pnpm --filter @chifoumi/db migrate:deploy
 
       - name: Test with coverage
-        run: pnpm -r run --if-present test
+        run: pnpm -r run --if-present test --coverage
 
       - name: Game service WebSocket e2e tests
         run: pnpm --filter @chifoumi/game-service test:e2e

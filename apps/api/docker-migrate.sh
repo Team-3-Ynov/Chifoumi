@@ -4,4 +4,7 @@ set -e
 cd /app
 
 pnpm --filter @chifoumi/db migrate:deploy
-pnpm db:seed
+
+if [ "${RUN_DB_SEED:-false}" = "true" ]; then
+  pnpm db:seed
+fi

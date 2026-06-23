@@ -26,6 +26,8 @@ RUN pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/elo build && pnp
 
 FROM base AS runner
 ENV NODE_ENV=production
+ENV JOB_RUNNER_METRICS_PORT=3002
 COPY --from=builder /app /app
 USER node
+EXPOSE 3002
 CMD ["node", "apps/job-runner/dist/main.js"]
