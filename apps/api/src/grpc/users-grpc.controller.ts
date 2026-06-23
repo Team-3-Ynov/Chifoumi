@@ -1,11 +1,11 @@
 import { status as GrpcStatus } from "@grpc/grpc-js";
-import { Controller } from "@nestjs/common";
+import { Controller, Inject } from "@nestjs/common";
 import { GrpcMethod, RpcException } from "@nestjs/microservices";
 import { UsersService } from "../users/users.service.js";
 
 @Controller()
 export class UsersGrpcController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(@Inject(UsersService) private readonly usersService: UsersService) {}
 
   @GrpcMethod("Users", "GetRating")
   async getRating(data: { userId: string }) {

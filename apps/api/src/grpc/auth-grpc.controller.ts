@@ -1,10 +1,13 @@
-import { Controller } from "@nestjs/common";
+import { Controller, Inject } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
 import { AuthVerificationService } from "./auth-verification.service.js";
 
 @Controller()
 export class AuthGrpcController {
-  constructor(private readonly authVerificationService: AuthVerificationService) {}
+  constructor(
+    @Inject(AuthVerificationService)
+    private readonly authVerificationService: AuthVerificationService,
+  ) {}
 
   @GrpcMethod("Auth", "VerifyToken")
   async verifyToken(data: { token: string }) {

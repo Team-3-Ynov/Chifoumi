@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { MatchStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { AuditRoundDto, MatchAuditResponseDto } from "./dto/match-audit-response.dto.js";
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async buildAudit(matchId: string): Promise<MatchAuditResponseDto> {
     const match = await this.prisma.match.findUnique({

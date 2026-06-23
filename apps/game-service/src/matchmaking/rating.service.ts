@@ -1,10 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { RedisService } from "../redis/redis.service.js";
 import { DEFAULT_RATING, USER_RATING_PREFIX } from "./matchmaking.constants.js";
 
 @Injectable()
 export class RatingService {
-  constructor(private readonly redisService: RedisService) {}
+  constructor(@Inject(RedisService) private readonly redisService: RedisService) {}
 
   async getRating(userId: string): Promise<number> {
     const stored = await this.redisService.get(`${USER_RATING_PREFIX}${userId}`);

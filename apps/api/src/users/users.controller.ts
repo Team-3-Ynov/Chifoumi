@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, UseGuards } from "@nestjs/common";
+import { Controller, Get, Inject, Param, ParseUUIDPipe, UseGuards } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiNotFoundResponse,
@@ -18,7 +18,7 @@ import { UsersService } from "./users.service.js";
 @UseGuards(JwtAuthGuard)
 @Controller("users")
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(@Inject(UsersService) private readonly usersService: UsersService) {}
 
   @Get(":id/profile")
   @ApiOperation({

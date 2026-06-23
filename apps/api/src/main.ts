@@ -41,7 +41,11 @@ async function bootstrap() {
   app.enableCors({
     origin: resolveCorsOrigins(),
   });
-  setupSwagger(app);
+  try {
+    setupSwagger(app);
+  } catch (err) {
+    console.warn("[Swagger] Skipped — schema generation failed:", (err as Error).message);
+  }
 
   const grpcPort = Number(process.env.API_GRPC_PORT ?? DEFAULT_GRPC_PORT);
   app.connectMicroservice<MicroserviceOptions>({

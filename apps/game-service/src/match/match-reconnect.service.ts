@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { forwardRef, Inject, Injectable } from "@nestjs/common";
 import { MatchSessionService } from "../match-session/match-session.service.js";
 import {
   type MatchResumedCurrentState,
@@ -13,11 +13,14 @@ import { MatchReconnectMetricsService } from "./match-reconnect-metrics.service.
 @Injectable()
 export class MatchReconnectService {
   constructor(
+    @Inject(forwardRef(() => MatchmakingService))
     private readonly matchmakingService: MatchmakingService,
-    private readonly matchSessionService: MatchSessionService,
+    @Inject(MatchSessionService) private readonly matchSessionService: MatchSessionService,
+    @Inject(MatchDisconnectSchedulerService)
     private readonly matchDisconnectScheduler: MatchDisconnectSchedulerService,
+    @Inject(MatchReconnectMetricsService)
     private readonly matchReconnectMetrics: MatchReconnectMetricsService,
-    private readonly redisService: RedisService,
+    @Inject(RedisService) private readonly redisService: RedisService,
   ) {}
 
   async handleDisconnect(userId: string, socketId: string): Promise<void> {

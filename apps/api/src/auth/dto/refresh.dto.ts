@@ -3,6 +3,7 @@ import { IsString, Length } from "class-validator";
 
 export class RefreshDto {
   @ApiProperty({
+    type: String,
     description: "Opaque refresh token issued at login or a prior refresh",
     minLength: 20,
     example: "dGhpcyBpcyBhbiBvcGFxdWUgcmVmcmVzaCB0b2tlbg",

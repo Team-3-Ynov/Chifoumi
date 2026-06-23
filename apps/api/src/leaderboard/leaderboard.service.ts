@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { LEADERBOARD_CACHE_KEY_PREFIX, RedisService } from "../redis/redis.service.js";
 import type { LeaderboardResponseDto } from "./dto/leaderboard-response.dto.js";
@@ -15,8 +15,8 @@ export type LeaderboardResult = {
 @Injectable()
 export class LeaderboardService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(RedisService) private readonly redis: RedisService,
   ) {}
 
   async get(limit: number): Promise<LeaderboardResult> {
@@ -39,7 +39,7 @@ export class LeaderboardService {
   private async fetchFromDatabase(limit: number): Promise<LeaderboardResponseDto> {
     const rows = await this.prisma.eloRating.findMany({
       orderBy: [{ rating: "desc" }, { gamesPlayed: "desc" }],
-      take: limit,
+      take: Math.trunc(Number(limit)),
       include: {
         user: {
           select: {

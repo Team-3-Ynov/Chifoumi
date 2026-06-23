@@ -1,4 +1,4 @@
-import { Controller, Get, Header } from "@nestjs/common";
+import { Controller, Get, Header, Inject } from "@nestjs/common";
 import { GrpcMetricsService } from "../grpc/grpc-metrics.service.js";
 import { MatchReconnectMetricsService } from "../match/match-reconnect-metrics.service.js";
 import { MatchmakingMetricsService } from "../matchmaking/matchmaking-metrics.service.js";
@@ -6,8 +6,10 @@ import { MatchmakingMetricsService } from "../matchmaking/matchmaking-metrics.se
 @Controller("metrics")
 export class MetricsController {
   constructor(
+    @Inject(MatchmakingMetricsService)
     private readonly matchmakingMetricsService: MatchmakingMetricsService,
-    private readonly grpcMetricsService: GrpcMetricsService,
+    @Inject(GrpcMetricsService) private readonly grpcMetricsService: GrpcMetricsService,
+    @Inject(MatchReconnectMetricsService)
     private readonly matchReconnectMetricsService: MatchReconnectMetricsService,
   ) {}
 

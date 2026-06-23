@@ -21,8 +21,8 @@ export type JwtPayload = {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     @Inject(JWT_CONFIG) jwtConfig: JwtConfig,
-    private readonly usersService: UsersService,
-    private readonly redisService: RedisService,
+    @Inject(UsersService) private readonly usersService: UsersService,
+    @Inject(RedisService) private readonly redisService: RedisService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),

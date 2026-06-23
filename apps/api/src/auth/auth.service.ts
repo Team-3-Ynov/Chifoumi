@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { NotificationsQueueService } from "../queues/notifications-queue.service.js";
 import { RedisService } from "../redis/redis.service.js";
@@ -20,11 +20,12 @@ const DEFAULT_FRONTEND_URL = "http://localhost:5173";
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsersService,
-    private readonly passwordService: PasswordService,
-    private readonly tokenService: TokenService,
-    private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
+    @Inject(UsersService) private readonly usersService: UsersService,
+    @Inject(PasswordService) private readonly passwordService: PasswordService,
+    @Inject(TokenService) private readonly tokenService: TokenService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(NotificationsQueueService)
     private readonly notificationsQueue: NotificationsQueueService,
   ) {}
 

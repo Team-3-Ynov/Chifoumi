@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { RedisService } from "../redis/redis.service.js";
 import {
   type MatchSessionEvent,
@@ -14,7 +14,7 @@ export type SerializedMatchEvent<E extends MatchSessionEvent = MatchSessionEvent
 
 @Injectable()
 export class MatchEventBus {
-  constructor(private readonly redis: RedisService) {}
+  constructor(@Inject(RedisService) private readonly redis: RedisService) {}
 
   async broadcastToMatch<E extends MatchSessionEvent>(
     matchId: string,

@@ -1,4 +1,10 @@
-import { Injectable, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import { v4 as uuidv4 } from "uuid";
 import { MatchPlayService } from "../match/match-play.service.js";
@@ -52,12 +58,12 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
   private running = false;
 
   constructor(
-    private readonly redisService: RedisService,
-    private readonly matchmakingService: MatchmakingService,
-    private readonly matchSessionService: MatchSessionService,
-    private readonly matchPlayService: MatchPlayService,
-    private readonly metricsService: MatchmakingMetricsService,
-    private readonly logger: Logger,
+    @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(MatchmakingService) private readonly matchmakingService: MatchmakingService,
+    @Inject(MatchSessionService) private readonly matchSessionService: MatchSessionService,
+    @Inject(forwardRef(() => MatchPlayService)) private readonly matchPlayService: MatchPlayService,
+    @Inject(MatchmakingMetricsService) private readonly metricsService: MatchmakingMetricsService,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   onModuleInit(): void {
