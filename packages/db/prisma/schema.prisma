@@ -29,21 +29,28 @@ enum RoundWinner {
   draw
 }
 
-model User {
-  id           String     @id @default(uuid()) @db.Uuid
-  email        String     @unique
-  displayName  String     @unique @map("display_name")
-  passwordHash String     @map("password_hash")
-  role         UserRole   @default(player)
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
+enum SeasonStatus {
+  upcoming
+  active
+  closed
+}
 
-  eloRating       EloRating?
-  refreshTokens   RefreshToken[]
-  matchesAsPlayerA Match[]      @relation("PlayerA")
-  matchesAsPlayerB Match[]      @relation("PlayerB")
-  matchesWon       Match[]      @relation("Winner")
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  displayName  String   @unique @map("display_name")
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(player)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  eloRating        EloRating?
+  refreshTokens    RefreshToken[]
+  matchesAsPlayerA Match[]          @relation("PlayerA")
+  matchesAsPlayerB Match[]          @relation("PlayerB")
+  matchesWon       Match[]          @relation("Winner")
   eloHistory       EloHistory[]
+  seasonStandings  SeasonStanding[]
 
   @@map("users")
 }
@@ -75,15 +82,15 @@ model EloRating {
 }
 
 model Match {
-  id         String      @id @default(uuid()) @db.Uuid
-  playerAId  String      @map("player_a_id") @db.Uuid
-  playerBId  String      @map("player_b_id") @db.Uuid
-  winnerId   String?     @map("winner_id") @db.Uuid
-  scoreA     Int         @map("score_a")
-  scoreB     Int         @map("score_b")
-  startedAt  DateTime    @map("started_at")
-  endedAt    DateTime?   @map("ended_at")
-  status     MatchStatus @default(in_progress)
+  id        String      @id @default(uuid()) @db.Uuid
+  playerAId String      @map("player_a_id") @db.Uuid
+  playerBId String      @map("player_b_id") @db.Uuid
+  winnerId  String?     @map("winner_id") @db.Uuid
+  scoreA    Int         @map("score_a")
+  scoreB    Int         @map("score_b")
+  startedAt DateTime    @map("started_at")
+  endedAt   DateTime?   @map("ended_at")
+  status    MatchStatus @default(in_progress)
 
   playerA    User         @relation("PlayerA", fields: [playerAId], references: [id])
   playerB    User         @relation("PlayerB", fields: [playerBId], references: [id])
@@ -129,4 +136,46 @@ model EloHistory {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("elo_history")
+}
+
+model Season {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  startedAt DateTime     @map("started_at")
+  endsAt    DateTime     @map("ends_at")
+  status    SeasonStatus
+
+  standings SeasonStanding[]
+
+  @@map("seasons")
+}
+
+model League {
+  id        String @id @default(uuid()) @db.Uuid
+  name      String
+  minRating Int    @map("min_rating")
+  maxRating Int?   @map("max_rating")
+  tier      Int    @unique
+
+  standings SeasonStanding[]
+
+  @@map("leagues")
+}
+
+model SeasonStanding {
+  id                 String  @id @default(uuid()) @db.Uuid
+  seasonId           String  @map("season_id") @db.Uuid
+  userId             String  @map("user_id") @db.Uuid
+  finalRating        Int     @map("final_rating")
+  finalLeagueId      String  @map("final_league_id") @db.Uuid
+  rank               Int
+  rewardsDistributed Boolean @default(false) @map("rewards_distributed")
+
+  season      Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  finalLeague League @relation(fields: [finalLeagueId], references: [id])
+
+  @@unique([seasonId, userId])
+  @@index([seasonId, rank])
+  @@map("season_standings")
 }
