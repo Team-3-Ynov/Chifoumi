@@ -1,5 +1,5 @@
 import { Prisma, type User, UserRole } from "@chifoumi/db";
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import type { PublicProfileDto } from "./dto/public-profile.dto.js";
 
@@ -12,7 +12,7 @@ export type SafeUser = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   findByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { email } });

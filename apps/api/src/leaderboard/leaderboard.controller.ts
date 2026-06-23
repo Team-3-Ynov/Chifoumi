@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, UseGuards } from "@nestjs/common";
+import { Controller, Get, Inject, Query, Res, UseGuards } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiOkResponse,
@@ -18,7 +18,9 @@ import { LeaderboardService } from "./leaderboard.service.js";
 @UseGuards(JwtAuthGuard)
 @Controller("leaderboard")
 export class LeaderboardController {
-  constructor(private readonly leaderboardService: LeaderboardService) {}
+  constructor(
+    @Inject(LeaderboardService) private readonly leaderboardService: LeaderboardService,
+  ) {}
 
   @Public()
   @Get()

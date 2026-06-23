@@ -1,5 +1,5 @@
 import type { VerifyTokenResponse } from "@chifoumi/proto";
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { JwtService, TokenExpiredError } from "@nestjs/jwt";
 import type { AccessTokenPayload } from "../auth/token.service.js";
 import { RedisService } from "../redis/redis.service.js";
@@ -9,8 +9,8 @@ export class AuthVerificationService {
   private readonly logger = new Logger(AuthVerificationService.name);
 
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly redisService: RedisService,
+    @Inject(JwtService) private readonly jwtService: JwtService,
+    @Inject(RedisService) private readonly redisService: RedisService,
   ) {}
 
   async verifyToken(token: string): Promise<VerifyTokenResponse> {

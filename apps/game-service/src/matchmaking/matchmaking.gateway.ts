@@ -1,3 +1,4 @@
+import { Inject } from "@nestjs/common";
 import {
   ConnectedSocket,
   MessageBody,
@@ -23,8 +24,8 @@ type PlayPayload = {
 })
 export class MatchmakingGateway {
   constructor(
-    private readonly matchmakingService: MatchmakingService,
-    private readonly matchPlayService: MatchPlayService,
+    @Inject(MatchmakingService) private readonly matchmakingService: MatchmakingService,
+    @Inject(MatchPlayService) private readonly matchPlayService: MatchPlayService,
   ) {}
 
   @SubscribeMessage("joinQueue")

@@ -1,4 +1,13 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -39,7 +48,7 @@ const FORGOT_PASSWORD_THROTTLE_LIMIT = IS_TEST_ENV ? 1_000_000 : 3;
 @Throttle({ auth: { limit: AUTH_THROTTLE_LIMIT, ttl: 60_000 } })
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   @Post("register")
   @HttpCode(HttpStatus.CREATED)

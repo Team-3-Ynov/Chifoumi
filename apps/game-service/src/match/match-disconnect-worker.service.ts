@@ -13,9 +13,10 @@ export class MatchDisconnectWorkerService implements OnModuleInit, OnModuleDestr
 
   constructor(
     @Inject(REDIS_CONFIG) private readonly redisConfig: RedisConfig,
-    private readonly matchPlayService: MatchPlayService,
+    @Inject(MatchPlayService) private readonly matchPlayService: MatchPlayService,
+    @Inject(MatchReconnectMetricsService)
     private readonly matchReconnectMetrics: MatchReconnectMetricsService,
-    private readonly logger: Logger,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   onModuleInit(): void {

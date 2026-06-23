@@ -54,8 +54,8 @@ export class ApiAuthClient implements OnModuleInit {
   constructor(
     @Inject(AUTH_GRPC_CLIENT) private readonly client: ClientGrpc,
     @Inject(GRPC_CLIENT_CONFIG) private readonly grpcConfig: GrpcClientConfig,
-    private readonly cache: AuthTokenCacheService,
-    private readonly metrics: GrpcMetricsService,
+    @Inject(AuthTokenCacheService) private readonly cache: AuthTokenCacheService,
+    @Inject(GrpcMetricsService) private readonly metrics: GrpcMetricsService,
   ) {}
 
   onModuleInit(): void {

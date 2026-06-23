@@ -9,13 +9,13 @@ export class HashCheckDto {
 }
 
 export class AuditRoundDto {
-  @ApiProperty({ example: 1 })
+  @ApiProperty({ type: Number, example: 1 })
   roundNumber!: number;
 
-  @ApiProperty({ nullable: true, example: "a1b2c3..." })
+  @ApiProperty({ type: String, nullable: true, example: "a1b2c3..." })
   commitA!: string | null;
 
-  @ApiProperty({ nullable: true, example: "d4e5f6..." })
+  @ApiProperty({ type: String, nullable: true, example: "d4e5f6..." })
   commitB!: string | null;
 
   @ApiProperty({ enum: ["rock", "paper", "scissors"], nullable: true, example: "rock" })
@@ -24,32 +24,31 @@ export class AuditRoundDto {
   @ApiProperty({ enum: ["rock", "paper", "scissors"], nullable: true, example: "paper" })
   moveB!: string | null;
 
-  @ApiProperty({ nullable: true, example: "deadbeef..." })
+  @ApiProperty({ type: String, nullable: true, example: "deadbeef..." })
   nonceA!: string | null;
 
-  @ApiProperty({ nullable: true, example: "cafebabe..." })
+  @ApiProperty({ type: String, nullable: true, example: "cafebabe..." })
   nonceB!: string | null;
 
-  @ApiProperty({ type: HashCheckDto })
+  @ApiProperty({ type: () => HashCheckDto })
   hashCheck!: HashCheckDto;
 }
 
 export class MatchPlayerDto {
   @ApiProperty({
+    type: String,
     description: "Player ID (UUID)",
     example: "550e8400-e29b-41d4-a716-446655440000",
   })
   id!: string;
 
-  @ApiProperty({
-    description: "Player display name",
-    example: "johndoe",
-  })
+  @ApiProperty({ type: String, description: "Player display name", example: "johndoe" })
   displayName!: string;
 }
 
 export class MatchAuditResponseDto {
   @ApiProperty({
+    type: String,
     description: "Match ID (UUID)",
     example: "550e8400-e29b-41d4-a716-446655440000",
   })
@@ -57,23 +56,19 @@ export class MatchAuditResponseDto {
 
   @ApiProperty({
     description: "Players involved in the match (player A and player B)",
-    type: [MatchPlayerDto],
+    type: () => MatchPlayerDto,
+    isArray: true,
     example: [
-      {
-        id: "550e8400-e29b-41d4-a716-446655440000",
-        displayName: "alice",
-      },
-      {
-        id: "660e8400-e29b-41d4-a716-446655440001",
-        displayName: "bob",
-      },
+      { id: "550e8400-e29b-41d4-a716-446655440000", displayName: "alice" },
+      { id: "660e8400-e29b-41d4-a716-446655440001", displayName: "bob" },
     ],
   })
   players!: MatchPlayerDto[];
 
   @ApiProperty({
     description: "All rounds of the match with cryptographic details",
-    type: [AuditRoundDto],
+    type: () => AuditRoundDto,
+    isArray: true,
   })
   rounds!: AuditRoundDto[];
 
@@ -84,6 +79,7 @@ export class MatchAuditResponseDto {
   finalScore!: [number, number];
 
   @ApiProperty({
+    type: String,
     description: "Winner player ID or null if draw",
     example: "550e8400-e29b-41d4-a716-446655440000",
     nullable: true,
@@ -91,6 +87,7 @@ export class MatchAuditResponseDto {
   winner!: string | null;
 
   @ApiProperty({
+    type: String,
     description: "Match end time (ISO 8601)",
     example: "2026-06-22T10:30:45.123Z",
   })

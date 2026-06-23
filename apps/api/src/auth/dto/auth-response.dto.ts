@@ -2,13 +2,13 @@ import { ApiProperty } from "@nestjs/swagger";
 import { TokensDto } from "./tokens.dto.js";
 
 export class SafeUserDto {
-  @ApiProperty({ format: "uuid", example: "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1" })
+  @ApiProperty({ type: String, format: "uuid", example: "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1" })
   id!: string;
 
-  @ApiProperty({ format: "email", example: "player@example.com" })
+  @ApiProperty({ type: String, format: "email", example: "player@example.com" })
   email!: string;
 
-  @ApiProperty({ example: "player1" })
+  @ApiProperty({ type: String, example: "player1" })
   displayName!: string;
 
   @ApiProperty({ enum: ["player", "admin"], example: "player" })
@@ -16,9 +16,9 @@ export class SafeUserDto {
 }
 
 export class AuthResponseDto {
-  @ApiProperty({ type: SafeUserDto })
+  @ApiProperty({ type: () => SafeUserDto })
   user!: SafeUserDto;
 
-  @ApiProperty({ type: TokensDto })
+  @ApiProperty({ type: () => TokensDto })
   tokens!: TokensDto;
 }

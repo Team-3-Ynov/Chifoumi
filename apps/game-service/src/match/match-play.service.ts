@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import { MatchEventBus } from "../match-session/match-event-bus.js";
 import {
@@ -48,14 +48,16 @@ type RoundResolution = {
 @Injectable()
 export class MatchPlayService {
   constructor(
-    private readonly matchSessionService: MatchSessionService,
-    private readonly eventBus: MatchEventBus,
-    private readonly matchEndedPublisher: MatchEndedPublisher,
+    @Inject(MatchSessionService) private readonly matchSessionService: MatchSessionService,
+    @Inject(MatchEventBus) private readonly eventBus: MatchEventBus,
+    @Inject(MatchEndedPublisher) private readonly matchEndedPublisher: MatchEndedPublisher,
+    @Inject(MatchTimeoutSchedulerService)
     private readonly matchTimeoutScheduler: MatchTimeoutSchedulerService,
-    private readonly metrics: MatchmakingMetricsService,
+    @Inject(MatchmakingMetricsService) private readonly metrics: MatchmakingMetricsService,
+    @Inject(MatchDisconnectSchedulerService)
     private readonly matchDisconnectScheduler: MatchDisconnectSchedulerService,
-    private readonly redisService: RedisService,
-    private readonly logger: Logger,
+    @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   async onMatchStarted(state: MatchState): Promise<void> {

@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Inject, Param } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { Public } from "../auth/decorators/public.decorator.js";
@@ -8,7 +8,7 @@ import { MatchAuditResponseDto } from "./dto/match-audit-response.dto.js";
 @ApiTags("Matches")
 @Controller("matches")
 export class MatchesController {
-  constructor(private readonly auditService: AuditService) {}
+  constructor(@Inject(AuditService) private readonly auditService: AuditService) {}
 
   @Get(":id/audit")
   @Public()

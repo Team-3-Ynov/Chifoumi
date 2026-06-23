@@ -1,3 +1,4 @@
+import { Inject } from "@nestjs/common";
 import {
   type OnGatewayConnection,
   type OnGatewayDisconnect,
@@ -38,12 +39,14 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   server!: Server;
 
   constructor(
-    private readonly wsAuthService: WsAuthService,
-    private readonly redisService: RedisService,
+    @Inject(WsAuthService) private readonly wsAuthService: WsAuthService,
+    @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(MatchmakingEventsService)
     private readonly matchmakingEventsService: MatchmakingEventsService,
+    @Inject(MatchEventsRelayService)
     private readonly matchEventsRelayService: MatchEventsRelayService,
-    private readonly matchReconnectService: MatchReconnectService,
-    private readonly logger: Logger,
+    @Inject(MatchReconnectService) private readonly matchReconnectService: MatchReconnectService,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   afterInit(server: Server): void {

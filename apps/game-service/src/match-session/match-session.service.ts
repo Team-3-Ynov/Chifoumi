@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { v4 as uuidv4 } from "uuid";
 import { RedisService } from "../redis/redis.service.js";
 import { MatchEventBus } from "./match-event-bus.js";
@@ -38,8 +38,8 @@ export class MatchSessionCorruptStateError extends Error {
 @Injectable()
 export class MatchSessionService {
   constructor(
-    private readonly redis: RedisService,
-    private readonly eventBus: MatchEventBus,
+    @Inject(RedisService) private readonly redis: RedisService,
+    @Inject(MatchEventBus) private readonly eventBus: MatchEventBus,
   ) {}
 
   buildInitialState(

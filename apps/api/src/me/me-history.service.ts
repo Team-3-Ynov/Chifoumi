@@ -1,6 +1,6 @@
 import type { Prisma } from "@chifoumi/db";
 import { MatchStatus } from "@chifoumi/db";
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { decodeHistoryCursor, encodeHistoryCursor } from "./history-cursor.js";
 
@@ -24,7 +24,7 @@ export type MeHistoryPage = {
 
 @Injectable()
 export class MeHistoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async getHistory(userId: string, limit: number, cursor?: string): Promise<MeHistoryPage> {
     const decodedCursor = cursor ? decodeHistoryCursor(cursor) : undefined;
@@ -50,10 +50,11 @@ export class MeHistoryService {
         : {}),
     };
 
+    const safeLimit = Math.trunc(Number(limit));
     const rows = await this.prisma.match.findMany({
       where,
       orderBy: [{ endedAt: "desc" }, { id: "desc" }],
-      take: limit + 1,
+      take: safeLimit + 1,
       include: {
         playerA: { select: { id: true, displayName: true } },
         playerB: { select: { id: true, displayName: true } },
@@ -61,8 +62,8 @@ export class MeHistoryService {
       },
     });
 
-    const hasMore = rows.length > limit;
-    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const hasMore = rows.length > safeLimit;
+    const pageRows = hasMore ? rows.slice(0, safeLimit) : rows;
 
     const items = pageRows.map((match) => this.toHistoryItem(match, userId));
 

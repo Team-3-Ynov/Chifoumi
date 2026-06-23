@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
 import type { Redis } from "ioredis";
 import type { Server } from "socket.io";
 import { RedisService } from "../redis/redis.service.js";
@@ -9,7 +9,7 @@ export class MatchmakingEventsService implements OnModuleInit, OnModuleDestroy {
   private server: Server | null = null;
   private subscriber: Redis | null = null;
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(@Inject(RedisService) private readonly redisService: RedisService) {}
 
   setServer(server: Server): void {
     this.server = server;

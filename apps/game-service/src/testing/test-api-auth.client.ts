@@ -1,5 +1,5 @@
 import type { VerifyTokenResponse } from "@chifoumi/proto";
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { JwtService, TokenExpiredError } from "@nestjs/jwt";
 import { RedisService } from "../redis/redis.service.js";
 import { testJwtKeys } from "./issue-test-access-token.js";
@@ -18,7 +18,7 @@ export class TestApiAuthClient {
     verifyOptions: { algorithms: ["RS256"] },
   });
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(@Inject(RedisService) private readonly redisService: RedisService) {}
 
   async verifyToken(token: string): Promise<VerifyTokenResponse> {
     if (token.trim().length === 0) {

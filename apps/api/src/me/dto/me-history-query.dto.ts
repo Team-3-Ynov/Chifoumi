@@ -12,6 +12,7 @@ export class MeHistoryQueryDto {
   limit = 20;
 
   @ApiPropertyOptional({
+    type: String,
     description: "Opaque cursor returned by the previous page",
     example: "eyJ0cyI6IjIwMjYtMDEtMDFUMDA6MDA6MzEuMDAwWiIsImlkIjoiIn0",
   })

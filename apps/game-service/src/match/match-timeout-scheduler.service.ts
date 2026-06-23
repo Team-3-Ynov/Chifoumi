@@ -16,7 +16,7 @@ export class MatchTimeoutSchedulerService implements OnModuleInit, OnModuleDestr
 
   constructor(
     @Inject(REDIS_CONFIG) private readonly redisConfig: RedisConfig,
-    private readonly redisService: RedisService,
+    @Inject(RedisService) private readonly redisService: RedisService,
   ) {}
 
   onModuleInit(): void {
