@@ -12,6 +12,8 @@ import { MatchSessionService } from "../match-session/match-session.service.js";
 import { RedisService } from "../redis/redis.service.js";
 import { getEloWindow, ratingsMatch } from "./elo-window.js";
 import {
+  MATCH_BY_USER_PREFIX,
+  MATCH_STATE_TTL_SECONDS,
   MATCHMAKING_PAIR_LOCK_TTL_SECONDS,
   MATCHMAKING_QUEUE_KEY,
   MATCHMAKING_WORKER_INTERVAL_MS,
@@ -37,7 +39,10 @@ if redis.call("EXISTS", pairLockKey) == 0 then
   return 0
 end
 
-if redis.call("ZSCORE", queueKey, userA) == false or redis.call("ZSCORE", queueKey, userB) == false then
+local scoreA = redis.call("ZSCORE", queueKey, userA)
+local scoreB = redis.call("ZSCORE", queueKey, userB)
+
+if not scoreA or not scoreB then
   redis.call("DEL", pairLockKey)
   return 0
 end
@@ -190,10 +195,10 @@ export class MatchmakingWorkerService implements OnModuleInit, OnModuleDestroy {
         matchId,
         playerA.userId,
         playerB.userId,
-        "match:byUser:",
+        MATCH_BY_USER_PREFIX,
         `match:${matchId}:state`,
         JSON.stringify(matchState),
-        String(3600),
+        String(MATCH_STATE_TTL_SECONDS),
       ],
     );
 

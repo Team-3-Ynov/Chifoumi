@@ -45,6 +45,8 @@ type RoundResolution = {
   roundNumber: number;
 };
 
+type SilentPlayer = "A" | "B" | "BOTH";
+
 @Injectable()
 export class MatchPlayService {
   constructor(
@@ -202,7 +204,7 @@ export class MatchPlayService {
       matchId,
       roundNumber,
       "WAITING_PLAYS",
-      () => "A",
+      () => "BOTH",
     );
 
     if (nextState.status === "ENDED") {
@@ -282,7 +284,7 @@ export class MatchPlayService {
     matchId: string,
     roundNumber: number,
     expectedStatus: MatchTimeoutExpectedState,
-    resolveSilentPlayer: (state: MatchState) => "A" | "B",
+    resolveSilentPlayer: (state: MatchState) => SilentPlayer,
   ): Promise<MatchState> {
     return this.matchSessionService.mutateState(matchId, (state) => {
       if (state.status !== expectedStatus || state.currentRound !== roundNumber) {
@@ -295,6 +297,15 @@ export class MatchPlayService {
           : resolveSilentPlayer(state);
 
       const resolvedAt = new Date();
+
+      if (silentPlayer === "BOTH") {
+        return transitionMatchState(state, {
+          type: "TIMEOUT",
+          silentPlayer,
+          now: resolvedAt,
+        });
+      }
+
       const winnerLabel = silentPlayer === "A" ? "b" : "a";
 
       if (expectedStatus === "WAITING_PLAYS") {
@@ -328,14 +339,20 @@ export class MatchPlayService {
     });
   }
 
-  private resolveSilentPlayer(slotA: string | Move | null, slotB: string | Move | null): "A" | "B" {
+  private resolveSilentPlayer(
+    slotA: string | Move | null,
+    slotB: string | Move | null,
+  ): SilentPlayer {
+    if (slotA === null && slotB === null) {
+      return "BOTH";
+    }
     if (slotA === null && slotB !== null) {
       return "A";
     }
     if (slotB === null && slotA !== null) {
       return "B";
     }
-    return "A";
+    return "BOTH";
   }
 
   private async afterRoundResolved(state: MatchState, resolution: RoundResolution): Promise<void> {

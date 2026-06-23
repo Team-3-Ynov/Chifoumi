@@ -231,6 +231,34 @@ describe("MatchPlayService", () => {
     expect(state?.endReason).toBe("FORFEIT_TIMEOUT");
   });
 
+  it("ends the match without a winner when both players miss the play timeout", async () => {
+    await service.handleMatchTimeout("match-1", 1, "WAITING_PLAYS");
+
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("ENDED");
+    expect(state?.winnerId).toBeUndefined();
+    expect(state?.endReason).toBe("FORFEIT_TIMEOUT");
+    expect(publishedJobs).toHaveLength(1);
+  });
+
+  it("ends the match without a winner when both players miss the reveal timeout", async () => {
+    await matchSessionService.mutateState("match-1", (state) => ({
+      ...state,
+      status: "WAITING_REVEALS",
+      roundCommits: { a: "abc123", b: "def456" },
+      roundReveals: { a: null, b: null },
+      revealDeadline: "2026-06-09T10:00:10.000Z",
+    }));
+
+    await service.handleMatchTimeout("match-1", 1, "WAITING_REVEALS");
+
+    const state = await matchSessionService.loadState("match-1");
+    expect(state?.status).toBe("ENDED");
+    expect(state?.winnerId).toBeUndefined();
+    expect(state?.endReason).toBe("FORFEIT_TIMEOUT");
+    expect(publishedJobs).toHaveLength(1);
+  });
+
   it("schedules commit phase timeout with expected state", async () => {
     await service.onCommitPhaseStarted({
       matchId: "match-1",

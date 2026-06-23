@@ -18,7 +18,7 @@ export class InvalidMatchTransitionError extends Error {
 export type MatchStateMachineEvent =
   | { type: "PLAYS_RECEIVED" }
   | { type: "ROUND_RESOLVED"; winner: "A" | "B" | "DRAW"; now: Date }
-  | { type: "TIMEOUT"; silentPlayer: "A" | "B"; now: Date };
+  | { type: "TIMEOUT"; silentPlayer: "A" | "B" | "BOTH"; now: Date };
 
 export function transitionMatchState(state: MatchState, event: MatchStateMachineEvent): MatchState {
   if (state.status === "ENDED") {
@@ -47,6 +47,10 @@ export function transitionMatchState(state: MatchState, event: MatchStateMachine
     ) {
       throw new InvalidMatchTransitionError(state.status, event.type);
     }
+    if (event.silentPlayer === "BOTH") {
+      return endMatch(state, null, "FORFEIT_TIMEOUT");
+    }
+
     const winnerIndex = event.silentPlayer === "A" ? 1 : 0;
     return endMatch(state, state.players[winnerIndex].userId, "FORFEIT_TIMEOUT");
   }
