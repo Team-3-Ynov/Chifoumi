@@ -213,8 +213,13 @@ describe("Match timeout BullMQ (e2e)", () => {
     }
   });
 
-  it("applies forfeit when another instance consumes the delayed timeout job", async () => {
+  it("applies play-phase forfeit when another instance consumes the delayed timeout job", async () => {
     const { playerA, playerB, matchId, roundStart } = await pairPlayers();
+
+    await matchSessionService.mutateState(matchId, (state) => ({
+      ...state,
+      roundPlays: { a: "rock", b: null },
+    }));
 
     await scheduler.cancelTimeout(matchId);
     await scheduler.scheduleTimeout(matchId, roundStart.roundNumber, "WAITING_PLAYS", 200);
@@ -243,7 +248,8 @@ describe("Match timeout BullMQ (e2e)", () => {
 
       expect(endedA.reason).toBe("FORFEIT_TIMEOUT");
       expect(endedB.reason).toBe("FORFEIT_TIMEOUT");
-      expect(endedA.winner).toBeTruthy();
+      expect(endedA.winner).toBe("player-a");
+      expect(endedB.winner).toBe("player-a");
     } finally {
       await recoveryWorker.close();
       recoveryWorker = null;
