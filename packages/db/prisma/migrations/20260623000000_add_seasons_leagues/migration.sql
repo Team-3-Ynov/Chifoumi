@@ -47,12 +47,8 @@ CREATE UNIQUE INDEX "leagues_tier_key" ON "leagues"("tier");
 -- CreateIndex
 CREATE INDEX "seasons_status_idx" ON "seasons"("status");
 
--- Partial unique index: enforce at most one active season at a time (AC1 #111)
+-- Partial unique index: at most one active season at a time (AC1 #111).
 -- Prisma does not support partial indexes natively; kept as raw SQL.
-CREATE UNIQUE INDEX "seasons_single_active_idx" ON "seasons" ("status") WHERE "status" = 'active';
-
--- CreateIndex
--- Prisma schema cannot represent PostgreSQL partial indexes; this enforces AC1.
 CREATE UNIQUE INDEX "seasons_single_active_idx" ON "seasons"("status") WHERE "status" = 'active';
 
 -- CreateIndex
