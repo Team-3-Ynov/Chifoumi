@@ -1,3 +1,4 @@
+import { getLeagueSummaryForRating, type LeagueSummary } from "@chifoumi/leagues";
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 
@@ -8,6 +9,7 @@ export type MeProfile = {
   role: "player" | "admin";
   rating: number;
   gamesPlayed: number;
+  league: LeagueSummary;
   createdAt: Date;
 };
 
@@ -25,13 +27,16 @@ export class MeService {
       throw new UnauthorizedException();
     }
 
+    const rating = user.eloRating?.rating ?? 1000;
+
     return {
       id: user.id,
       email: user.email,
       displayName: user.displayName,
       role: user.role === "admin" ? "admin" : "player",
-      rating: user.eloRating?.rating ?? 1000,
+      rating,
       gamesPlayed: user.eloRating?.gamesPlayed ?? 0,
+      league: getLeagueSummaryForRating(rating),
       createdAt: user.createdAt,
     };
   }

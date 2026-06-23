@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/schemas build",
-    "pretypecheck": "pnpm --filter @chifoumi/db typecheck && pnpm --filter @chifoumi/schemas build && pnpm --filter @chifoumi/proto build",
-    "pretest": "pnpm --filter @chifoumi/schemas build && pnpm --filter @chifoumi/proto build",
-    "pretest:e2e": "pnpm --filter @chifoumi/schemas build && pnpm --filter @chifoumi/proto build",
+    "predev": "pnpm --filter @chifoumi/leagues build && pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/schemas build",
+    "pretypecheck": "pnpm --filter @chifoumi/leagues build && pnpm --filter @chifoumi/db typecheck && pnpm --filter @chifoumi/schemas build && pnpm --filter @chifoumi/proto build",
+    "pretest": "pnpm --filter @chifoumi/leagues build && pnpm --filter @chifoumi/schemas build && pnpm --filter @chifoumi/proto build",
+    "pretest:e2e": "pnpm --filter @chifoumi/leagues build && pnpm --filter @chifoumi/schemas build && pnpm --filter @chifoumi/proto build",
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "prebuild": "pnpm --filter @chifoumi/proto build",
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@chifoumi/db": "workspace:*",
+    "@chifoumi/leagues": "workspace:*",
     "@chifoumi/proto": "workspace:*",
     "@chifoumi/schemas": "workspace:*",
     "@grpc/grpc-js": "^1.13.4",

@@ -103,6 +103,7 @@ describe("Auth (e2e)", () => {
       role: "player",
       rating: 1000,
       gamesPlayed: 0,
+      league: { name: "Bronze", tier: 1 },
       createdAt: expect.any(String),
     });
 
@@ -116,6 +117,7 @@ describe("Auth (e2e)", () => {
       displayName: "player1",
       rating: 1000,
       gamesPlayed: 0,
+      league: { name: "Bronze", tier: 1 },
       winRate: 0,
       createdAt: expect.any(String),
     });

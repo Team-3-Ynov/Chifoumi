@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { LeagueSummaryDto } from "../../leagues/dto/league-summary.dto.js";
 
 export class LeaderboardEntryDto {
   @ApiProperty({ type: Number, example: 1 })
@@ -15,6 +16,9 @@ export class LeaderboardEntryDto {
 
   @ApiProperty({ type: Number, example: 42 })
   gamesPlayed!: number;
+
+  @ApiProperty({ type: () => LeagueSummaryDto })
+  league!: LeagueSummaryDto;
 }
 
 export class LeaderboardResponseDto {

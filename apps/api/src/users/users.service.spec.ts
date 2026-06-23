@@ -7,13 +7,19 @@ describe("UsersService.listUsers", () => {
   let service: UsersService;
   let prisma: {
     $transaction: ReturnType<typeof jest.fn>;
-    user: { findMany: ReturnType<typeof jest.fn>; count: ReturnType<typeof jest.fn> };
+    $queryRaw: ReturnType<typeof jest.fn>;
+    user: {
+      findMany: ReturnType<typeof jest.fn>;
+      findUnique: ReturnType<typeof jest.fn>;
+      count: ReturnType<typeof jest.fn>;
+    };
   };
 
   beforeEach(() => {
     prisma = {
       $transaction: jest.fn(),
-      user: { findMany: jest.fn(), count: jest.fn() },
+      $queryRaw: jest.fn(),
+      user: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
     };
     service = new UsersService(prisma as unknown as PrismaService);
   });
@@ -70,5 +76,27 @@ describe("UsersService.listUsers", () => {
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ skip: 20, take: 10, orderBy: { createdAt: "desc" } }),
     );
+  });
+
+  it("adds the current league to public profiles", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      displayName: "gold-player",
+      createdAt: new Date("2026-03-01T00:00:00.000Z"),
+      eloRating: { rating: 1250, gamesPlayed: 10 },
+    });
+    prisma.$queryRaw.mockResolvedValue([{ wins: 4 }]);
+
+    const result = await service.getPublicProfile("user-1");
+
+    expect(result).toEqual({
+      id: "user-1",
+      displayName: "gold-player",
+      rating: 1250,
+      gamesPlayed: 10,
+      league: { name: "Gold", tier: 3 },
+      winRate: 0.4,
+      createdAt: new Date("2026-03-01T00:00:00.000Z"),
+    });
   });
 });

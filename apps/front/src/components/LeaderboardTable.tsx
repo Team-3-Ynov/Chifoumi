@@ -14,6 +14,7 @@ export function LeaderboardTable({ items }: LeaderboardTableProps) {
             <th scope="col">Rang</th>
             <th scope="col">Joueur</th>
             <th scope="col">Rating</th>
+            <th scope="col">Ligue</th>
             <th scope="col">Matchs joués</th>
           </tr>
         </thead>
@@ -27,6 +28,7 @@ export function LeaderboardTable({ items }: LeaderboardTableProps) {
                 </Link>
               </td>
               <td>{entry.rating}</td>
+              <td>{entry.league.name}</td>
               <td>{entry.gamesPlayed}</td>
             </tr>
           ))}

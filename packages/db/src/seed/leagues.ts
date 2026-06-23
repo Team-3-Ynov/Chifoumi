@@ -1,13 +1,8 @@
+import { REFERENCE_LEAGUES } from "@chifoumi/leagues";
 import { type PrismaClient, SeasonStatus } from "@prisma/client";
 
 const THIRTY_DAYS_IN_MS = 30 * 24 * 60 * 60 * 1000;
-
-export const REFERENCE_LEAGUES = [
-  { name: "Bronze", tier: 1, minRating: 0, maxRating: 1099 },
-  { name: "Silver", tier: 2, minRating: 1100, maxRating: 1199 },
-  { name: "Gold", tier: 3, minRating: 1200, maxRating: 1349 },
-  { name: "Platinum", tier: 4, minRating: 1350, maxRating: null },
-] as const;
+export { REFERENCE_LEAGUES };
 
 export async function seedLeaguesAndActiveSeason(
   prisma: PrismaClient,
