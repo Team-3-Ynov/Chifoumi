@@ -9,15 +9,53 @@ export const MatchStatus = {
   aborted: "aborted",
 } as const;
 
-export class PrismaClient {}
+export type User = {
+  id: string;
+  email: string;
+  displayName: string;
+  passwordHash: string;
+  role: keyof typeof UserRole;
+};
 
-export const Prisma = {
-  PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {
+type PrismaDelegate = {
+  create: (...args: unknown[]) => Promise<unknown>;
+  delete: (...args: unknown[]) => Promise<unknown>;
+  findMany: (...args: unknown[]) => Promise<unknown[]>;
+  findUnique: (...args: unknown[]) => Promise<unknown>;
+  update: (...args: unknown[]) => Promise<unknown>;
+  updateMany: (...args: unknown[]) => Promise<unknown>;
+};
+
+const delegate = {} as PrismaDelegate;
+
+export class PrismaClient {
+  readonly eloRating = delegate;
+  readonly match = delegate;
+  readonly passwordResetToken = delegate;
+  readonly refreshToken = delegate;
+  readonly user = delegate;
+
+  async $queryRaw<T = unknown>(..._args: unknown[]): Promise<T> {
+    return [] as T;
+  }
+
+  async $transaction<T>(callback: (tx: this) => Promise<T>): Promise<T> {
+    return callback(this);
+  }
+}
+
+export namespace Prisma {
+  export type MatchWhereInput = Record<string, unknown>;
+
+  export class PrismaClientKnownRequestError extends Error {
     readonly code: string;
 
-    constructor(message: string, opts: { code: string }) {
+    readonly meta?: Record<string, unknown>;
+
+    constructor(message: string, opts: { code: string; meta?: Record<string, unknown> }) {
       super(message);
       this.code = opts.code;
+      this.meta = opts.meta;
     }
-  },
-};
+  }
+}

@@ -83,7 +83,7 @@ jobs:
         run: pnpm --filter @chifoumi/db migrate:deploy
 
       - name: Test with coverage
-        run: pnpm -r run --if-present test
+        run: pnpm -r run --if-present test --coverage
 
       - name: Game service WebSocket e2e tests
         run: pnpm --filter @chifoumi/game-service test:e2e
