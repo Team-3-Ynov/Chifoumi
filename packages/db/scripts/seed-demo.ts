@@ -7,6 +7,7 @@ import { hashPassword } from "../src/seed/password.js";
 const FORCE = process.argv.includes("--force");
 const DEMO_PASSWORD = "Demo1234!";
 const DEMO_DOMAIN = "@chifoumi.demo";
+const ADMIN_EMAIL = "admin@chifoumi.local";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -360,6 +361,73 @@ const MATCHES: MatchDef[] = [
   },
 ];
 
+// Admin is index 8 in the combined player arrays (fetched at runtime).
+// Round winner rules: rock>scissors, scissors>paper, paper>rock.
+const ADMIN_MATCHES: MatchDef[] = [
+  {
+    a: 8,
+    b: 7,
+    daysAgo: 19,
+    rounds: [
+      // admin beats birdie 2-0
+      { moveA: M.rock, moveB: M.scissors },
+      { moveA: M.paper, moveB: M.rock },
+    ],
+  },
+  {
+    a: 8,
+    b: 4,
+    daysAgo: 14,
+    rounds: [
+      // admin beats zangief 2-1
+      { moveA: M.rock, moveB: M.scissors }, //   A wins
+      { moveA: M.scissors, moveB: M.rock }, //   B wins (rock>scissors)
+      { moveA: M.paper, moveB: M.rock }, //   A wins → 2-1
+    ],
+  },
+  {
+    a: 5,
+    b: 8,
+    daysAgo: 10,
+    rounds: [
+      // blanka beats admin 2-0
+      { moveA: M.rock, moveB: M.scissors }, //   A(blanka) wins
+      { moveA: M.paper, moveB: M.rock }, //   A(blanka) wins
+    ],
+  },
+  {
+    a: 8,
+    b: 3,
+    daysAgo: 6,
+    rounds: [
+      // chunli beats admin 2-1
+      { moveA: M.rock, moveB: M.scissors }, //   A(admin) wins
+      { moveA: M.paper, moveB: M.scissors }, //   B wins (scissors>paper)
+      { moveA: M.rock, moveB: M.paper }, //   B wins (paper>rock) → 1-2
+    ],
+  },
+  {
+    a: 2,
+    b: 8,
+    daysAgo: 3,
+    rounds: [
+      // ken beats admin 2-0
+      { moveA: M.paper, moveB: M.rock }, //   A(ken) wins
+      { moveA: M.scissors, moveB: M.paper }, //   A(ken) wins
+    ],
+  },
+  {
+    a: 8,
+    b: 6,
+    daysAgo: 0,
+    rounds: [
+      // admin beats dan 2-0 (today)
+      { moveA: M.rock, moveB: M.scissors },
+      { moveA: M.paper, moveB: M.rock },
+    ],
+  },
+];
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -385,6 +453,17 @@ async function main(): Promise<void> {
       where: { OR: [{ playerAId: { in: ids } }, { playerBId: { in: ids } }] },
     });
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    // Reset admin ELO (admin matches were deleted above since they all involve demo players)
+    const adminUser = await prisma.user.findUnique({
+      where: { email: ADMIN_EMAIL },
+      select: { id: true },
+    });
+    if (adminUser) {
+      await prisma.eloRating.update({
+        where: { userId: adminUser.id },
+        data: { rating: 1000, gamesPlayed: 0 },
+      });
+    }
   }
 
   console.log("Hashing demo password…");
@@ -406,20 +485,35 @@ async function main(): Promise<void> {
     userIds.push(user.id);
   }
 
-  // Live ELO state (updated as matches are processed in chronological order)
-  const ratings = new Array<number>(PLAYERS.length).fill(1000);
-  const games = new Array<number>(PLAYERS.length).fill(0);
+  // Fetch admin — must exist (run admin seed first)
+  const adminUser = await prisma.user.findUnique({
+    where: { email: ADMIN_EMAIL },
+    select: { id: true, eloRating: { select: { rating: true } } },
+  });
+  if (!adminUser) throw new Error(`Admin user not found — run: pnpm --filter @chifoumi/db seed`);
 
-  console.log(`Creating ${MATCHES.length} demo matches…`);
+  // allUserIds[0..7] = demo players, allUserIds[8] = admin
+  const allUserIds = [...userIds, adminUser.id];
+  const allRatings = [
+    ...new Array<number>(PLAYERS.length).fill(1000),
+    adminUser.eloRating?.rating ?? 1000,
+  ];
+  const allGames = new Array<number>(PLAYERS.length + 1).fill(0);
+  const allWins = new Array<number>(PLAYERS.length + 1).fill(0);
+
+  // Sort all matches oldest-first so ELO progresses chronologically
+  const allMatchDefs = [...MATCHES, ...ADMIN_MATCHES].sort((a, b) => b.daysAgo - a.daysAgo);
+  console.log(
+    `Creating ${allMatchDefs.length} matches (${MATCHES.length} demo + ${ADMIN_MATCHES.length} admin)…`,
+  );
   const now = Date.now();
 
-  for (const def of MATCHES) {
-    const playerAId = userIds[def.a];
-    const playerBId = userIds[def.b];
-    const ratingA = ratings[def.a];
-    const ratingB = ratings[def.b];
+  for (const def of allMatchDefs) {
+    const playerAId = allUserIds[def.a];
+    const playerBId = allUserIds[def.b];
+    const ratingA = allRatings[def.a];
+    const ratingB = allRatings[def.b];
 
-    // Score from round results
     let scoreA = 0;
     let scoreB = 0;
     for (const r of def.rounds) {
@@ -487,69 +581,48 @@ async function main(): Promise<void> {
       },
     });
 
-    ratings[def.a] += deltaA;
-    ratings[def.b] += deltaB;
-    games[def.a]++;
-    games[def.b]++;
+    allRatings[def.a] += deltaA;
+    allRatings[def.b] += deltaB;
+    allGames[def.a]++;
+    allGames[def.b]++;
+    if (outcome === "a") allWins[def.a]++;
+    else if (outcome === "b") allWins[def.b]++;
   }
 
   console.log("Flushing ELO ratings…");
   for (let i = 0; i < PLAYERS.length; i++) {
     await prisma.eloRating.update({
-      where: { userId: userIds[i] },
-      data: { rating: ratings[i], gamesPlayed: games[i] },
+      where: { userId: allUserIds[i] },
+      data: { rating: allRatings[i], gamesPlayed: allGames[i] },
     });
   }
+  await prisma.eloRating.update({
+    where: { userId: adminUser.id },
+    data: { rating: allRatings[PLAYERS.length], gamesPlayed: allGames[PLAYERS.length] },
+  });
+
+  const allPlayerNames = [...PLAYERS.map((p) => p.displayName), "admin"];
+  const leaderboard = allPlayerNames
+    .map((name, i) => ({
+      name,
+      rating: allRatings[i],
+      g: allGames[i],
+      w: allWins[i],
+      l: allGames[i] - allWins[i],
+    }))
+    .sort((a, b) => b.rating - a.rating);
 
   console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Demo seed complete
-  Password (all demo accounts): ${DEMO_PASSWORD}
+  Demo password  : ${DEMO_PASSWORD}
+  Admin          : ${ADMIN_EMAIL} (existing password)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Rank  Player            ELO    G  W  L
 `);
-
-  // Print leaderboard sorted by rating desc
-  const entries = PLAYERS.map((p, i) => ({
-    name: p.displayName,
-    email: p.email,
-    rating: ratings[i],
-    g: games[i],
-  }));
-  entries.sort((x, y) => y.rating - x.rating);
-  entries.forEach((e, rank) => {
-    const wins = MATCHES.filter(
-      (m) =>
-        (m.a === PLAYERS.findIndex((p) => p.displayName === e.name) &&
-          ["a"].includes(
-            (() => {
-              let sA = 0,
-                sB = 0;
-              for (const r of m.rounds) {
-                const w = resolveRound(r.moveA, r.moveB);
-                if (w === RoundWinner.a) sA++;
-                else if (w === RoundWinner.b) sB++;
-              }
-              return sA > sB ? "a" : "b";
-            })(),
-          )) ||
-        (m.b === PLAYERS.findIndex((p) => p.displayName === e.name) &&
-          ["b"].includes(
-            (() => {
-              let sA = 0,
-                sB = 0;
-              for (const r of m.rounds) {
-                const w = resolveRound(r.moveA, r.moveB);
-                if (w === RoundWinner.a) sA++;
-                else if (w === RoundWinner.b) sB++;
-              }
-              return sA > sB ? "a" : "b";
-            })(),
-          )),
-    ).length;
-    const losses = e.g - wins;
+  leaderboard.forEach((e, rank) => {
     console.log(
-      `  ${String(rank + 1).padStart(4)}  ${e.name.padEnd(16)}  ${String(e.rating).padStart(4)}   ${e.g}  ${wins}  ${losses}`,
+      `  ${String(rank + 1).padStart(4)}  ${e.name.padEnd(16)}  ${String(e.rating).padStart(4)}   ${e.g}  ${e.w}  ${e.l}`,
     );
   });
   console.log("");
