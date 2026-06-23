@@ -13,6 +13,7 @@ COPY apps/job-runner/package.json apps/job-runner/package.json
 COPY packages/biome/package.json packages/biome/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/elo/package.json packages/elo/package.json
+COPY packages/leagues/package.json packages/leagues/package.json
 COPY packages/proto/package.json packages/proto/package.json
 COPY packages/schemas/package.json packages/schemas/package.json
 COPY packages/tsconfig/package.json packages/tsconfig/package.json
