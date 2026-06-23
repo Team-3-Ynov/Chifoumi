@@ -154,7 +154,7 @@ model EloHistory {
 
 model League {
   id        String @id @default(uuid()) @db.Uuid
-  name      String
+  name      String @unique
   minRating Int    @map("min_rating")
   maxRating Int?   @map("max_rating")
   tier      Int    @unique
@@ -171,9 +171,11 @@ model Season {
   endsAt    DateTime?    @map("ends_at")
   status    SeasonStatus @default(upcoming)
   createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
 
   standings SeasonStanding[]
 
+  @@index([status])
   @@map("seasons")
 }
 
@@ -192,5 +194,6 @@ model SeasonStanding {
 
   @@unique([seasonId, userId])
   @@index([seasonId, rank])
+  @@index([userId])
   @@map("season_standings")
 }

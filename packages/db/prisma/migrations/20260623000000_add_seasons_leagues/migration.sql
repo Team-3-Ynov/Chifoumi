@@ -20,6 +20,7 @@ CREATE TABLE "seasons" (
     "ends_at" TIMESTAMP(3),
     "status" "SeasonStatus" NOT NULL DEFAULT 'upcoming',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "seasons_pkey" PRIMARY KEY ("id")
 );
@@ -38,13 +39,22 @@ CREATE TABLE "season_standings" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "leagues_name_key" ON "leagues"("name");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "leagues_tier_key" ON "leagues"("tier");
+
+-- CreateIndex
+CREATE INDEX "seasons_status_idx" ON "seasons"("status");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "season_standings_season_id_user_id_key" ON "season_standings"("season_id", "user_id");
 
 -- CreateIndex
 CREATE INDEX "season_standings_season_id_rank_idx" ON "season_standings"("season_id", "rank");
+
+-- CreateIndex
+CREATE INDEX "season_standings_user_id_idx" ON "season_standings"("user_id");
 
 -- AddForeignKey
 ALTER TABLE "season_standings" ADD CONSTRAINT "season_standings_season_id_fkey" FOREIGN KEY ("season_id") REFERENCES "seasons"("id") ON DELETE CASCADE ON UPDATE CASCADE;
