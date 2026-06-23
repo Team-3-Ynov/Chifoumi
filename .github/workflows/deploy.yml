@@ -1,0 +1,213 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/team-3-ynov/chifoumi
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api
+            dockerfile: apps/api/Dockerfile
+          - service: game-service
+            dockerfile: apps/game-service/Dockerfile
+          - service: job-runner
+            dockerfile: apps/job-runner/Dockerfile
+          - service: front
+            dockerfile: apps/front/Dockerfile
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Validate deploy configuration
+        env:
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+          GAME_DOMAIN: ${{ vars.GAME_DOMAIN }}
+          FRONT_DOMAIN: ${{ vars.FRONT_DOMAIN }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in DEPLOY_DOMAIN GAME_DOMAIN FRONT_DOMAIN; do
+            value="${!name:-}"
+            if [ -z "${value}" ]; then
+              missing+=("${name}")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Missing required repository variables: ${missing[*]}"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Set short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@b5ca514318bd6e3a484aa35cf641af65989412dd # v3
+
+      - uses: docker/login-action@9780b0c442871a886119961781d9f7322bab0fdd # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service }}
+        if: matrix.service != 'front'
+        uses: docker/build-push-action@ca052bb54abe4789168706a8d8281df627eb0def # v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:sha-${{ env.SHORT_SHA }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Build and push front image
+        if: matrix.service == 'front'
+        uses: docker/build-push-action@ca052bb54abe4789168706a8d8281df627eb0def # v6
+        with:
+          context: .
+          file: apps/front/Dockerfile
+          push: true
+          build-args: |
+            VITE_API_BASE_URL=https://${{ vars.DEPLOY_DOMAIN }}
+            VITE_GAME_SERVICE_URL=https://${{ vars.GAME_DOMAIN }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-front:sha-${{ env.SHORT_SHA }}
+            ${{ env.IMAGE_PREFIX }}-front:latest
+          cache-from: type=gha,scope=front
+          cache-to: type=gha,mode=max,scope=front
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Rolling deploy on VPS
+        uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f # v1.2.2
+        env:
+          IMAGE_TAG: sha-${{ env.SHORT_SHA }}
+          DEPLOY_GIT_SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: IMAGE_TAG,DEPLOY_GIT_SHA
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            if [ ! -d .git ]; then
+              echo "DEPLOY_PATH must be a git clone of the repository"
+              exit 1
+            fi
+
+            env_backup="$(mktemp)"
+            if [ -f .env.prod ]; then
+              cp .env.prod "${env_backup}"
+            fi
+
+            git fetch --prune origin main
+            git reset --hard "${DEPLOY_GIT_SHA}"
+
+            if [ -f "${env_backup}" ]; then
+              cp "${env_backup}" .env.prod
+              rm -f "${env_backup}"
+            fi
+
+            if grep -q '^IMAGE_TAG=' .env.prod 2>/dev/null; then
+              sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" .env.prod
+            else
+              echo "IMAGE_TAG=${IMAGE_TAG}" >> .env.prod
+            fi
+
+            bash scripts/deploy/rolling-update.sh docker-compose.prod.yml
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Post-deploy smoke tests
+        env:
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+          FRONT_DOMAIN: ${{ vars.FRONT_DOMAIN }}
+          SWAGGER_USER: ${{ secrets.SWAGGER_USER }}
+          SWAGGER_PASSWORD: ${{ secrets.SWAGGER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_DOMAIN}" ] || [ -z "${FRONT_DOMAIN}" ]; then
+            echo "DEPLOY_DOMAIN and FRONT_DOMAIN repository variables are required for smoke tests"
+            exit 1
+          fi
+
+          if [ -z "${SWAGGER_USER:-}" ] || [ -z "${SWAGGER_PASSWORD:-}" ]; then
+            echo "SWAGGER_USER and SWAGGER_PASSWORD GitHub secrets are required for smoke tests"
+            exit 1
+          fi
+
+          health_ok=false
+          for attempt in $(seq 1 30); do
+            status_code="$(curl -sS -o /tmp/health.json -w '%{http_code}' "https://${DEPLOY_DOMAIN}/health")"
+            if [ "${status_code}" = "200" ] && jq -e '.status == "ok"' /tmp/health.json >/dev/null; then
+              echo "Health check passed on attempt ${attempt}"
+              health_ok=true
+              break
+            fi
+            echo "Waiting for health endpoint (attempt ${attempt}/30, status=${status_code})"
+            sleep 10
+          done
+
+          if [ "${health_ok}" != "true" ]; then
+            echo "Health smoke test failed"
+            cat /tmp/health.json || true
+            exit 1
+          fi
+
+          docs_status="$(curl -sS -u "${SWAGGER_USER}:${SWAGGER_PASSWORD}" -o /tmp/docs.json -w '%{http_code}' "https://${DEPLOY_DOMAIN}/api/docs-json")"
+          if [ "${docs_status}" != "200" ]; then
+            echo "Swagger docs smoke test failed with status ${docs_status}"
+            exit 1
+          fi
+
+          jq -e '.info.title == "Chifoumi API"' /tmp/docs.json >/dev/null
+
+          front_ok=false
+          for attempt in $(seq 1 30); do
+            front_status="$(curl -sS -o /tmp/front.html -w '%{http_code}' "https://${FRONT_DOMAIN}/")"
+            if [ "${front_status}" = "200" ] && grep -q '<div id="root">' /tmp/front.html; then
+              echo "Front smoke test passed on attempt ${attempt}"
+              front_ok=true
+              break
+            fi
+            echo "Waiting for front endpoint (attempt ${attempt}/30, status=${front_status})"
+            sleep 10
+          done
+
+          if [ "${front_ok}" != "true" ]; then
+            echo "Front smoke test failed for https://${FRONT_DOMAIN}/"
+            head -n 20 /tmp/front.html || true
+            exit 1
+          fi
+
+          echo "Smoke tests passed for https://${DEPLOY_DOMAIN} and https://${FRONT_DOMAIN}"
