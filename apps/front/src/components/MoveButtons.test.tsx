@@ -20,7 +20,7 @@ describe("MoveButtons", () => {
 
     await user.click(screen.getByRole("button", { name: "Feuille" }));
 
-    expect(onPlay).toHaveBeenCalledWith("PAPER");
+    expect(onPlay).toHaveBeenCalledWith("paper");
   });
 
   it("disables buttons after a move is played", async () => {

@@ -59,12 +59,10 @@ x-game-common: &game-common
   <<: *image-game
   environment: &game-env
     NODE_ENV: production
-    DATABASE_URL: ${DATABASE_URL}
     REDIS_URL: ${REDIS_URL}
     GAME_SERVICE_PORT: "3001"
     CORS_ORIGINS: ${CORS_ORIGINS}
     FRONTEND_URL: ${FRONTEND_URL}
-    JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
     BULLMQ_PREFIX: ${BULLMQ_PREFIX:-rps}
   healthcheck:
     test:

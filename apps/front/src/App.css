@@ -380,3 +380,266 @@ a {
     padding: 16px;
   }
 }
+
+.game-shell {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  gap: 20px;
+  padding: 32px 20px;
+  background: linear-gradient(145deg, #eef3fb, #f7f8fa 55%);
+}
+
+.lobby-card,
+.match-card,
+.final-screen,
+.empty-match {
+  width: min(100%, 760px);
+  border: 1px solid #d9dee7;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: clamp(24px, 5vw, 44px);
+  box-shadow: 0 20px 50px rgb(21 23 26 / 10%);
+}
+
+.lobby-card,
+.match-card {
+  display: grid;
+  gap: 28px;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: #1f5fbf;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.supporting-text,
+.player-card,
+.connection-state {
+  color: #5d6675;
+}
+
+.rating-card,
+.resume-warning,
+.queue-status,
+.error-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.rating-card {
+  border: 1px solid #d9dee7;
+  background: #f7f8fa;
+}
+
+.rating-card strong {
+  font-size: 26px;
+}
+
+.resume-warning {
+  border: 1px solid #f5c451;
+  background: #fff8e7;
+}
+
+.queue-status {
+  justify-content: flex-start;
+  border: 1px solid #8db6ee;
+  background: #eef3fb;
+}
+
+.resume-warning p,
+.queue-status p,
+.error-notice p {
+  margin: 4px 0 0;
+}
+
+.search-pulse {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #1f5fbf;
+  animation: game-pulse 1.5s infinite;
+}
+
+@keyframes game-pulse {
+  70% {
+    box-shadow: 0 0 0 10px rgb(31 95 191 / 0%);
+  }
+}
+
+.lobby-actions,
+.match-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.primary-button,
+.secondary-button {
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 16px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.primary-button {
+  background: #1f5fbf;
+  color: #ffffff;
+}
+
+.secondary-button {
+  background: #eef3fb;
+  color: #1f5fbf;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.move-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.error-notice {
+  width: min(100%, 760px);
+  border: 1px solid #ffc7bd;
+  background: #fff3f0;
+  color: #7a271a;
+}
+
+.error-notice button,
+.text-button {
+  border: 0;
+  background: transparent;
+  color: #1f5fbf;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.player-card {
+  display: grid;
+  gap: 4px;
+}
+
+.player-card strong {
+  color: #15171a;
+  font-size: 18px;
+}
+
+.score {
+  display: grid;
+  place-items: center;
+  min-width: 100px;
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: #eef3fb;
+}
+
+.score strong {
+  font-size: 28px;
+}
+
+.round-panel {
+  display: grid;
+  justify-items: center;
+  gap: 20px;
+  border-radius: 12px;
+  padding: 28px;
+  background: #f7f8fa;
+  text-align: center;
+}
+
+.countdown {
+  display: grid;
+  color: #5d6675;
+}
+
+.countdown strong {
+  color: #1f5fbf;
+  font-size: 42px;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-urgent strong,
+.elo-delta.negative {
+  color: #b42318;
+}
+
+.move-buttons {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.move-button {
+  min-height: 64px;
+}
+
+.waiting-message {
+  color: #8a6100;
+  font-weight: 600;
+}
+
+.round-result {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.round-result-win {
+  border-color: #75c9a5;
+  background: #ecfdf3;
+}
+
+.round-result-loss {
+  border-color: #ffc7bd;
+  background: #fff3f0;
+}
+
+.final-screen,
+.empty-match {
+  text-align: center;
+}
+
+.elo-delta {
+  margin-bottom: 24px;
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.elo-delta.positive {
+  color: #067647;
+}
+
+@media (max-width: 640px) {
+  .move-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .rating-card,
+  .resume-warning,
+  .error-notice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

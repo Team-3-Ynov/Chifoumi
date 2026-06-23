@@ -20,7 +20,9 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder
 ARG VITE_API_BASE_URL=http://localhost:3000
+ARG VITE_GAME_SERVICE_URL=http://localhost:3001
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_GAME_SERVICE_URL=$VITE_GAME_SERVICE_URL
 COPY apps ./apps
 COPY packages ./packages
 RUN pnpm --filter @chifoumi/front build

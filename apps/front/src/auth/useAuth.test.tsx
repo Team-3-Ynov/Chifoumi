@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "../queryClient.js";
 import { AuthProvider, useAuth } from "./AuthContext.js";
-import { setStoredRefreshToken } from "./authStorage.js";
+import { getStoredRefreshToken, setStoredRefreshToken } from "./authStorage.js";
 
 function AuthProbe() {
   const { login, logout, isBootstrapping, isAuthenticated, user } = useAuth();
@@ -184,5 +184,30 @@ describe("useAuth", () => {
 
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/auth/refresh"))).toBe(true);
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/me"))).toBe(true);
+  });
+
+  it("clears a revoked refresh token during bootstrap", async () => {
+    setStoredRefreshToken("revoked-refresh");
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAuthProbe();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("authenticated")).toHaveTextContent("false");
+      expect(screen.getByTestId("user")).toHaveTextContent("none");
+    });
+
+    expect(getStoredRefreshToken()).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/auth/refresh"))).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/me"))).toBe(false);
   });
 });

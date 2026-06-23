@@ -43,16 +43,17 @@ git clone https://github.com/Team-3-Ynov/Chifoumi.git /opt/chifoumi
 cd /opt/chifoumi
 cp docs/devops/.env.prod.example .env.prod
 # Edit .env.prod with real secrets and domains
+# First deploy only: set RUN_DB_SEED=true to create the admin user
 chmod +x scripts/deploy/rolling-update.sh
 ```
 
-Log in to GHCR on the VPS once (package read access for the org):
+Log in to GHCR on the VPS **before the first deploy** (required — the CD workflow pushes images but the VPS must authenticate to pull them):
 
 ```bash
 echo "$GITHUB_PAT" | docker login ghcr.io -u USERNAME --password-stdin
 ```
 
-Use a classic PAT with `read:packages` or configure the VPS as a GitHub Actions deploy target only (the CD workflow pushes images; the VPS pulls them).
+Use a classic PAT with `read:packages`. Without this step, `docker compose pull` fails on the VPS even when CI builds succeed.
 
 ## GitHub configuration
 
@@ -74,8 +75,8 @@ Configure under **Settings → Secrets and variables → Actions → Secrets**:
 | `MAIL_USER` | SMTP username |
 | `MAIL_PASSWORD` | SMTP password |
 | `MAIL_FROM` | Sender address |
-| `SWAGGER_USER` | Basic auth user for `/api/docs` in production |
-| `SWAGGER_PASSWORD` | Basic auth password for Swagger (required for smoke test) |
+| `SWAGGER_USER` | Basic auth user for `/api/docs` in production (**required** GitHub secret for smoke tests) |
+| `SWAGGER_PASSWORD` | Basic auth password for Swagger (**required** GitHub secret for smoke tests) |
 
 > Runtime secrets (`DATABASE_URL`, JWT keys, mail, …) are read from `.env.prod` on the VPS. GitHub secrets above are listed in the ticket AC4 for traceability; only deploy-related secrets are consumed directly by the workflow.
 
@@ -83,7 +84,8 @@ Configure under **Settings → Secrets and variables → Actions → Secrets**:
 
 | Variable | Description |
 |---|---|
-| `DEPLOY_DOMAIN` | Public API hostname used by smoke tests (`https://<domain>/health`) |
+| `DEPLOY_DOMAIN` | Public API hostname used by smoke tests (`https://<domain>/health`) and front build (`VITE_API_BASE_URL`) |
+| `GAME_DOMAIN` | Public game WebSocket hostname (`VITE_GAME_SERVICE_URL` baked into the front image at build time) |
 
 ### Workflow permissions
 

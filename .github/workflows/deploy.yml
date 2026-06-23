@@ -61,6 +61,18 @@ jobs:
 
       - name: Build and push front
         if: matrix.service == 'front'
+        env:
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+          GAME_DOMAIN: ${{ vars.GAME_DOMAIN }}
+        run: |
+          if [ -z "${DEPLOY_DOMAIN}" ] || [ -z "${GAME_DOMAIN}" ]; then
+            echo "DEPLOY_DOMAIN and GAME_DOMAIN repository variables are required for front build"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Build and push front image
+        if: matrix.service == 'front'
         uses: docker/build-push-action@ca052bb54abe4789168706a8d8281df627eb0def # v6
         with:
           context: .
@@ -68,6 +80,7 @@ jobs:
           push: true
           build-args: |
             VITE_API_BASE_URL=https://${{ vars.DEPLOY_DOMAIN }}
+            VITE_GAME_SERVICE_URL=https://${{ vars.GAME_DOMAIN }}
           tags: |
             ${{ env.IMAGE_PREFIX }}-front:sha-${{ env.SHORT_SHA }}
             ${{ env.IMAGE_PREFIX }}-front:latest
@@ -79,8 +92,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
       - name: Set short SHA
         run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
@@ -120,6 +131,11 @@ jobs:
             exit 1
           fi
 
+          if [ -z "${SWAGGER_USER:-}" ] || [ -z "${SWAGGER_PASSWORD:-}" ]; then
+            echo "SWAGGER_USER and SWAGGER_PASSWORD GitHub secrets are required for smoke tests"
+            exit 1
+          fi
+
           health_ok=false
           for attempt in $(seq 1 30); do
             status_code="$(curl -sS -o /tmp/health.json -w '%{http_code}' "https://${DEPLOY_DOMAIN}/health")"
@@ -138,12 +154,7 @@ jobs:
             exit 1
           fi
 
-          docs_args=()
-          if [ -n "${SWAGGER_USER:-}" ] && [ -n "${SWAGGER_PASSWORD:-}" ]; then
-            docs_args=(-u "${SWAGGER_USER}:${SWAGGER_PASSWORD}")
-          fi
-
-          docs_status="$(curl -sS "${docs_args[@]}" -o /tmp/docs.json -w '%{http_code}' "https://${DEPLOY_DOMAIN}/api/docs-json")"
+          docs_status="$(curl -sS -u "${SWAGGER_USER}:${SWAGGER_PASSWORD}" -o /tmp/docs.json -w '%{http_code}' "https://${DEPLOY_DOMAIN}/api/docs-json")"
           if [ "${docs_status}" != "200" ]; then
             echo "Swagger docs smoke test failed with status ${docs_status}"
             exit 1

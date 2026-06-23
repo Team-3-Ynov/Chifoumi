@@ -4,6 +4,7 @@ set -euo pipefail
 
 COMPOSE_FILE="${1:-docker-compose.prod.yml}"
 COMPOSE=(docker compose -f "${COMPOSE_FILE}")
+WAIT_TIMEOUT="${ROLLING_WAIT_TIMEOUT:-120}"
 
 if [ ! -f "${COMPOSE_FILE}" ]; then
   echo "Compose file not found: ${COMPOSE_FILE}" >&2
@@ -21,14 +22,13 @@ export IMAGE_TAG="${IMAGE_TAG:-latest}"
 echo "Rolling update with IMAGE_TAG=${IMAGE_TAG}"
 
 ROLLING_SERVICES=(
-  job-runner-match
-  job-runner-misc
   api-1
   api-2
   game-1
   game-2
+  job-runner-match
+  job-runner-misc
   front
-  traefik
 )
 
 "${COMPOSE[@]}" pull
@@ -46,8 +46,7 @@ for service in "${ROLLING_SERVICES[@]}"; do
 
   echo "Updating ${service}"
   "${COMPOSE[@]}" pull "${service}"
-  "${COMPOSE[@]}" up -d --no-deps --remove-orphans "${service}"
-  sleep 5
+  "${COMPOSE[@]}" up -d --no-deps --remove-orphans --wait --wait-timeout "${WAIT_TIMEOUT}" "${service}"
 done
 
 "${COMPOSE[@]}" up -d --remove-orphans

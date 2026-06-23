@@ -25,3 +25,10 @@ Run tests locally:
 ```bash
 pnpm --filter @chifoumi/front test
 ```
+
+## Game client
+
+The lobby and BO3 match screens use `VITE_GAME_SERVICE_URL` (default:
+`http://localhost:3001`) and connect to the `/game` Socket.io namespace. The access token comes
+from `AuthContext` memory and is never persisted by the game client. Only public active-match
+metadata is stored in `sessionStorage` to display the resume action.
