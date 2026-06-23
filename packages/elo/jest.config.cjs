@@ -8,7 +8,17 @@ module.exports = {
   testEnvironment: "node",
   roots: ["<rootDir>/src"],
   testRegex: ".*\\.spec\\.ts$",
-  collectCoverageFrom: ["src/**/*.ts", "!src/**/*.spec.ts", "!src/index.ts"],
+  collectCoverageFrom: [
+    "src/**/*.ts",
+    "!src/**/*.spec.ts",
+    "!src/index.ts", // public re-export barrel
+  ],
+  coveragePathIgnorePatterns: [
+    "/node_modules/",
+    "/dist/",
+    "\\.spec\\.ts$",
+    "index\\.ts$", // public re-export barrel
+  ],
   coverageThreshold: {
     global: {
       branches: 95,

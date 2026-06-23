@@ -3,6 +3,7 @@ import {
   ApiError,
   apiRequest,
   configureApiClient,
+  forgotPassword,
   formatApiError,
   refreshTokens,
 } from "./apiClient.js";
@@ -81,6 +82,21 @@ describe("apiRequest", () => {
 
     await expect(apiRequest("/users/missing/profile")).rejects.toEqual(
       new ApiError("USER_NOT_FOUND", 404),
+    );
+  });
+
+  it("resolves successful empty 200 responses", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(forgotPassword("player@example.com")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/forgot-password"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ email: "player@example.com" }),
+      }),
     );
   });
 });

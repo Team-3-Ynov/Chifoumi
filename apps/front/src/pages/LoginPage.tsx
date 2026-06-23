@@ -12,10 +12,10 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const locationState = location.state as { from?: string; notice?: string } | null;
   const redirectTo =
-    (location.state as { from?: string } | null)?.from && typeof location.state === "object"
-      ? (location.state as { from?: string }).from
-      : "/lobby";
+    locationState?.from && typeof location.state === "object" ? locationState.from : "/lobby";
+  const notice = locationState?.notice ?? null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,6 +45,8 @@ export function LoginPage() {
         <p className="subtitle">
           Pas encore de compte ? <Link to="/register">Créer un compte</Link>
         </p>
+
+        {notice ? <output className="subtitle">{notice}</output> : null}
 
         <form className="form" onSubmit={(event) => void handleSubmit(event)}>
           <label className="field">
@@ -80,6 +82,10 @@ export function LoginPage() {
             {isSubmitting ? "Connexion…" : "Se connecter"}
           </button>
         </form>
+
+        <p className="subtitle">
+          <Link to="/forgot-password">Mot de passe oublié ?</Link>
+        </p>
       </section>
     </div>
   );
