@@ -10,14 +10,17 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
+        // Bootstrap entrypoints
         "src/main.tsx",
         "src/App.tsx",
+        // Basic CRUD / layout pages (covered manually or via e2e)
         "src/pages/LeaderboardPage.tsx",
         "src/pages/ProfilePage.tsx",
         "src/pages/LoginPage.tsx",
         "src/pages/RegisterPage.tsx",
         "src/pages/LobbyPage.tsx",
         "src/pages/MatchPage.tsx",
+        // Presentational shells wired in pages above
         "src/components/AsyncState.tsx",
         "src/components/FinalScreen.tsx",
         "src/components/GameErrorNotice.tsx",
@@ -27,12 +30,14 @@ export default defineConfig({
         "src/components/MatchHeader.tsx",
         "src/components/ProfileHeader.tsx",
         "src/components/ProtectedRoute.tsx",
+        // Data-fetch hooks colocated with CRUD pages
         "src/hooks/useLeaderboard.ts",
         "src/hooks/useMyHistory.ts",
         "src/hooks/useProfile.ts",
         "src/hooks/gameSocketTypes.ts",
         "src/game/GameSocketContext.tsx",
         "src/hooks/useDeadlineCountdown.ts",
+        // Test harness and generated typings
         "src/test/**",
         "src/**/*.test.{ts,tsx}",
         "src/vite-env.d.ts",

@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "pnpm --filter @chifoumi/elo build",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "preintegration": "pnpm --filter @chifoumi/elo build && pnpm --filter @chifoumi/db build",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./jest-e2e.config.cjs --runInBand"
   },

@@ -12,7 +12,7 @@
     "pretypecheck": "pnpm --filter @chifoumi/proto build",
     "pretest": "pnpm --filter @chifoumi/proto build",
     "pretest:e2e": "pnpm --filter @chifoumi/proto build",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./jest-e2e.config.cjs"
   },
   "devDependencies": {

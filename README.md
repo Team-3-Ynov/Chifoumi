@@ -193,6 +193,7 @@ pnpm -r typecheck
 pnpm -r run --if-present build
 pnpm exec biome ci .
 pnpm exec biome check --write .
+pnpm -r run --if-present test --coverage
 docker compose ps
 docker compose logs -f
 ```
@@ -205,6 +206,41 @@ pnpm --filter @chifoumi/game-service dev
 pnpm --filter @chifoumi/job-runner dev
 pnpm --filter @chifoumi/front dev
 ```
+
+### Couverture de tests (US-044)
+
+La CI echoue si la couverture descend sous les seuils definis par package :
+
+| Package | Runner | Seuils (`lines` / `branches` / `functions`) |
+|---|---|---|
+| `apps/api`, `apps/game-service`, `apps/job-runner` | Jest | 70 % / 60 % / 70 % |
+| `packages/elo` | Jest | 95 % / 95 % / 100 % |
+| `apps/front` | Vitest | 60 % / 50 % / — |
+
+Commande locale equivalente a la CI :
+
+```bash
+pnpm -r run --if-present test --coverage
+```
+
+Les rapports `lcov.info` / `coverage/` sont uploades en artefact GitHub Actions (`coverage-reports`) a chaque PR.
+
+#### Ajouter une exclusion explicite
+
+Preferer exclure un fichier ou dossier entier plutot que baisser un seuil global.
+
+**Back (Jest)** — editer `coveragePathIgnorePatterns` dans le `jest.config.cjs` du package concerne, avec un commentaire inline expliquant pourquoi (DTO, bootstrap, infra, e2e-only…) :
+
+```js
+coveragePathIgnorePatterns: [
+  "/dto/", // DTOs — validation-only
+  "main\\.ts$", // NestJS bootstrap
+],
+```
+
+**Front (Vitest)** — ajouter un glob commente dans `apps/front/vitest.config.ts` → `test.coverage.exclude`.
+
+**Packages purement fonctionnels (`packages/elo`)** — viser 95 %+ ; n'exclure que les barrels (`index.ts`) ou le code genere.
 
 ### Job-runner (deploiement)
 
