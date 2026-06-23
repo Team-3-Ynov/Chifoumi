@@ -3,8 +3,10 @@ import {
   ApiError,
   apiRequest,
   configureApiClient,
+  forgotPassword,
   formatApiError,
   refreshTokens,
+  resetPassword,
 } from "./apiClient.js";
 
 describe("formatApiError", () => {
@@ -68,6 +70,14 @@ describe("apiRequest", () => {
     expect(fetchMock.mock.calls[1]?.[1]?.headers?.get("Authorization")).toBe("Bearer fresh-token");
   });
 
+  it("resolves to undefined on an empty 200 OK response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+
+    await expect(
+      apiRequest<void>("/auth/forgot-password", { method: "POST" }),
+    ).resolves.toBeUndefined();
+  });
+
   it("throws ApiError with parsed API error body", async () => {
     vi.stubGlobal(
       "fetch",
@@ -81,6 +91,46 @@ describe("apiRequest", () => {
 
     await expect(apiRequest("/users/missing/profile")).rejects.toEqual(
       new ApiError("USER_NOT_FOUND", 404),
+    );
+  });
+});
+
+describe("forgotPassword", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("posts the email to forgot-password and resolves on an empty 200", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(forgotPassword("player@example.com")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/forgot-password"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ email: "player@example.com" }),
+      }),
+    );
+  });
+});
+
+describe("resetPassword", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("posts the token and new password and resolves on a 204", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(resetPassword("reset-token", "newPassword1234")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/reset-password"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ token: "reset-token", newPassword: "newPassword1234" }),
+      }),
     );
   });
 });
