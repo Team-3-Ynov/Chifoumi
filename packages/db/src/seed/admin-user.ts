@@ -1,5 +1,6 @@
 import { type PrismaClient, UserRole } from "@prisma/client";
 import { getSeedConfig, type SeedConfig } from "./config.js";
+import { seedLeaguesAndActiveSeason } from "./leagues.js";
 import { hashPassword } from "./password.js";
 
 const DEFAULT_ELO_RATING = 1000;
@@ -47,7 +48,8 @@ export async function runSeed(
   prisma: PrismaClient,
   config: SeedConfig = getSeedConfig(),
 ): Promise<void> {
-  // TODO sprint 2: seed leagues reference data
+  await seedLeaguesAndActiveSeason(prisma);
+
   // TODO sprint 4: seed default skins reference data
 
   if (await adminUserExists(prisma, config.adminEmail)) {
