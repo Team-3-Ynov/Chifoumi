@@ -11,6 +11,12 @@ enum UserRole {
   admin
 }
 
+enum SeasonStatus {
+  upcoming
+  active
+  closed
+}
+
 enum MatchStatus {
   in_progress
   ended
@@ -38,13 +44,14 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  eloRating       EloRating?
-  refreshTokens   RefreshToken[]
+  eloRating           EloRating?
+  refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
-  matchesAsPlayerA Match[]      @relation("PlayerA")
-  matchesAsPlayerB Match[]      @relation("PlayerB")
-  matchesWon       Match[]      @relation("Winner")
-  eloHistory       EloHistory[]
+  matchesAsPlayerA    Match[]          @relation("PlayerA")
+  matchesAsPlayerB    Match[]          @relation("PlayerB")
+  matchesWon          Match[]          @relation("Winner")
+  eloHistory          EloHistory[]
+  seasonStandings     SeasonStanding[]
 
   @@map("users")
 }
@@ -143,4 +150,47 @@ model EloHistory {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("elo_history")
+}
+
+model League {
+  id        String @id @default(uuid()) @db.Uuid
+  name      String
+  minRating Int    @map("min_rating")
+  maxRating Int?   @map("max_rating")
+  tier      Int    @unique
+
+  seasonStandings SeasonStanding[]
+
+  @@map("leagues")
+}
+
+model Season {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  startedAt DateTime     @map("started_at")
+  endsAt    DateTime?    @map("ends_at")
+  status    SeasonStatus @default(upcoming)
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  standings SeasonStanding[]
+
+  @@map("seasons")
+}
+
+model SeasonStanding {
+  id                 String  @id @default(uuid()) @db.Uuid
+  seasonId           String  @map("season_id") @db.Uuid
+  userId             String  @map("user_id") @db.Uuid
+  finalRating        Int     @map("final_rating")
+  finalLeagueId      String  @map("final_league_id") @db.Uuid
+  rank               Int
+  rewardsDistributed Boolean @default(false) @map("rewards_distributed")
+
+  season      Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  finalLeague League @relation(fields: [finalLeagueId], references: [id])
+
+  @@unique([seasonId, userId])
+  @@index([seasonId, rank])
+  @@map("season_standings")
 }
