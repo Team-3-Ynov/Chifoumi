@@ -117,7 +117,8 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export async function forgotPassword(email: string): Promise<void> {
