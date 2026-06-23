@@ -299,7 +299,7 @@ describe("Match timeout BullMQ (e2e)", () => {
     }
   });
 
-  it("defaults reveal-phase forfeit to player-b when both players are silent", async () => {
+  it("ends reveal-phase timeout without a winner when both players are silent", async () => {
     const { playerA, playerB, matchId, roundStart } = await pairPlayers();
 
     await matchSessionService.mutateState(matchId, (state) => ({
@@ -337,7 +337,8 @@ describe("Match timeout BullMQ (e2e)", () => {
 
       expect(endedA.reason).toBe("FORFEIT_TIMEOUT");
       expect(endedB.reason).toBe("FORFEIT_TIMEOUT");
-      expect(endedA.winner).toBe("player-b");
+      expect(endedA.winner).toBeNull();
+      expect(endedB.winner).toBeNull();
     } finally {
       await recoveryWorker.close();
       recoveryWorker = null;
