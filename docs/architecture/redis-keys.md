@@ -37,6 +37,7 @@ Ce document centralise les cles, channels et prefixes BullMQ utilises par Chifou
 | `<BULLMQ_PREFIX>:seasons:*` | Structures BullMQ | Selon retention BullMQ | Job Runner | Queue `seasons`, job repeatable `season-reset`; traitements planifies de saisons. |
 | `<BULLMQ_PREFIX>:tournaments:*` | Structures BullMQ | Selon retention BullMQ | Job Runner | Queue reservee aux traitements asynchrones de tournois. |
 | `<BULLMQ_PREFIX>:job-runner:cron-scheduler-lock` | String lock NX | 60 s | Job Runner | Lock de leader election courte pour qu'une seule instance enregistre les jobs cron repeatables. |
+| `<BULLMQ_PREFIX>:lock:season-reset:<seasonId>` | String lock NX | 600 s | Job Runner | Lock distribue par saison pendant le traitement `season-reset`; empeche deux workers d'archiver/reset en parallele. |
 
 ## Notes de synchronisation avec le code
 

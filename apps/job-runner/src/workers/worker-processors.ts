@@ -6,21 +6,21 @@ import {
 } from "../match-events/match-ended.processor.js";
 import type { MailService } from "../notifications/mail.service.js";
 import { createNotificationsProcessor } from "../notifications/notifications.processor.js";
+import {
+  createSeasonResetProcessor,
+  type SeasonResetProcessorDependencies,
+} from "../seasons/season-reset.processor.js";
 
 export type WorkerProcessor = (job: Job) => Promise<void>;
-export type ProcessorDependencies = MatchEventsProcessorDependencies & {
-  mailService: MailService;
-};
+export type ProcessorDependencies = MatchEventsProcessorDependencies &
+  SeasonResetProcessorDependencies & {
+    mailService: MailService;
+  };
 
 const STUB_PROCESSORS: Record<
-  Exclude<WorkerQueueName, "match-events" | "notifications">,
+  Exclude<WorkerQueueName, "match-events" | "notifications" | "seasons">,
   WorkerProcessor
 > = {
-  seasons: async (job) => {
-    if (job.name !== "season-reset") {
-      throw new Error(`Unsupported job name on seasons: ${job.name}`);
-    }
-  },
   tournaments: async (job) => {
     if (job.name !== "generate-bracket") {
       throw new Error(`Unsupported job name on tournaments: ${job.name}`);
@@ -38,6 +38,10 @@ export function getProcessorForQueue(
 
   if (queue === "notifications") {
     return createNotificationsProcessor(deps.mailService);
+  }
+
+  if (queue === "seasons") {
+    return createSeasonResetProcessor(deps);
   }
 
   return STUB_PROCESSORS[queue];
