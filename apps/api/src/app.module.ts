@@ -15,6 +15,7 @@ import { PrismaModule } from "./prisma/prisma.module.js";
 import { QueuesModule } from "./queues/queues.module.js";
 import { RedisModule } from "./redis/redis.module.js";
 import { SeasonsModule } from "./seasons/seasons.module.js";
+import { TournamentsModule } from "./tournaments/tournaments.module.js";
 import { UsersModule } from "./users/users.module.js";
 
 @Module({
@@ -48,6 +49,7 @@ import { UsersModule } from "./users/users.module.js";
     MatchesModule,
     MetricsModule,
     SeasonsModule,
+    TournamentsModule,
     JwksModule,
     GrpcModule,
   ],
