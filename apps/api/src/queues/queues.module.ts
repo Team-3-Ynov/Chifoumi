@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { loadQueueConfig, QUEUE_CONFIG } from "../config/queue.config.js";
 import { NotificationsQueueService } from "./notifications-queue.service.js";
 import { SeasonsQueueService } from "./seasons-queue.service.js";
+import { TournamentsQueueService } from "./tournaments-queue.service.js";
 
 @Global()
 @Module({
@@ -12,7 +13,8 @@ import { SeasonsQueueService } from "./seasons-queue.service.js";
     },
     NotificationsQueueService,
     SeasonsQueueService,
+    TournamentsQueueService,
   ],
-  exports: [NotificationsQueueService, SeasonsQueueService],
+  exports: [NotificationsQueueService, SeasonsQueueService, TournamentsQueueService],
 })
 export class QueuesModule {}
