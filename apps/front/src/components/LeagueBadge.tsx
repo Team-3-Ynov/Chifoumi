@@ -12,12 +12,17 @@ const TIER_LABELS: Record<number, string> = {
 
 export function LeagueBadge({ name, tier }: LeagueBadgeProps) {
   const tierLabel = TIER_LABELS[tier] ?? `palier ${tier}`;
+  const visualTier = tier >= 1 && tier <= 4 ? String(tier) : "default";
 
   return (
-    <span className={`league-badge league-badge-tier-${tier}`} data-tier={tier}>
+    <span
+      className={`league-badge league-badge-tier-${visualTier}`}
+      data-tier={tier}
+      role="img"
+      aria-label={`Ligue ${name}, ${tierLabel}`}
+    >
       <span className="league-badge-mark" aria-hidden="true" />
-      <span>{name}</span>
-      <span className="sr-only">, {tierLabel}</span>
+      <span aria-hidden="true">{name}</span>
     </span>
   );
 }

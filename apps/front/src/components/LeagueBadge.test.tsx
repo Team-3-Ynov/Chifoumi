@@ -13,11 +13,19 @@ describe("LeagueBadge", () => {
   it.each(tiers)("renders the $name tier indicator", ({ name, tier }) => {
     render(<LeagueBadge name={name} tier={tier} />);
 
-    const badge = screen.getByText(name).closest(".league-badge");
+    const badge = screen.getByRole("img", { name: `Ligue ${name}, palier ${name}` });
 
     expect(screen.getByText(name)).toBeInTheDocument();
-    expect(screen.getByText(`, palier ${name}`)).toBeInTheDocument();
     expect(badge).toHaveClass(`league-badge-tier-${tier}`);
     expect(badge).toHaveAttribute("data-tier", String(tier));
+  });
+
+  it("uses the default visual style for unknown tiers", () => {
+    render(<LeagueBadge name="Legend" tier={5} />);
+
+    const badge = screen.getByRole("img", { name: "Ligue Legend, palier 5" });
+
+    expect(badge).toHaveClass("league-badge-tier-default");
+    expect(badge).toHaveAttribute("data-tier", "5");
   });
 });

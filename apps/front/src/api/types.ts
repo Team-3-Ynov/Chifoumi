@@ -24,6 +24,26 @@ export type LeagueSummary = {
   tier: number;
 };
 
+export type CurrentSeason = {
+  id: string;
+  name: string;
+  startedAt: string;
+  endsAt: string | null;
+  status: "upcoming" | "active" | "closed";
+};
+
+export type CurrentSeasonMe = {
+  rating: number;
+  league: LeagueSummary;
+  rank: number;
+  progressToNextLeague: number;
+};
+
+export type CurrentSeasonResponse = {
+  season: CurrentSeason;
+  me: CurrentSeasonMe;
+};
+
 export type MeProfile = {
   id: string;
   email: string;
