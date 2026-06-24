@@ -28,12 +28,14 @@ describe("SeasonsService", () => {
   let prisma: {
     season: {
       create: ReturnType<typeof jest.fn>;
+      findMany: ReturnType<typeof jest.fn>;
       findFirst: ReturnType<typeof jest.fn>;
       findUnique: ReturnType<typeof jest.fn>;
       updateMany: ReturnType<typeof jest.fn>;
     };
     eloRating: { findUnique: ReturnType<typeof jest.fn>; count: ReturnType<typeof jest.fn> };
     league: { findMany: ReturnType<typeof jest.fn> };
+    seasonStanding: { findMany: ReturnType<typeof jest.fn>; count: ReturnType<typeof jest.fn> };
   };
   let enqueueSeasonReset: ReturnType<typeof jest.fn>;
 
@@ -41,12 +43,14 @@ describe("SeasonsService", () => {
     prisma = {
       season: {
         create: jest.fn(),
+        findMany: jest.fn(),
         findFirst: jest.fn(),
         findUnique: jest.fn(),
         updateMany: jest.fn(),
       },
       eloRating: { findUnique: jest.fn(), count: jest.fn() },
       league: { findMany: jest.fn() },
+      seasonStanding: { findMany: jest.fn(), count: jest.fn() },
     };
     prisma.league.findMany.mockResolvedValue(DB_LEAGUES);
     enqueueSeasonReset = jest.fn();
@@ -113,6 +117,146 @@ describe("SeasonsService", () => {
         response: { code: "NO_ACTIVE_SEASON" },
       });
       expect(prisma.eloRating.count).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getStandings", () => {
+    it("returns paginated archived standings ordered by rank", async () => {
+      prisma.season.findUnique.mockResolvedValue({
+        id: "season-closed",
+        name: "Saison 0",
+        status: SeasonStatus.closed,
+      });
+      prisma.seasonStanding.findMany.mockResolvedValue([
+        {
+          rank: 1,
+          finalRating: 1400,
+          user: { id: "player-1", displayName: "alice" },
+          finalLeague: { name: "Platinum", tier: 4 },
+        },
+      ]);
+      prisma.seasonStanding.count.mockResolvedValue(12);
+
+      const result = await service.getStandings("season-closed", { page: 2, limit: 5 });
+
+      expect(prisma.seasonStanding.findMany).toHaveBeenCalledWith({
+        where: { seasonId: "season-closed" },
+        orderBy: { rank: "asc" },
+        skip: 5,
+        take: 5,
+        include: {
+          user: { select: { id: true, displayName: true } },
+          finalLeague: { select: { name: true, tier: true } },
+        },
+      });
+      expect(prisma.seasonStanding.count).toHaveBeenCalledWith({
+        where: { seasonId: "season-closed" },
+      });
+      expect(result).toEqual({
+        season: { id: "season-closed", name: "Saison 0", status: SeasonStatus.closed },
+        items: [
+          {
+            rank: 1,
+            userId: "player-1",
+            displayName: "alice",
+            finalRating: 1400,
+            finalLeague: { name: "Platinum", tier: 4 },
+          },
+        ],
+        total: 12,
+        page: 2,
+        limit: 5,
+      });
+    });
+
+    it("filters archived standings by final league", async () => {
+      prisma.season.findUnique.mockResolvedValue({
+        id: "season-closed",
+        name: "Saison 0",
+        status: SeasonStatus.closed,
+      });
+      prisma.seasonStanding.findMany.mockResolvedValue([]);
+      prisma.seasonStanding.count.mockResolvedValue(0);
+
+      await service.getStandings("season-closed", { page: 1, limit: 50, league: "gold" });
+
+      expect(prisma.seasonStanding.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { seasonId: "season-closed", finalLeague: { name: "Gold" } },
+        }),
+      );
+      expect(prisma.seasonStanding.count).toHaveBeenCalledWith({
+        where: { seasonId: "season-closed", finalLeague: { name: "Gold" } },
+      });
+    });
+
+    it("throws 400 UNKNOWN_LEAGUE when the league filter is invalid", async () => {
+      prisma.season.findUnique.mockResolvedValue({
+        id: "season-closed",
+        name: "Saison 0",
+        status: SeasonStatus.closed,
+      });
+
+      await expect(
+        service.getStandings("season-closed", { page: 1, limit: 50, league: "diamond" }),
+      ).rejects.toMatchObject({
+        response: { code: "UNKNOWN_LEAGUE" },
+      });
+      expect(prisma.seasonStanding.findMany).not.toHaveBeenCalled();
+    });
+
+    it("throws 409 SEASON_NOT_CLOSED when standings are requested for an active season", async () => {
+      prisma.season.findUnique.mockResolvedValue({
+        id: "season-active",
+        name: "Saison courante",
+        status: SeasonStatus.active,
+      });
+
+      await expect(
+        service.getStandings("season-active", { page: 1, limit: 50 }),
+      ).rejects.toMatchObject({
+        response: { error: "SEASON_NOT_CLOSED" },
+      });
+      await expect(
+        service.getStandings("season-active", { page: 1, limit: 50 }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.seasonStanding.findMany).not.toHaveBeenCalled();
+    });
+
+    it("throws 404 SEASON_NOT_FOUND when the season does not exist", async () => {
+      prisma.season.findUnique.mockResolvedValue(null);
+
+      await expect(service.getStandings("missing", { page: 1, limit: 50 })).rejects.toMatchObject({
+        response: { error: "SEASON_NOT_FOUND" },
+      });
+      expect(prisma.seasonStanding.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("listClosed", () => {
+    it("returns recent closed seasons ordered by end date", async () => {
+      const closedSeason = {
+        id: "season-closed",
+        name: "Saison 0",
+        startedAt: new Date("2026-05-01T00:00:00.000Z"),
+        endsAt: new Date("2026-06-01T00:00:00.000Z"),
+        status: SeasonStatus.closed,
+      };
+      prisma.season.findMany.mockResolvedValue([closedSeason]);
+
+      await expect(service.listClosed()).resolves.toEqual({ items: [closedSeason] });
+      expect(prisma.season.findMany).toHaveBeenCalledWith({
+        where: { status: SeasonStatus.closed },
+        orderBy: { endsAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          startedAt: true,
+          endsAt: true,
+          status: true,
+        },
+      });
     });
   });
 
