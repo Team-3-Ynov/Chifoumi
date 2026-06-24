@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { LeaderboardEntry } from "../api/types.js";
+import { LeagueBadge } from "./LeagueBadge.js";
 
 type LeaderboardTableProps = {
   items: LeaderboardEntry[];
@@ -28,7 +29,9 @@ export function LeaderboardTable({ items }: LeaderboardTableProps) {
                 </Link>
               </td>
               <td>{entry.rating}</td>
-              <td>{entry.league.name}</td>
+              <td>
+                <LeagueBadge name={entry.league.name} tier={entry.league.tier} />
+              </td>
               <td>{entry.gamesPlayed}</td>
             </tr>
           ))}

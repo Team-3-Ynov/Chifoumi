@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-notification-templates.mjs",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretest": "pnpm --filter @chifoumi/elo build",
+    "pretest": "pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/elo build && pnpm --filter @chifoumi/leagues build",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "preintegration": "pnpm --filter @chifoumi/elo build && pnpm --filter @chifoumi/db build",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./jest-e2e.config.cjs --runInBand"
@@ -27,6 +27,7 @@
   "dependencies": {
     "@chifoumi/db": "workspace:*",
     "@chifoumi/elo": "workspace:*",
+    "@chifoumi/leagues": "workspace:*",
     "@nestjs/common": "^11.1.21",
     "@nestjs/core": "^11.1.21",
     "@nestjs/platform-express": "^11.1.21",

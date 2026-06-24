@@ -12,6 +12,7 @@ export type RenderedMail = {
 const TEMPLATE_SUBJECTS: Record<string, string> = {
   welcome: "Bienvenue sur Chifoumi",
   "reset-password": "Réinitialisation de votre mot de passe Chifoumi",
+  "season-reward": "Fin de saison Chifoumi — tes résultats",
 };
 
 @Injectable()

@@ -8,8 +8,11 @@ import { MailService } from "./notifications/mail.service.js";
 import { TemplateService } from "./notifications/template.service.js";
 import { MatchPersistenceService } from "./persistence/match-persistence.service.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
+import { NotificationsQueueService } from "./queues/notifications-queue.service.js";
 import { RedisInvalidationService } from "./redis/redis-invalidation.service.js";
 import { RunnerService } from "./runner.service.js";
+import { SeasonResetService } from "./seasons/season-reset.service.js";
+import { SeasonResetLockService } from "./seasons/season-reset-lock.service.js";
 import { WorkerFactory } from "./workers/worker-factory.js";
 
 @Module({
@@ -29,6 +32,9 @@ import { WorkerFactory } from "./workers/worker-factory.js";
     MailService,
     MatchPersistenceService,
     RedisInvalidationService,
+    NotificationsQueueService,
+    SeasonResetLockService,
+    SeasonResetService,
     WorkerFactory,
     CronSchedulerService,
     RunnerService,

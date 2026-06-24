@@ -226,6 +226,41 @@ a {
   font: inherit;
 }
 
+.field select {
+  padding: 10px 12px;
+  border: 1px solid #d9dee7;
+  border-radius: 6px;
+  font: inherit;
+  background: #ffffff;
+}
+
+.leaderboard-filter {
+  max-width: 260px;
+  margin-bottom: 20px;
+}
+
+.season-archive {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #e7ebf2;
+}
+
+.archive-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.archive-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .form-error {
   margin: 0;
   color: #b42318;

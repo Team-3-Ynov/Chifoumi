@@ -78,6 +78,40 @@ export type LeaderboardResponse = {
   items: LeaderboardEntry[];
 };
 
+export type SeasonStandingsSeason = {
+  id: string;
+  name: string;
+  status: "upcoming" | "active" | "closed";
+};
+
+export type SeasonStandingEntry = {
+  rank: number;
+  userId: string;
+  displayName: string;
+  finalRating: number;
+  finalLeague: LeagueSummary;
+};
+
+export type SeasonStandingsResponse = {
+  season: SeasonStandingsSeason;
+  items: SeasonStandingEntry[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export type ClosedSeasonSummary = {
+  id: string;
+  name: string;
+  startedAt: string;
+  endsAt: string | null;
+  status: "closed";
+};
+
+export type ClosedSeasonsResponse = {
+  items: ClosedSeasonSummary[];
+};
+
 export type MeHistoryOpponent = {
   displayName: string;
   ratingAtMatch: number;

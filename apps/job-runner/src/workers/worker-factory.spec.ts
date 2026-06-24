@@ -10,6 +10,7 @@ class MockUnrecoverableError extends Error {}
 jest.unstable_mockModule("bullmq", () => ({
   UnrecoverableError: MockUnrecoverableError,
   Worker: workerCtor,
+  Queue: jest.fn(),
 }));
 
 const { WorkerFactory: WorkerFactoryClass } = await import("./worker-factory.js");
@@ -43,6 +44,12 @@ function createRedisInvalidation(): { invalidateLeaderboard: () => Promise<void>
   };
 }
 
+function createSeasonReset(): { processSeasonReset: () => Promise<"noop"> } {
+  return {
+    processSeasonReset: jest.fn(async (): Promise<"noop"> => "noop"),
+  };
+}
+
 function createMailService(): { send: () => Promise<void> } {
   return {
     send: jest.fn(async () => undefined),
@@ -67,6 +74,7 @@ describe("WorkerFactory", () => {
       metrics,
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
+      createSeasonReset() as never,
       createMailService() as never,
       logger,
     );
@@ -111,6 +119,7 @@ describe("WorkerFactory", () => {
       metrics,
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
+      createSeasonReset() as never,
       createMailService() as never,
       { log: jest.fn(), error: jest.fn() } as unknown as Logger,
     );
@@ -154,6 +163,7 @@ describe("WorkerFactory", () => {
       metrics,
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
+      createSeasonReset() as never,
       createMailService() as never,
       logger,
     );
