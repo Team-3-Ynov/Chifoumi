@@ -3,14 +3,14 @@ import { BracketError } from "./bracket-error.js";
 import { computeBracketSize } from "./compute-bracket-size.js";
 import { generateFirstRound } from "./generate-first-round.js";
 import { seedPlayers } from "./seed-players.js";
-import type { Player, SeededPlayer } from "./types.js";
+import type { Player, PlayerId, SeededPlayer } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function makePlayers(ratings: number[]): Player[] {
-  return ratings.map((rating, i) => ({ id: `p${i + 1}`, rating }));
+  return ratings.map((rating, i) => ({ id: `p${i + 1}` as PlayerId, rating }));
 }
 
 // ---------------------------------------------------------------------------
@@ -66,6 +66,22 @@ describe("computeBracketSize", () => {
   it("returns 32 for count 17", () => {
     expect(computeBracketSize(17)).toBe(32);
   });
+
+  it("returns 1024 for count 1024 (maximum supported bracket size)", () => {
+    expect(computeBracketSize(1024)).toBe(1024);
+  });
+
+  it("throws BracketError for count exceeding MAX_BRACKET_SIZE (1025)", () => {
+    expect(() => computeBracketSize(1025)).toThrow(BracketError);
+    const err = (() => {
+      try {
+        computeBracketSize(1025);
+      } catch (e) {
+        return e;
+      }
+    })() as BracketError;
+    expect(err.code).toBe("INVALID_BRACKET_SIZE");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -86,7 +102,7 @@ describe("seedPlayers", () => {
   });
 
   it("throws BracketError for 1 player", () => {
-    expect(() => seedPlayers([{ id: "p1", rating: 1000 }])).toThrow(BracketError);
+    expect(() => seedPlayers([{ id: "p1" as PlayerId, rating: 1000 }])).toThrow(BracketError);
   });
 
   it("assigns seed 1 to the highest-rated player", () => {
@@ -110,8 +126,8 @@ describe("seedPlayers", () => {
 
   it("preserves original player id and rating on seeded objects", () => {
     const players: Player[] = [
-      { id: "alice", rating: 1500 },
-      { id: "bob", rating: 1200 },
+      { id: "alice" as PlayerId, rating: 1500 },
+      { id: "bob" as PlayerId, rating: 1200 },
     ];
     const seeded = seedPlayers(players);
     expect(seeded[0]).toMatchObject({ id: "alice", rating: 1500, seed: 1 });
@@ -144,8 +160,8 @@ describe("seedPlayers", () => {
 
   it("handles players with identical ratings (stable output, seeds still sequential)", () => {
     const players: Player[] = [
-      { id: "a", rating: 1000 },
-      { id: "b", rating: 1000 },
+      { id: "a" as PlayerId, rating: 1000 },
+      { id: "b" as PlayerId, rating: 1000 },
     ];
     const seeded = seedPlayers(players);
     expect(seeded.map((p) => p.seed)).toEqual([1, 2]);
@@ -182,6 +198,31 @@ describe("generateFirstRound", () => {
   it("throws BracketError when bracketSize is 0", () => {
     const seeded = makeSeeded([1500, 1200]);
     expect(() => generateFirstRound(seeded, 0)).toThrow(BracketError);
+  });
+
+  it("throws BracketError when 0 players are provided", () => {
+    expect(() => generateFirstRound([], 2)).toThrow(BracketError);
+    const err = (() => {
+      try {
+        generateFirstRound([], 2);
+      } catch (e) {
+        return e;
+      }
+    })() as BracketError;
+    expect(err.code).toBe("INSUFFICIENT_PLAYERS");
+  });
+
+  it("throws BracketError when 1 player is provided", () => {
+    const single: SeededPlayer[] = [{ id: "p1" as PlayerId, seed: 1, rating: 1500 }];
+    expect(() => generateFirstRound(single, 2)).toThrow(BracketError);
+    const err = (() => {
+      try {
+        generateFirstRound(single, 2);
+      } catch (e) {
+        return e;
+      }
+    })() as BracketError;
+    expect(err.code).toBe("INSUFFICIENT_PLAYERS");
   });
 
   it("throws BracketError when players exceed bracketSize", () => {
