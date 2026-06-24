@@ -35,6 +35,23 @@ enum RoundWinner {
   draw
 }
 
+enum TournamentFormat {
+  single_elim
+  double_elim
+}
+
+enum TournamentStatus {
+  upcoming
+  registration_open
+  in_progress
+  completed
+}
+
+enum WinnerSlot {
+  a
+  b
+}
+
 model User {
   id           String     @id @default(uuid()) @db.Uuid
   email        String     @unique
@@ -47,11 +64,15 @@ model User {
   eloRating           EloRating?
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
-  matchesAsPlayerA    Match[]          @relation("PlayerA")
-  matchesAsPlayerB    Match[]          @relation("PlayerB")
-  matchesWon          Match[]          @relation("Winner")
+  matchesAsPlayerA    Match[]                  @relation("PlayerA")
+  matchesAsPlayerB    Match[]                  @relation("PlayerB")
+  matchesWon          Match[]                  @relation("Winner")
   eloHistory          EloHistory[]
   seasonStandings     SeasonStanding[]
+  tournamentsWon      Tournament[]             @relation("TournamentWinner")
+  tournamentRegistrations TournamentRegistration[]
+  tournamentSlotA     TournamentMatch[]        @relation("SlotA")
+  tournamentSlotB     TournamentMatch[]        @relation("SlotB")
 
   @@map("users")
 }
@@ -111,6 +132,7 @@ model Match {
   winner     User?        @relation("Winner", fields: [winnerId], references: [id])
   rounds     Round[]
   eloHistory EloHistory[]
+  tournamentMatch TournamentMatch?
 
   @@index([playerAId, endedAt(sort: Desc)])
   @@index([playerBId, endedAt(sort: Desc)])
@@ -196,4 +218,55 @@ model SeasonStanding {
   @@index([seasonId, rank])
   @@index([userId])
   @@map("season_standings")
+}
+
+model Tournament {
+  id                   String           @id @default(uuid()) @db.Uuid
+  name                 String
+  format               TournamentFormat
+  bracketSize          Int              @map("bracket_size")
+  registrationOpensAt  DateTime         @map("registration_opens_at")
+  startsAt             DateTime         @map("starts_at")
+  status               TournamentStatus @default(upcoming)
+  winnerId             String?          @map("winner_id") @db.Uuid
+
+  winner        User?                    @relation("TournamentWinner", fields: [winnerId], references: [id])
+  registrations TournamentRegistration[]
+  matches       TournamentMatch[]
+
+  @@map("tournaments")
+}
+
+model TournamentRegistration {
+  tournamentId String   @map("tournament_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  seed         Int?
+  registeredAt DateTime @default(now()) @map("registered_at")
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@map("tournament_registrations")
+}
+
+model TournamentMatch {
+  id           String     @id @default(uuid()) @db.Uuid
+  tournamentId String     @map("tournament_id") @db.Uuid
+  round        Int
+  matchId      String?    @unique @map("match_id") @db.Uuid
+  slotAId      String?    @map("slot_a_id") @db.Uuid
+  slotBId      String?    @map("slot_b_id") @db.Uuid
+  nextMatchId  String?    @map("next_match_id") @db.Uuid
+  winnerSlot   WinnerSlot? @map("winner_slot")
+
+  tournament Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  match      Match?        @relation(fields: [matchId], references: [id])
+  slotA      User?         @relation("SlotA", fields: [slotAId], references: [id])
+  slotB      User?         @relation("SlotB", fields: [slotBId], references: [id])
+  nextMatch  TournamentMatch?  @relation("BracketChain", fields: [nextMatchId], references: [id])
+  prevMatches TournamentMatch[] @relation("BracketChain")
+
+  @@index([tournamentId, round])
+  @@map("tournament_matches")
 }
