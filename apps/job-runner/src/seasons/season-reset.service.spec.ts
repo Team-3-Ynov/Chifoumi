@@ -81,7 +81,7 @@ describe("SeasonResetService", () => {
     };
 
     const seasonResetLock = {
-      acquire: jest.fn(async () => true),
+      acquire: jest.fn(async () => "lock-token"),
       release: jest.fn(async () => undefined),
     };
     const notificationsQueue = {
@@ -116,7 +116,7 @@ describe("SeasonResetService", () => {
       data: { rating: softResetRating(1200), gamesPlayed: 0 },
     });
     expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledTimes(2);
-    expect(seasonResetLock.release).toHaveBeenCalledWith(seasonId);
+    expect(seasonResetLock.release).toHaveBeenCalledWith(seasonId, "lock-token");
   });
 
   it("is idempotent when standings already exist", async () => {
@@ -144,7 +144,7 @@ describe("SeasonResetService", () => {
     const service = createService({
       prisma,
       seasonResetLock: {
-        acquire: jest.fn(async () => true),
+        acquire: jest.fn(async () => "lock-token"),
         release: jest.fn(async () => undefined),
       },
       notificationsQueue: {
@@ -157,6 +157,72 @@ describe("SeasonResetService", () => {
     expect(result).toBe("already_processed");
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.eloRating.update).not.toHaveBeenCalled();
+  });
+
+  it("resumes pending rewards for cron retries after standings were archived", async () => {
+    const closedSeason = {
+      id: seasonId,
+      name: "Season 1",
+      status: SeasonStatus.closed,
+    };
+    const prisma = {
+      season: {
+        findFirst: jest.fn(async (args: { where: unknown }) =>
+          "OR" in (args.where as { OR?: unknown }) ? closedSeason : null,
+        ),
+        count: jest.fn(async () => 0),
+        findUnique: jest.fn(async () => closedSeason),
+      },
+      seasonStanding: {
+        count: jest.fn(async () => 2),
+        findMany: jest.fn(async () => [
+          {
+            id: "standing-a",
+            rank: 1,
+            rewardsDistributed: false,
+            user: { email: "alice@test.com", displayName: "alice" },
+            finalLeague: { name: "Gold" },
+          },
+        ]),
+        update: jest.fn(async () => ({})),
+      },
+      league: { findMany: jest.fn() },
+      eloRating: { findMany: jest.fn(), update: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    const notificationsQueue = {
+      enqueueSeasonRewardMail: jest.fn(async () => undefined),
+    };
+
+    const result = await createService({
+      prisma,
+      seasonResetLock: {
+        acquire: jest.fn(async () => "lock-token"),
+        release: jest.fn(async () => undefined),
+      },
+      notificationsQueue,
+    }).processSeasonReset({ source: "cron-scheduler" });
+
+    expect(result).toBe("already_processed");
+    expect(prisma.season.findFirst).toHaveBeenCalledWith({
+      where: {
+        status: SeasonStatus.closed,
+        OR: [{ standings: { none: {} } }, { standings: { some: { rewardsDistributed: false } } }],
+      },
+      orderBy: { updatedAt: "asc" },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledWith({
+      to: "alice@test.com",
+      displayName: "alice",
+      seasonName: "Season 1",
+      rank: "1",
+      leagueName: "Gold",
+    });
+    expect(prisma.seasonStanding.update).toHaveBeenCalledWith({
+      where: { id: "standing-a" },
+      data: { rewardsDistributed: true },
+    });
   });
 
   it("returns noop when cron finds no eligible season", async () => {
@@ -193,7 +259,7 @@ describe("SeasonResetService", () => {
         },
       },
       seasonResetLock: {
-        acquire: jest.fn(async () => false),
+        acquire: jest.fn(async () => null),
         release: jest.fn(),
       },
       notificationsQueue: {

@@ -27,8 +27,8 @@ export class SeasonResetService {
       throw new UnrecoverableError(`Season ${season.id} is not closed`);
     }
 
-    const lockAcquired = await this.seasonResetLock.acquire(season.id);
-    if (!lockAcquired) {
+    const lockToken = await this.seasonResetLock.acquire(season.id);
+    if (!lockToken) {
       throw new Error(`Season reset lock not acquired for ${season.id}`);
     }
 
@@ -48,7 +48,7 @@ export class SeasonResetService {
       await this.enqueuePendingRewardMails(season.id);
       return "processed";
     } finally {
-      await this.seasonResetLock.release(season.id);
+      await this.seasonResetLock.release(season.id, lockToken);
     }
   }
 
@@ -60,7 +60,7 @@ export class SeasonResetService {
     const closedPendingReset = await this.prisma.season.findFirst({
       where: {
         status: SeasonStatus.closed,
-        standings: { none: {} },
+        OR: [{ standings: { none: {} } }, { standings: { some: { rewardsDistributed: false } } }],
       },
       orderBy: { updatedAt: "asc" },
     });

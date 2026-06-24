@@ -16,7 +16,7 @@ describe("SeasonResetLockService", () => {
   it("acquires and releases the distributed lock", async () => {
     const redis = {
       set: jest.fn(async () => "OK"),
-      del: jest.fn(async () => 1),
+      eval: jest.fn(async () => 1),
       quit: jest.fn(async () => "OK"),
     };
     const service = new SeasonResetLockService({
@@ -26,16 +26,37 @@ describe("SeasonResetLockService", () => {
     } as never);
     (service as never as { redis: typeof redis }).redis = redis;
 
-    await expect(service.acquire("season-id")).resolves.toBe(true);
-    await service.release("season-id");
+    const token = await service.acquire("season-id");
+    expect(token).toEqual(expect.stringMatching(/^cron:/));
+
+    await service.release("season-id", token ?? "missing-token");
 
     expect(redis.set).toHaveBeenCalledWith(
       "rps:lock:season-reset:season-id",
-      "cron",
+      token,
       "EX",
       600,
       "NX",
     );
-    expect(redis.del).toHaveBeenCalledWith("rps:lock:season-reset:season-id");
+    expect(redis.eval).toHaveBeenCalledWith(
+      expect.stringContaining('redis.call("GET", KEYS[1]) == ARGV[1]'),
+      1,
+      "rps:lock:season-reset:season-id",
+      token,
+    );
+  });
+
+  it("returns null when the distributed lock is already held", async () => {
+    const redis = {
+      set: jest.fn(async () => null),
+    };
+    const service = new SeasonResetLockService({
+      BULLMQ_PREFIX: "rps",
+      WORKER_ROLE: "cron",
+      REDIS_URL: "redis://localhost:6379",
+    } as never);
+    (service as never as { redis: typeof redis }).redis = redis;
+
+    await expect(service.acquire("season-id")).resolves.toBeNull();
   });
 });
