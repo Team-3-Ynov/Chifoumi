@@ -224,11 +224,15 @@ model Tournament {
   id                   String           @id @default(uuid()) @db.Uuid
   name                 String
   format               TournamentFormat
+  // must be a power of 2 (8, 16, 32, 64); enforced at the application layer
   bracketSize          Int              @map("bracket_size")
   registrationOpensAt  DateTime         @map("registration_opens_at")
   startsAt             DateTime         @map("starts_at")
+  endedAt              DateTime?        @map("ended_at")
   status               TournamentStatus @default(upcoming)
   winnerId             String?          @map("winner_id") @db.Uuid
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
 
   winner        User?                    @relation("TournamentWinner", fields: [winnerId], references: [id])
   registrations TournamentRegistration[]
@@ -247,6 +251,7 @@ model TournamentRegistration {
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([tournamentId, userId])
+  @@index([userId])
   @@map("tournament_registrations")
 }
 
@@ -260,13 +265,14 @@ model TournamentMatch {
   nextMatchId  String?    @map("next_match_id") @db.Uuid
   winnerSlot   WinnerSlot? @map("winner_slot")
 
-  tournament Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  match      Match?        @relation(fields: [matchId], references: [id])
-  slotA      User?         @relation("SlotA", fields: [slotAId], references: [id])
-  slotB      User?         @relation("SlotB", fields: [slotBId], references: [id])
-  nextMatch  TournamentMatch?  @relation("BracketChain", fields: [nextMatchId], references: [id])
+  tournament  Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  match       Match?            @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  slotA       User?             @relation("SlotA", fields: [slotAId], references: [id], onDelete: SetNull)
+  slotB       User?             @relation("SlotB", fields: [slotBId], references: [id], onDelete: SetNull)
+  nextMatch   TournamentMatch?  @relation("BracketChain", fields: [nextMatchId], references: [id], onDelete: SetNull)
   prevMatches TournamentMatch[] @relation("BracketChain")
 
   @@index([tournamentId, round])
+  @@index([nextMatchId])
   @@map("tournament_matches")
 }
