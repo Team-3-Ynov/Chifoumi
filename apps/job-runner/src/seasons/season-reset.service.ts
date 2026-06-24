@@ -8,6 +8,8 @@ import { NotificationsQueueService } from "../queues/notifications-queue.service
 import type { SeasonResetPayload, SeasonResetResult } from "./season-reset.types.js";
 import { SeasonResetLockService } from "./season-reset-lock.service.js";
 
+const MAIL_BATCH_SIZE = 200;
+
 @Injectable()
 export class SeasonResetService {
   constructor(
@@ -163,40 +165,69 @@ export class SeasonResetService {
       return;
     }
 
-    const pendingRewards = await this.prisma.seasonStanding.findMany({
-      where: {
-        seasonId,
-        rewardsDistributed: false,
-      },
-      include: {
-        user: {
-          select: {
-            email: true,
-            displayName: true,
-          },
+    for (;;) {
+      const batch = await this.prisma.seasonStanding.findMany({
+        where: { seasonId, rewardsDistributed: false },
+        include: {
+          user: { select: { email: true, displayName: true } },
+          finalLeague: { select: { name: true } },
         },
-        finalLeague: {
-          select: {
-            name: true,
-          },
-        },
-      },
-      orderBy: { rank: "asc" },
-    });
-
-    for (const standing of pendingRewards) {
-      await this.notificationsQueue.enqueueSeasonRewardMail({
-        to: standing.user.email,
-        displayName: standing.user.displayName,
-        seasonName: season.name,
-        rank: String(standing.rank),
-        leagueName: standing.finalLeague.name,
+        orderBy: { rank: "asc" },
+        take: MAIL_BATCH_SIZE,
       });
 
-      await this.prisma.seasonStanding.update({
-        where: { id: standing.id },
-        data: { rewardsDistributed: true },
-      });
+      if (batch.length === 0) {
+        break;
+      }
+
+      for (const standing of batch) {
+        const delta = await this.computeDelta(
+          standing.userId,
+          standing.finalRating,
+          season.startedAt,
+        );
+
+        await this.notificationsQueue.enqueueSeasonRewardMail({
+          to: standing.user.email,
+          displayName: SeasonResetService.sanitizeForTemplate(standing.user.displayName),
+          seasonName: season.name,
+          rank: String(standing.rank),
+          leagueName: standing.finalLeague.name,
+          finalRating: String(standing.finalRating),
+          delta: SeasonResetService.formatDelta(delta),
+        });
+
+        await this.prisma.seasonStanding.update({
+          where: { id: standing.id },
+          data: { rewardsDistributed: true },
+        });
+      }
+
+      if (batch.length < MAIL_BATCH_SIZE) {
+        break;
+      }
     }
+  }
+
+  private async computeDelta(
+    userId: string,
+    finalRating: number,
+    seasonStartedAt: Date,
+  ): Promise<number> {
+    const firstEntry = await this.prisma.eloHistory.findFirst({
+      where: { userId, createdAt: { gte: seasonStartedAt } },
+      orderBy: { createdAt: "asc" },
+      select: { ratingBefore: true },
+    });
+    return firstEntry ? finalRating - firstEntry.ratingBefore : 0;
+  }
+
+  private static sanitizeForTemplate(displayName: string): string {
+    return displayName.replace(/__[A-Z_]+__/g, "");
+  }
+
+  private static formatDelta(delta: number): string {
+    if (delta > 0) return `+${delta}`;
+    return String(delta);
   }
 }

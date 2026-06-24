@@ -40,6 +40,27 @@ describe("SeasonResetService", () => {
       { userId: userBId, rating: 1000, gamesPlayed: 5, user: { id: userBId } },
     ];
 
+    const standingsBatch = [
+      {
+        id: "standing-a",
+        userId: userAId,
+        finalRating: 1200,
+        rank: 1,
+        rewardsDistributed: false,
+        user: { email: "alice@test.com", displayName: "alice" },
+        finalLeague: { name: "Gold" },
+      },
+      {
+        id: "standing-b",
+        userId: userBId,
+        finalRating: 1000,
+        rank: 2,
+        rewardsDistributed: false,
+        user: { email: "bob@test.com", displayName: "bob" },
+        finalLeague: { name: "Bronze" },
+      },
+    ];
+
     const prisma = {
       season: {
         findUnique: jest.fn(async () => closedSeason),
@@ -50,22 +71,10 @@ describe("SeasonResetService", () => {
       seasonStanding: {
         count: jest.fn(async () => 0),
         createMany: jest.fn(async () => ({ count: 2 })),
-        findMany: jest.fn(async () => [
-          {
-            id: "standing-a",
-            rank: 1,
-            rewardsDistributed: false,
-            user: { email: "alice@test.com", displayName: "alice" },
-            finalLeague: { name: "Silver" },
-          },
-          {
-            id: "standing-b",
-            rank: 2,
-            rewardsDistributed: false,
-            user: { email: "bob@test.com", displayName: "bob" },
-            finalLeague: { name: "Bronze" },
-          },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce(standingsBatch as never)
+          .mockResolvedValueOnce([] as never),
         update: jest.fn(async () => ({})),
       },
       league: {
@@ -74,6 +83,9 @@ describe("SeasonResetService", () => {
       eloRating: {
         findMany: jest.fn(async () => ratings),
         update: jest.fn(async () => ({})),
+      },
+      eloHistory: {
+        findFirst: jest.fn(async () => ({ ratingBefore: 1100 })),
       },
       $transaction: jest.fn(async (callback: (tx: typeof prisma) => Promise<void>) => {
         await callback(prisma);
@@ -95,20 +107,8 @@ describe("SeasonResetService", () => {
     expect(seasonResetLock.acquire).toHaveBeenCalledWith(seasonId);
     expect(prisma.seasonStanding.createMany).toHaveBeenCalledWith({
       data: [
-        {
-          seasonId,
-          userId: userAId,
-          finalRating: 1200,
-          finalLeagueId: goldLeagueId,
-          rank: 1,
-        },
-        {
-          seasonId,
-          userId: userBId,
-          finalRating: 1000,
-          finalLeagueId: bronzeLeagueId,
-          rank: 2,
-        },
+        { seasonId, userId: userAId, finalRating: 1200, finalLeagueId: goldLeagueId, rank: 1 },
+        { seasonId, userId: userBId, finalRating: 1000, finalLeagueId: bronzeLeagueId, rank: 2 },
       ],
     });
     expect(prisma.eloRating.update).toHaveBeenCalledWith({
@@ -116,6 +116,9 @@ describe("SeasonResetService", () => {
       data: { rating: softResetRating(1200), gamesPlayed: 0 },
     });
     expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledTimes(2);
+    expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledWith(
+      expect.objectContaining({ finalRating: "1200", delta: "+100" }),
+    );
     expect(seasonResetLock.release).toHaveBeenCalledWith(seasonId, "lock-token");
   });
 
@@ -124,6 +127,7 @@ describe("SeasonResetService", () => {
       id: seasonId,
       name: "Season 1",
       status: SeasonStatus.closed,
+      startedAt: new Date("2026-01-01T00:00:00.000Z"),
     };
 
     const prisma = {
@@ -134,10 +138,11 @@ describe("SeasonResetService", () => {
       },
       seasonStanding: {
         count: jest.fn(async () => 2),
-        findMany: jest.fn(async () => []),
+        findMany: jest.fn(async () => [] as never),
       },
       league: { findMany: jest.fn() },
       eloRating: { findMany: jest.fn(), update: jest.fn() },
+      eloHistory: { findFirst: jest.fn() },
       $transaction: jest.fn(),
     };
 
@@ -164,7 +169,19 @@ describe("SeasonResetService", () => {
       id: seasonId,
       name: "Season 1",
       status: SeasonStatus.closed,
+      startedAt: new Date("2026-01-01T00:00:00.000Z"),
     };
+    const standingsBatch = [
+      {
+        id: "standing-a",
+        userId: userAId,
+        finalRating: 1050,
+        rank: 1,
+        rewardsDistributed: false,
+        user: { email: "alice@test.com", displayName: "alice" },
+        finalLeague: { name: "Gold" },
+      },
+    ];
     const prisma = {
       season: {
         findFirst: jest.fn(async (args: { where: unknown }) =>
@@ -175,19 +192,17 @@ describe("SeasonResetService", () => {
       },
       seasonStanding: {
         count: jest.fn(async () => 2),
-        findMany: jest.fn(async () => [
-          {
-            id: "standing-a",
-            rank: 1,
-            rewardsDistributed: false,
-            user: { email: "alice@test.com", displayName: "alice" },
-            finalLeague: { name: "Gold" },
-          },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce(standingsBatch as never)
+          .mockResolvedValueOnce([] as never),
         update: jest.fn(async () => ({})),
       },
       league: { findMany: jest.fn() },
       eloRating: { findMany: jest.fn(), update: jest.fn() },
+      eloHistory: {
+        findFirst: jest.fn(async () => ({ ratingBefore: 1000 })),
+      },
       $transaction: jest.fn(),
     };
     const notificationsQueue = {
@@ -204,6 +219,7 @@ describe("SeasonResetService", () => {
     }).processSeasonReset({ source: "cron-scheduler" });
 
     expect(result).toBe("already_processed");
+    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.season.findFirst).toHaveBeenCalledWith({
       where: {
         status: SeasonStatus.closed,
@@ -211,13 +227,14 @@ describe("SeasonResetService", () => {
       },
       orderBy: { updatedAt: "asc" },
     });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledWith({
       to: "alice@test.com",
       displayName: "alice",
       seasonName: "Season 1",
       rank: "1",
       leagueName: "Gold",
+      finalRating: "1050",
+      delta: "+50",
     });
     expect(prisma.seasonStanding.update).toHaveBeenCalledWith({
       where: { id: "standing-a" },
@@ -269,6 +286,180 @@ describe("SeasonResetService", () => {
 
     await expect(service.processSeasonReset({ seasonId, source: "admin" })).rejects.toThrow(
       "Season reset lock not acquired",
+    );
+  });
+
+  it("uses ratingBefore from first season match to compute delta", async () => {
+    const seasonStart = new Date("2026-01-01T00:00:00.000Z");
+    const closedSeason = {
+      id: seasonId,
+      name: "Season 1",
+      status: SeasonStatus.closed,
+      startedAt: seasonStart,
+    };
+    const standingsBatch = [
+      {
+        id: "standing-a",
+        userId: userAId,
+        finalRating: 1350,
+        rank: 1,
+        rewardsDistributed: false,
+        user: { email: "alice@test.com", displayName: "alice" },
+        finalLeague: { name: "Gold" },
+      },
+    ];
+
+    const prisma = {
+      season: {
+        findUnique: jest.fn(async () => closedSeason),
+        count: jest.fn(async () => 0),
+        findFirst: jest.fn(async () => null),
+      },
+      seasonStanding: {
+        count: jest.fn(async () => 2),
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce(standingsBatch as never)
+          .mockResolvedValueOnce([] as never),
+        update: jest.fn(async () => ({})),
+      },
+      eloHistory: {
+        findFirst: jest.fn(async () => ({ ratingBefore: 1200 })),
+      },
+      $transaction: jest.fn(),
+    };
+    const notificationsQueue = {
+      enqueueSeasonRewardMail: jest.fn(async () => undefined),
+    };
+
+    await createService({
+      prisma,
+      seasonResetLock: {
+        acquire: jest.fn(async () => "lock-token"),
+        release: jest.fn(async () => undefined),
+      },
+      notificationsQueue,
+    }).processSeasonReset({ seasonId, source: "admin" });
+
+    expect(prisma.eloHistory.findFirst).toHaveBeenCalledWith({
+      where: { userId: userAId, createdAt: { gte: seasonStart } },
+      orderBy: { createdAt: "asc" },
+      select: { ratingBefore: true },
+    });
+    expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledWith(
+      expect.objectContaining({ finalRating: "1350", delta: "+150" }),
+    );
+  });
+
+  it("sets delta to 0 when the user has no history for the season", async () => {
+    const closedSeason = {
+      id: seasonId,
+      name: "Season 1",
+      status: SeasonStatus.closed,
+      startedAt: new Date("2026-01-01T00:00:00.000Z"),
+    };
+    const standingsBatch = [
+      {
+        id: "standing-a",
+        userId: userAId,
+        finalRating: 1000,
+        rank: 1,
+        rewardsDistributed: false,
+        user: { email: "alice@test.com", displayName: "alice" },
+        finalLeague: { name: "Bronze" },
+      },
+    ];
+
+    const prisma = {
+      season: {
+        findUnique: jest.fn(async () => closedSeason),
+        count: jest.fn(async () => 0),
+        findFirst: jest.fn(async () => null),
+      },
+      seasonStanding: {
+        count: jest.fn(async () => 1),
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce(standingsBatch as never)
+          .mockResolvedValueOnce([] as never),
+        update: jest.fn(async () => ({})),
+      },
+      eloHistory: {
+        findFirst: jest.fn(async () => null),
+      },
+      $transaction: jest.fn(),
+    };
+    const notificationsQueue = {
+      enqueueSeasonRewardMail: jest.fn(async () => undefined),
+    };
+
+    await createService({
+      prisma,
+      seasonResetLock: {
+        acquire: jest.fn(async () => "lock-token"),
+        release: jest.fn(async () => undefined),
+      },
+      notificationsQueue,
+    }).processSeasonReset({ seasonId, source: "admin" });
+
+    expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledWith(
+      expect.objectContaining({ delta: "0" }),
+    );
+  });
+
+  it("strips template placeholders from displayName before sending mail", async () => {
+    const closedSeason = {
+      id: seasonId,
+      name: "Season 1",
+      status: SeasonStatus.closed,
+      startedAt: new Date("2026-01-01T00:00:00.000Z"),
+    };
+    const standingsBatch = [
+      {
+        id: "standing-a",
+        userId: userAId,
+        finalRating: 1000,
+        rank: 1,
+        rewardsDistributed: false,
+        user: { email: "evil@test.com", displayName: "__DISPLAY_NAME__hacker" },
+        finalLeague: { name: "Bronze" },
+      },
+    ];
+
+    const prisma = {
+      season: {
+        findUnique: jest.fn(async () => closedSeason),
+        count: jest.fn(async () => 0),
+        findFirst: jest.fn(async () => null),
+      },
+      seasonStanding: {
+        count: jest.fn(async () => 1),
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce(standingsBatch as never)
+          .mockResolvedValueOnce([] as never),
+        update: jest.fn(async () => ({})),
+      },
+      eloHistory: {
+        findFirst: jest.fn(async () => null),
+      },
+      $transaction: jest.fn(),
+    };
+    const notificationsQueue = {
+      enqueueSeasonRewardMail: jest.fn(async () => undefined),
+    };
+
+    await createService({
+      prisma,
+      seasonResetLock: {
+        acquire: jest.fn(async () => "lock-token"),
+        release: jest.fn(async () => undefined),
+      },
+      notificationsQueue,
+    }).processSeasonReset({ seasonId, source: "admin" });
+
+    expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledWith(
+      expect.objectContaining({ displayName: "hacker" }),
     );
   });
 });
