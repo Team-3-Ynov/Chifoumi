@@ -9,6 +9,22 @@ export const MatchStatus = {
   aborted: "aborted",
 } as const;
 
+export const SeasonStatus = {
+  upcoming: "upcoming",
+  active: "active",
+  closed: "closed",
+} as const;
+
+export type Season = {
+  id: string;
+  name: string;
+  startedAt: Date;
+  endsAt: Date | null;
+  status: keyof typeof SeasonStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type User = {
   id: string;
   email: string;
@@ -33,6 +49,7 @@ export class PrismaClient {
   readonly match = delegate;
   readonly passwordResetToken = delegate;
   readonly refreshToken = delegate;
+  readonly season = delegate;
   readonly user = delegate;
 
   async $queryRaw<T = unknown>(..._args: unknown[]): Promise<T> {

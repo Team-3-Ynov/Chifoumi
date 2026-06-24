@@ -14,6 +14,7 @@ import { MetricsModule } from "./metrics/metrics.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { QueuesModule } from "./queues/queues.module.js";
 import { RedisModule } from "./redis/redis.module.js";
+import { SeasonsModule } from "./seasons/seasons.module.js";
 import { UsersModule } from "./users/users.module.js";
 
 @Module({
@@ -46,6 +47,7 @@ import { UsersModule } from "./users/users.module.js";
     LeaderboardModule,
     MatchesModule,
     MetricsModule,
+    SeasonsModule,
     JwksModule,
     GrpcModule,
   ],
