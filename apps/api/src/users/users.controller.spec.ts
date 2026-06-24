@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { ForbiddenException, type INestApplication } from "@nestjs/common";
+import { type ExecutionContext, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
@@ -52,14 +52,15 @@ describe("UsersController — guard wiring (AC6)", () => {
           provide: UsersService,
           useValue: { listUsers: jest.fn(), getPublicProfile: jest.fn() },
         },
+        // Real RolesGuard — the 403 comes from actual guard logic, not a stub.
+        RolesGuard,
       ],
     })
       .overrideGuard(JwtAuthGuard)
-      .useValue({ canActivate: () => true })
-      .overrideGuard(RolesGuard)
       .useValue({
-        canActivate: () => {
-          throw new ForbiddenException({ error: "FORBIDDEN" });
+        canActivate: (ctx: ExecutionContext) => {
+          ctx.switchToHttp().getRequest<{ user: unknown }>().user = { role: "player" };
+          return true;
         },
       })
       .compile();
