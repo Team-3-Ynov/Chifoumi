@@ -1,5 +1,7 @@
+export type PlayerId = string & { readonly _brand: "PlayerId" };
+
 export type Player = {
-  id: string;
+  id: PlayerId;
   rating: number;
 };
 
