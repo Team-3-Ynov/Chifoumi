@@ -1,4 +1,5 @@
 import { SeasonStatus } from "@chifoumi/db";
+import { softResetRating } from "@chifoumi/elo";
 import { describe, expect, it, jest } from "@jest/globals";
 import { SeasonResetService } from "./season-reset.service.js";
 
@@ -112,7 +113,7 @@ describe("SeasonResetService", () => {
     });
     expect(prisma.eloRating.update).toHaveBeenCalledWith({
       where: { userId: userAId },
-      data: { rating: expect.any(Number), gamesPlayed: 0 },
+      data: { rating: softResetRating(1200), gamesPlayed: 0 },
     });
     expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledTimes(2);
     expect(notificationsQueue.enqueueSeasonRewardMail).toHaveBeenCalledWith(
