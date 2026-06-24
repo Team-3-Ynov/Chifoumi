@@ -20,6 +20,13 @@ export function generateFirstRound(
     );
   }
 
+  if (seededPlayers.length < 2) {
+    throw new BracketError(
+      "INSUFFICIENT_PLAYERS",
+      `Cannot generate a first round with ${seededPlayers.length} player(s). Minimum is 2.`,
+    );
+  }
+
   if (seededPlayers.length > bracketSize) {
     throw new BracketError(
       "PLAYERS_EXCEED_BRACKET_SIZE",
