@@ -13,7 +13,7 @@ export function generateFirstRound(
   seededPlayers: SeededPlayer[],
   bracketSize: number,
 ): BracketMatch[] {
-  if (bracketSize < 2 || !isPowerOfTwo(bracketSize)) {
+  if (!Number.isInteger(bracketSize) || bracketSize < 2 || !isPowerOfTwo(bracketSize)) {
     throw new BracketError(
       "INVALID_BRACKET_SIZE",
       `bracketSize must be a power of 2 >= 2, got ${bracketSize}.`,

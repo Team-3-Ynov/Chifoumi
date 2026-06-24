@@ -13,6 +13,15 @@ export function seedPlayers(players: Player[]): SeededPlayer[] {
     );
   }
 
+  for (const player of players) {
+    if (!Number.isFinite(player.rating)) {
+      throw new BracketError(
+        "INVALID_PLAYER_RATING",
+        `Player ${player.id} has an invalid rating: ${player.rating}.`,
+      );
+    }
+  }
+
   return [...players]
     .sort((a, b) => b.rating - a.rating)
     .map((player, index) => ({ ...player, seed: index + 1 }));

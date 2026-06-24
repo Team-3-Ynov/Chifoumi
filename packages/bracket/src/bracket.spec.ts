@@ -82,6 +82,20 @@ describe("computeBracketSize", () => {
     })() as BracketError;
     expect(err.code).toBe("INVALID_BRACKET_SIZE");
   });
+
+  it("throws BracketError for non-finite or non-integer counts", () => {
+    for (const count of [Number.NaN, Number.POSITIVE_INFINITY, 2.5]) {
+      expect(() => computeBracketSize(count)).toThrow(BracketError);
+      const err = (() => {
+        try {
+          computeBracketSize(count);
+        } catch (e) {
+          return e;
+        }
+      })() as BracketError;
+      expect(err.code).toBe("INVALID_BRACKET_SIZE");
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -166,6 +180,27 @@ describe("seedPlayers", () => {
     const seeded = seedPlayers(players);
     expect(seeded.map((p) => p.seed)).toEqual([1, 2]);
   });
+
+  it("throws BracketError for non-finite player ratings", () => {
+    expect(() =>
+      seedPlayers([
+        { id: "a" as PlayerId, rating: 1000 },
+        { id: "b" as PlayerId, rating: Number.NaN },
+      ]),
+    ).toThrow(BracketError);
+
+    const err = (() => {
+      try {
+        seedPlayers([
+          { id: "a" as PlayerId, rating: 1000 },
+          { id: "b" as PlayerId, rating: Number.POSITIVE_INFINITY },
+        ]);
+      } catch (e) {
+        return e;
+      }
+    })() as BracketError;
+    expect(err.code).toBe("INVALID_PLAYER_RATING");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -198,6 +233,21 @@ describe("generateFirstRound", () => {
   it("throws BracketError when bracketSize is 0", () => {
     const seeded = makeSeeded([1500, 1200]);
     expect(() => generateFirstRound(seeded, 0)).toThrow(BracketError);
+  });
+
+  it("throws BracketError when bracketSize is non-finite or non-integer", () => {
+    const seeded = makeSeeded([1500, 1200]);
+    for (const bracketSize of [Number.NaN, Number.POSITIVE_INFINITY, 2.5]) {
+      expect(() => generateFirstRound(seeded, bracketSize)).toThrow(BracketError);
+      const err = (() => {
+        try {
+          generateFirstRound(seeded, bracketSize);
+        } catch (e) {
+          return e;
+        }
+      })() as BracketError;
+      expect(err.code).toBe("INVALID_BRACKET_SIZE");
+    }
   });
 
   it("throws BracketError when 0 players are provided", () => {

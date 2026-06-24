@@ -9,6 +9,13 @@ const MAX_BRACKET_SIZE = 1024;
  * larger than MAX_BRACKET_SIZE.
  */
 export function computeBracketSize(registrationCount: number): number {
+  if (!Number.isInteger(registrationCount)) {
+    throw new BracketError(
+      "INVALID_BRACKET_SIZE",
+      `registrationCount must be a finite integer, got ${registrationCount}.`,
+    );
+  }
+
   if (registrationCount < 2) {
     throw new BracketError(
       "INSUFFICIENT_PLAYERS",
