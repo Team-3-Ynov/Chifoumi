@@ -15,6 +15,14 @@ export const SeasonStatus = {
   closed: "closed",
 } as const;
 
+export type User = {
+  id: string;
+  email: string;
+  displayName: string;
+  passwordHash: string;
+  role: keyof typeof UserRole;
+};
+
 export type Season = {
   id: string;
   name: string;
@@ -25,17 +33,11 @@ export type Season = {
   updatedAt: Date;
 };
 
-export type User = {
-  id: string;
-  email: string;
-  displayName: string;
-  passwordHash: string;
-  role: keyof typeof UserRole;
-};
-
 type PrismaDelegate = {
+  count: (...args: unknown[]) => Promise<number>;
   create: (...args: unknown[]) => Promise<unknown>;
   delete: (...args: unknown[]) => Promise<unknown>;
+  findFirst: (...args: unknown[]) => Promise<unknown>;
   findMany: (...args: unknown[]) => Promise<unknown[]>;
   findUnique: (...args: unknown[]) => Promise<unknown>;
   update: (...args: unknown[]) => Promise<unknown>;
@@ -46,6 +48,7 @@ const delegate = {} as PrismaDelegate;
 
 export class PrismaClient {
   readonly eloRating = delegate;
+  readonly league = delegate;
   readonly match = delegate;
   readonly passwordResetToken = delegate;
   readonly refreshToken = delegate;
