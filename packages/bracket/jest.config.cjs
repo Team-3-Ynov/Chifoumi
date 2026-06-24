@@ -24,6 +24,7 @@ module.exports = {
       branches: 95,
       functions: 100,
       lines: 95,
+      statements: 95,
     },
   },
   transform: {
