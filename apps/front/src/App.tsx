@@ -14,6 +14,7 @@ import { MatchPage } from "./pages/MatchPage.js";
 import { ProfilePage } from "./pages/ProfilePage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage.js";
+import { SeasonStandingsPage } from "./pages/SeasonStandingsPage.js";
 import "./App.css";
 
 function CatchAllRedirect() {
@@ -48,6 +49,7 @@ export function App() {
           </Route>
 
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/seasons/:id/standings" element={<SeasonStandingsPage />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/lobby" element={<LobbyPage />} />

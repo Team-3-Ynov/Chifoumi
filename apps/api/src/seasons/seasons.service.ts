@@ -1,9 +1,22 @@
 import { type Season, SeasonStatus } from "@chifoumi/db";
-import { getLeagueForRating, getLeagueProgress } from "@chifoumi/leagues";
-import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  getLeagueForRating,
+  getLeagueProgress,
+  getReferenceLeagueByName,
+  type ReferenceLeague,
+} from "@chifoumi/leagues";
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SeasonsQueueService } from "../queues/seasons-queue.service.js";
+import type { ClosedSeasonsResponseDto } from "./dto/closed-seasons-response.dto.js";
 import type { CurrentSeasonResponseDto } from "./dto/current-season-response.dto.js";
+import type { SeasonStandingsResponseDto } from "./dto/season-standings-response.dto.js";
 
 // Players always have an elo rating row created at registration, but fall back
 // to the platform starting rating defensively (mirrors UsersService).
@@ -49,6 +62,90 @@ export class SeasonsService {
         rank,
         progressToNextLeague,
       },
+    };
+  }
+
+  async getStandings(
+    seasonId: string,
+    query: { page: number; limit: number; league?: string },
+  ): Promise<SeasonStandingsResponseDto> {
+    const season = await this.prisma.season.findUnique({
+      where: { id: seasonId },
+      select: { id: true, name: true, status: true },
+    });
+
+    if (!season) {
+      throw new NotFoundException({ error: "SEASON_NOT_FOUND" });
+    }
+
+    if (season.status !== SeasonStatus.closed) {
+      throw new ConflictException({ error: "SEASON_NOT_CLOSED" });
+    }
+
+    const league = this.resolveLeague(query.league);
+    const where = {
+      seasonId,
+      ...(league ? { finalLeague: { name: league.name } } : {}),
+    };
+    const skip = (query.page - 1) * query.limit;
+    const [items, total] = await Promise.all([
+      this.prisma.seasonStanding.findMany({
+        where,
+        orderBy: { rank: "asc" },
+        skip,
+        take: query.limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              displayName: true,
+            },
+          },
+          finalLeague: {
+            select: {
+              name: true,
+              tier: true,
+            },
+          },
+        },
+      }),
+      this.prisma.seasonStanding.count({ where }),
+    ]);
+
+    return {
+      season,
+      items: items.map((standing) => ({
+        rank: standing.rank,
+        userId: standing.user.id,
+        displayName: standing.user.displayName,
+        finalRating: standing.finalRating,
+        finalLeague: standing.finalLeague,
+      })),
+      total,
+      page: query.page,
+      limit: query.limit,
+    };
+  }
+
+  async listClosed(): Promise<ClosedSeasonsResponseDto> {
+    const items = await this.prisma.season.findMany({
+      where: { status: SeasonStatus.closed },
+      orderBy: { endsAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        startedAt: true,
+        endsAt: true,
+        status: true,
+      },
+    });
+
+    return {
+      items: items.map((season) => ({
+        ...season,
+        status: SeasonStatus.closed,
+      })),
     };
   }
 
@@ -117,6 +214,19 @@ export class SeasonsService {
     });
 
     return ahead + 1;
+  }
+
+  private resolveLeague(leagueName: string | undefined): ReferenceLeague | null {
+    if (!leagueName) {
+      return null;
+    }
+
+    const league = getReferenceLeagueByName(leagueName);
+    if (!league) {
+      throw new BadRequestException({ code: "UNKNOWN_LEAGUE" });
+    }
+
+    return league;
   }
 
   private async requireClosableSeason(seasonId: string): Promise<Season> {
