@@ -10,12 +10,12 @@ describe("SeasonsService", () => {
   let season: {
     create: ReturnType<typeof jest.fn>;
     findUnique: ReturnType<typeof jest.fn>;
-    update: ReturnType<typeof jest.fn>;
+    updateMany: ReturnType<typeof jest.fn>;
   };
   let enqueueSeasonReset: ReturnType<typeof jest.fn>;
 
   beforeEach(() => {
-    season = { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() };
+    season = { create: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() };
     enqueueSeasonReset = jest.fn();
     enqueueSeasonReset.mockResolvedValue(undefined);
     service = new SeasonsService(
@@ -49,16 +49,49 @@ describe("SeasonsService", () => {
   describe("closeSeason", () => {
     it("closes an active season and enqueues a season-reset job", async () => {
       season.findUnique.mockResolvedValue({ id: "season-1", status: SeasonStatus.active });
-      season.update.mockResolvedValue({ id: "season-1", status: SeasonStatus.closed });
+      season.updateMany.mockResolvedValue({ count: 1 });
+      season.findUnique.mockResolvedValueOnce({ id: "season-1", status: SeasonStatus.active });
+      season.findUnique.mockResolvedValueOnce({ id: "season-1", status: SeasonStatus.closed });
 
       const result = await service.closeSeason("season-1");
 
-      expect(season.update).toHaveBeenCalledWith({
-        where: { id: "season-1" },
+      expect(season.updateMany).toHaveBeenCalledWith({
+        where: { id: "season-1", status: SeasonStatus.active },
         data: { status: SeasonStatus.closed },
       });
       expect(enqueueSeasonReset).toHaveBeenCalledWith("season-1");
       expect(result.status).toBe(SeasonStatus.closed);
+    });
+
+    it("rolls back the season status when enqueueing the reset job fails", async () => {
+      const queueError = new Error("Redis unavailable");
+      season.findUnique.mockResolvedValueOnce({ id: "season-1", status: SeasonStatus.active });
+      season.updateMany.mockResolvedValueOnce({ count: 1 });
+      season.updateMany.mockResolvedValueOnce({ count: 1 });
+      enqueueSeasonReset.mockRejectedValue(queueError);
+
+      await expect(service.closeSeason("season-1")).rejects.toThrow(queueError);
+
+      expect(season.updateMany).toHaveBeenNthCalledWith(1, {
+        where: { id: "season-1", status: SeasonStatus.active },
+        data: { status: SeasonStatus.closed },
+      });
+      expect(season.updateMany).toHaveBeenNthCalledWith(2, {
+        where: { id: "season-1", status: SeasonStatus.closed },
+        data: { status: SeasonStatus.active },
+      });
+    });
+
+    it("does not enqueue twice when another request already closed the season", async () => {
+      season.findUnique.mockResolvedValueOnce({ id: "season-1", status: SeasonStatus.active });
+      season.findUnique.mockResolvedValueOnce({ id: "season-1", status: SeasonStatus.closed });
+      season.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.closeSeason("season-1")).rejects.toMatchObject({
+        response: { error: "SEASON_ALREADY_CLOSED" },
+      });
+
+      expect(enqueueSeasonReset).not.toHaveBeenCalled();
     });
 
     it("throws 409 SEASON_ALREADY_CLOSED when the season is already closed", async () => {
@@ -68,7 +101,7 @@ describe("SeasonsService", () => {
         response: { error: "SEASON_ALREADY_CLOSED" },
       });
       await expect(service.closeSeason("season-1")).rejects.toBeInstanceOf(ConflictException);
-      expect(season.update).not.toHaveBeenCalled();
+      expect(season.updateMany).not.toHaveBeenCalled();
       expect(enqueueSeasonReset).not.toHaveBeenCalled();
     });
 

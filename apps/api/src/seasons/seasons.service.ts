@@ -31,6 +31,38 @@ export class SeasonsService {
    * monthly cron would publish. Only an active season can be closed.
    */
   async closeSeason(seasonId: string): Promise<Season> {
+    const season = await this.requireClosableSeason(seasonId);
+
+    const closeResult = await this.prisma.season.updateMany({
+      where: { id: season.id, status: SeasonStatus.active },
+      data: { status: SeasonStatus.closed },
+    });
+
+    if (closeResult.count === 0) {
+      await this.requireClosableSeason(seasonId);
+      throw new ConflictException({ error: "SEASON_NOT_ACTIVE" });
+    }
+
+    try {
+      await this.seasonsQueue.enqueueSeasonReset(season.id);
+    } catch (error) {
+      await this.prisma.season.updateMany({
+        where: { id: season.id, status: SeasonStatus.closed },
+        data: { status: SeasonStatus.active },
+      });
+      throw error;
+    }
+
+    const closed = await this.prisma.season.findUnique({ where: { id: season.id } });
+
+    if (!closed) {
+      throw new NotFoundException({ error: "SEASON_NOT_FOUND" });
+    }
+
+    return closed;
+  }
+
+  private async requireClosableSeason(seasonId: string): Promise<Season> {
     const season = await this.prisma.season.findUnique({ where: { id: seasonId } });
 
     if (!season) {
@@ -45,13 +77,6 @@ export class SeasonsService {
       throw new ConflictException({ error: "SEASON_NOT_ACTIVE" });
     }
 
-    const closed = await this.prisma.season.update({
-      where: { id: seasonId },
-      data: { status: SeasonStatus.closed },
-    });
-
-    await this.seasonsQueue.enqueueSeasonReset(closed.id);
-
-    return closed;
+    return season;
   }
 }
