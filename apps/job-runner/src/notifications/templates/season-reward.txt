@@ -2,4 +2,6 @@ Bravo __DISPLAY_NAME__ !
 
 La saison __SEASON_NAME__ est terminée. Tu as terminé #__RANK__ en ligue __LEAGUE_NAME__.
 
+ELO final : __FINAL_RATING__ (__DELTA__ sur la saison).
+
 Tes récompenses seront bientôt disponibles. Bonne chance pour la prochaine saison !

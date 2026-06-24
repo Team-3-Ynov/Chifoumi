@@ -21,6 +21,8 @@ describe("NotificationsQueueService", () => {
         seasonName: "Season 1",
         rank: "3",
         leagueName: "Gold",
+        finalRating: "1200",
+        delta: "+50",
       }),
     ).rejects.toThrow("Notifications queue is not connected");
   });

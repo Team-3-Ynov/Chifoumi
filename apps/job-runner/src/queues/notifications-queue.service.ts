@@ -42,6 +42,8 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
     seasonName: string;
     rank: string;
     leagueName: string;
+    finalRating: string;
+    delta: string;
   }): Promise<void> {
     const payload: SendMailJobPayload = {
       to: input.to,
@@ -51,6 +53,8 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
         seasonName: input.seasonName,
         rank: input.rank,
         leagueName: input.leagueName,
+        finalRating: input.finalRating,
+        delta: input.delta,
       },
     };
 
