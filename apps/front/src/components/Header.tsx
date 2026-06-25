@@ -25,6 +25,9 @@ export function Header() {
             <NavLink to="/leaderboard" className="nav-link">
               Leaderboard
             </NavLink>
+            <NavLink to="/tournaments" className="nav-link">
+              Tournois
+            </NavLink>
             <NavLink to="/profile" className="nav-link">
               Profil
             </NavLink>

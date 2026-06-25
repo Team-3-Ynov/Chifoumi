@@ -15,6 +15,8 @@ import { ProfilePage } from "./pages/ProfilePage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage.js";
 import { SeasonStandingsPage } from "./pages/SeasonStandingsPage.js";
+import { TournamentDetailPage } from "./pages/TournamentDetailPage.js";
+import { TournamentsPage } from "./pages/TournamentsPage.js";
 import "./App.css";
 
 function CatchAllRedirect() {
@@ -56,6 +58,8 @@ export function App() {
             <Route path="/match/:matchId" element={<MatchPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/:id" element={<ProfilePage />} />
+            <Route path="/tournaments" element={<TournamentsPage />} />
+            <Route path="/tournaments/:id" element={<TournamentDetailPage />} />
           </Route>
 
           <Route element={<AdminRoute />}>

@@ -843,6 +843,29 @@ a {
   word-break: break-all;
 }
 
+.detail-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  margin: 16px 0 24px;
+}
+
+.detail-list dt {
+  color: #5d6675;
+}
+
+.detail-list dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.participant-list {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+
 .audit-summary {
   display: grid;
   grid-template-columns: max-content 1fr;
