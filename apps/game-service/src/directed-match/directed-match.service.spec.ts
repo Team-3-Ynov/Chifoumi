@@ -33,6 +33,7 @@ describe("DirectedMatchService", () => {
     setnx: jest.Mock<(key: string, ttlSeconds: number) => Promise<boolean>>;
     evalScript: jest.Mock<(script: string, keys: string[], args: string[]) => Promise<number>>;
     del: jest.Mock<(key: string) => Promise<void>>;
+    get: jest.Mock<(key: string) => Promise<string | null>>;
   };
   let ratingService: {
     getRating: jest.Mock<(userId: string) => Promise<number>>;
@@ -56,6 +57,7 @@ describe("DirectedMatchService", () => {
       setnx: jest.fn(async () => true),
       evalScript: jest.fn(async () => 1),
       del: jest.fn(async () => undefined),
+      get: jest.fn(async () => null),
     };
     ratingService = {
       getRating: jest.fn(async (userId: string) => (userId === slotAId ? 1000 : 1040)),
@@ -149,6 +151,29 @@ describe("DirectedMatchService", () => {
     });
 
     expect(result).toEqual({ ok: false, code: "TOURNAMENT_MATCH_ALREADY_STARTED" });
+    expect(matchSessionService.create).not.toHaveBeenCalled();
+  });
+
+  it("returns the existing matchId when the same tournamentMatchId is retried while active", async () => {
+    const existingMatchId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    redisService.evalScript.mockResolvedValue(2);
+    redisService.get.mockImplementation(async (key: string) => {
+      if (key === `tournament-match:${tournamentMatchId}:match`) {
+        return existingMatchId;
+      }
+      if (key === `match:byUser:${slotAId}` || key === `match:byUser:${slotBId}`) {
+        return existingMatchId;
+      }
+      return null;
+    });
+
+    const result = await service.startMatch({
+      tournamentMatchId,
+      slotA: { userId: slotAId, displayName: "Ace" },
+      slotB: { userId: slotBId, displayName: "Bob" },
+    });
+
+    expect(result).toEqual({ ok: true, matchId: existingMatchId });
     expect(matchSessionService.create).not.toHaveBeenCalled();
   });
 

@@ -5,6 +5,10 @@ import { Queue } from "bullmq";
 import { config } from "dotenv";
 import { io, type Socket } from "socket.io-client";
 import { DirectedMatchService } from "../src/directed-match/directed-match.service.js";
+import {
+  MATCHMAKING_QUEUE_KEY,
+  matchmakingMetaKey,
+} from "../src/matchmaking/matchmaking.constants.js";
 import { RedisService } from "../src/redis/redis.service.js";
 import { createGameServiceTestModule } from "../src/testing/create-game-service-test-module.js";
 import { issueTestAccessToken } from "../src/testing/issue-test-access-token.js";
@@ -235,5 +239,51 @@ describe("Directed tournament match (e2e)", () => {
     });
 
     expect(second).toEqual({ ok: false, code: "PLAYER_ALREADY_IN_MATCH" });
+  });
+
+  it("pulls queued players into a directed match", async () => {
+    await redisService.setex(`user:rating:${slotAId}`, 60, "1000");
+    await redisService.setex(`user:rating:${slotBId}`, 60, "1040");
+    await redisService.zadd(MATCHMAKING_QUEUE_KEY, 1000, slotAId);
+    await redisService.hset(matchmakingMetaKey(slotAId), {
+      userId: slotAId,
+      rating: "1000",
+      displayName: "Ace",
+      queuedAt: String(Date.now()),
+    });
+
+    const result = await directedMatchService.startMatch({
+      tournamentMatchId,
+      slotA: { userId: slotAId, displayName: "Ace" },
+      slotB: { userId: slotBId, displayName: "Bob" },
+    });
+
+    expect(result).toEqual({ ok: true, matchId: expect.any(String) });
+    const client = redisService.getClient();
+    expect(await client.zscore(MATCHMAKING_QUEUE_KEY, slotAId)).toBeNull();
+    expect(await client.exists(matchmakingMetaKey(slotAId))).toBe(0);
+  });
+
+  it("returns the same matchId for duplicate tournamentMatchId retries", async () => {
+    await redisService.setex(`user:rating:${slotAId}`, 60, "1000");
+    await redisService.setex(`user:rating:${slotBId}`, 60, "1040");
+
+    const first = await directedMatchService.startMatch({
+      tournamentMatchId,
+      slotA: { userId: slotAId, displayName: "Ace" },
+      slotB: { userId: slotBId, displayName: "Bob" },
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      throw new Error("expected directed match to start");
+    }
+
+    const retry = await directedMatchService.startMatch({
+      tournamentMatchId,
+      slotA: { userId: slotAId, displayName: "Ace" },
+      slotB: { userId: slotBId, displayName: "Bob" },
+    });
+
+    expect(retry).toEqual({ ok: true, matchId: first.matchId });
   });
 });

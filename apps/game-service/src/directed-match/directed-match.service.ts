@@ -78,7 +78,7 @@ export class DirectedMatchService {
       matchId,
     );
     if (claim === "tournament_already_started") {
-      return { ok: false, code: "TOURNAMENT_MATCH_ALREADY_STARTED" };
+      return this.resolveExistingTournamentMatch(tournamentMatchId, playerA.userId, playerB.userId);
     }
     if (claim === "players_busy") {
       return { ok: false, code: "PLAYER_ALREADY_IN_MATCH" };
@@ -151,6 +151,28 @@ export class DirectedMatchService {
       return "tournament_already_started";
     }
     return "players_busy";
+  }
+
+  private async resolveExistingTournamentMatch(
+    tournamentMatchId: string,
+    userA: string,
+    userB: string,
+  ): Promise<StartDirectedMatchResult> {
+    const existingMatchId = await this.redisService.get(tournamentMatchKey(tournamentMatchId));
+    if (!existingMatchId) {
+      return { ok: false, code: "TOURNAMENT_MATCH_ALREADY_STARTED" };
+    }
+
+    const [userAMatchId, userBMatchId] = await Promise.all([
+      this.redisService.get(userMatchKey(userA)),
+      this.redisService.get(userMatchKey(userB)),
+    ]);
+
+    if (userAMatchId === existingMatchId && userBMatchId === existingMatchId) {
+      return { ok: true, matchId: existingMatchId };
+    }
+
+    return { ok: false, code: "TOURNAMENT_MATCH_ALREADY_STARTED" };
   }
 
   private async releaseClaims(
