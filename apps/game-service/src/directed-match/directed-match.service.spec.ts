@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { MatchPlayService } from "../match/match-play.service.js";
 import type { MatchSessionService } from "../match-session/match-session.service.js";
 import type { MatchState } from "../match-session/match-session.types.js";
-import type { MatchmakingService } from "../matchmaking/matchmaking.service.js";
 import type { RatingService } from "../matchmaking/rating.service.js";
 import type { RedisService } from "../redis/redis.service.js";
 import { DirectedMatchService } from "./directed-match.service.js";
@@ -31,16 +30,21 @@ function createState(matchId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"): MatchSta
 
 describe("DirectedMatchService", () => {
   let redisService: {
-    get: jest.Mock<(key: string) => Promise<string | null>>;
-  };
-  let matchmakingService: {
-    isInQueue: jest.Mock<(userId: string) => Promise<boolean>>;
+    setnx: jest.Mock<(key: string, ttlSeconds: number) => Promise<boolean>>;
+    evalScript: jest.Mock<(script: string, keys: string[], args: string[]) => Promise<number>>;
+    del: jest.Mock<(key: string) => Promise<void>>;
   };
   let ratingService: {
     getRating: jest.Mock<(userId: string) => Promise<number>>;
   };
   let matchSessionService: {
-    create: jest.Mock;
+    create: jest.Mock<
+      (input: {
+        players: unknown;
+        matchId?: string;
+        tournamentMatchId?: string;
+      }) => Promise<MatchState>
+    >;
   };
   let matchPlayService: {
     onMatchStarted: jest.Mock;
@@ -49,16 +53,18 @@ describe("DirectedMatchService", () => {
 
   beforeEach(() => {
     redisService = {
-      get: jest.fn(async () => null),
-    };
-    matchmakingService = {
-      isInQueue: jest.fn(async () => false),
+      setnx: jest.fn(async () => true),
+      evalScript: jest.fn(async () => 1),
+      del: jest.fn(async () => undefined),
     };
     ratingService = {
       getRating: jest.fn(async (userId: string) => (userId === slotAId ? 1000 : 1040)),
     };
     matchSessionService = {
-      create: jest.fn(async () => createState()),
+      create: jest.fn(
+        async (input: { players: unknown; matchId?: string; tournamentMatchId?: string }) =>
+          createState(input.matchId ?? "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+      ),
     };
     matchPlayService = {
       onMatchStarted: jest.fn(async () => undefined),
@@ -66,7 +72,6 @@ describe("DirectedMatchService", () => {
 
     service = new DirectedMatchService(
       redisService as unknown as RedisService,
-      matchmakingService as unknown as MatchmakingService,
       ratingService as unknown as RatingService,
       matchSessionService as unknown as MatchSessionService,
       matchPlayService as unknown as MatchPlayService,
@@ -81,24 +86,26 @@ describe("DirectedMatchService", () => {
       slotB: { userId: slotBId, displayName: "Bob" },
     });
 
-    expect(result).toEqual({
-      ok: true,
-      matchId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("expected directed match to start");
+    }
+
+    expect(redisService.setnx).toHaveBeenCalledTimes(1);
+    expect(redisService.evalScript).toHaveBeenCalledTimes(1);
     expect(matchSessionService.create).toHaveBeenCalledWith({
       players: [
         { userId: slotAId, displayName: "Ace", rating: 1000 },
         { userId: slotBId, displayName: "Bob", rating: 1040 },
       ],
+      matchId: result.matchId,
       tournamentMatchId,
     });
     expect(matchPlayService.onMatchStarted).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects when a player is already in a match", async () => {
-    redisService.get.mockImplementation(async (key: string) =>
-      key.includes(slotAId) ? "existing-match" : null,
-    );
+  it("rejects when atomic player claim fails", async () => {
+    redisService.evalScript.mockResolvedValue(0);
 
     const result = await service.startMatch({
       tournamentMatchId,
@@ -110,6 +117,32 @@ describe("DirectedMatchService", () => {
     expect(matchSessionService.create).not.toHaveBeenCalled();
   });
 
+  it("rejects when pair lock cannot be acquired", async () => {
+    redisService.setnx.mockResolvedValue(false);
+
+    const result = await service.startMatch({
+      tournamentMatchId,
+      slotA: { userId: slotAId, displayName: "Ace" },
+      slotB: { userId: slotBId, displayName: "Bob" },
+    });
+
+    expect(result).toEqual({ ok: false, code: "PLAYER_ALREADY_IN_MATCH" });
+    expect(redisService.evalScript).not.toHaveBeenCalled();
+    expect(matchSessionService.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects when tournamentMatchId is not a UUID", async () => {
+    const result = await service.startMatch({
+      tournamentMatchId: "bracket-1",
+      slotA: { userId: slotAId, displayName: "Ace" },
+      slotB: { userId: slotBId, displayName: "Bob" },
+    });
+
+    expect(result).toEqual({ ok: false, code: "INVALID_TOURNAMENT_MATCH" });
+    expect(redisService.setnx).not.toHaveBeenCalled();
+    expect(matchSessionService.create).not.toHaveBeenCalled();
+  });
+
   it("rejects when both slots refer to the same player", async () => {
     const result = await service.startMatch({
       tournamentMatchId,
@@ -118,5 +151,19 @@ describe("DirectedMatchService", () => {
     });
 
     expect(result).toEqual({ ok: false, code: "SAME_PLAYER" });
+  });
+
+  it("releases player claims when session creation fails", async () => {
+    matchSessionService.create.mockRejectedValue(new Error("redis unavailable"));
+
+    await expect(
+      service.startMatch({
+        tournamentMatchId,
+        slotA: { userId: slotAId, displayName: "Ace" },
+        slotB: { userId: slotBId, displayName: "Bob" },
+      }),
+    ).rejects.toThrow("redis unavailable");
+
+    expect(redisService.del).toHaveBeenCalledTimes(2);
   });
 });

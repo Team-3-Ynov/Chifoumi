@@ -1,12 +1,22 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
+import { validate as uuidValidate, v4 as uuidv4 } from "uuid";
 import { MatchPlayService } from "../match/match-play.service.js";
 import { MatchSessionService } from "../match-session/match-session.service.js";
-import type { MatchPlayer } from "../match-session/match-session.types.js";
-import { matchByUserKey } from "../matchmaking/matchmaking.constants.js";
-import { MatchmakingService } from "../matchmaking/matchmaking.service.js";
+import {
+  MATCH_SESSION_TTL_SECONDS,
+  type MatchPlayer,
+  userMatchKey,
+} from "../match-session/match-session.types.js";
+import {
+  MATCH_BY_USER_PREFIX,
+  MATCHMAKING_PAIR_LOCK_TTL_SECONDS,
+  MATCHMAKING_QUEUE_KEY,
+  matchmakingPairLockKey,
+} from "../matchmaking/matchmaking.constants.js";
 import { RatingService } from "../matchmaking/rating.service.js";
 import { RedisService } from "../redis/redis.service.js";
+import { CLAIM_DIRECTED_PLAYERS_SCRIPT } from "./directed-match.constants.js";
 
 export type DirectedMatchPlayer = {
   userId: string;
@@ -22,7 +32,8 @@ export type StartDirectedMatchInput = {
 export type StartDirectedMatchErrorCode =
   | "SAME_PLAYER"
   | "PLAYER_ALREADY_IN_MATCH"
-  | "INVALID_PLAYER";
+  | "INVALID_PLAYER"
+  | "INVALID_TOURNAMENT_MATCH";
 
 export type StartDirectedMatchResult =
   | { ok: true; matchId: string }
@@ -32,7 +43,6 @@ export type StartDirectedMatchResult =
 export class DirectedMatchService {
   constructor(
     @Inject(RedisService) private readonly redisService: RedisService,
-    @Inject(MatchmakingService) private readonly matchmakingService: MatchmakingService,
     @Inject(RatingService) private readonly ratingService: RatingService,
     @Inject(MatchSessionService) private readonly matchSessionService: MatchSessionService,
     @Inject(MatchPlayService) private readonly matchPlayService: MatchPlayService,
@@ -44,17 +54,13 @@ export class DirectedMatchService {
       return { ok: false, code: "SAME_PLAYER" };
     }
 
-    if (
-      !this.isValidPlayer(input.slotA) ||
-      !this.isValidPlayer(input.slotB) ||
-      input.tournamentMatchId.trim().length === 0
-    ) {
+    if (!this.isValidPlayer(input.slotA) || !this.isValidPlayer(input.slotB)) {
       return { ok: false, code: "INVALID_PLAYER" };
     }
 
-    const busyCheck = await this.ensurePlayersAvailable(input.slotA.userId, input.slotB.userId);
-    if (!busyCheck.ok) {
-      return busyCheck;
+    const tournamentMatchId = input.tournamentMatchId.trim();
+    if (tournamentMatchId.length === 0 || !uuidValidate(tournamentMatchId)) {
+      return { ok: false, code: "INVALID_TOURNAMENT_MATCH" };
     }
 
     const [playerA, playerB] = await Promise.all([
@@ -62,53 +68,66 @@ export class DirectedMatchService {
       this.toMatchPlayer(input.slotB),
     ]);
 
-    const state = await this.matchSessionService.create({
-      players: [playerA, playerB],
-      tournamentMatchId: input.tournamentMatchId,
-    });
+    const matchId = uuidv4();
+    const claimed = await this.claimPlayers(playerA.userId, playerB.userId, matchId);
+    if (!claimed) {
+      return { ok: false, code: "PLAYER_ALREADY_IN_MATCH" };
+    }
 
-    await this.matchPlayService.onMatchStarted(state);
+    try {
+      const state = await this.matchSessionService.create({
+        players: [playerA, playerB],
+        matchId,
+        tournamentMatchId,
+      });
 
-    this.logger.log(
-      {
-        matchId: state.matchId,
-        tournamentMatchId: input.tournamentMatchId,
-        slotA: input.slotA.userId,
-        slotB: input.slotB.userId,
-      },
-      "directed tournament match created",
-    );
+      await this.matchPlayService.onMatchStarted(state);
 
-    return { ok: true, matchId: state.matchId };
+      this.logger.log(
+        {
+          matchId: state.matchId,
+          tournamentMatchId,
+          slotA: input.slotA.userId,
+          slotB: input.slotB.userId,
+        },
+        "directed tournament match created",
+      );
+
+      return { ok: true, matchId: state.matchId };
+    } catch (error) {
+      await this.releasePlayerClaims(playerA.userId, playerB.userId);
+      throw error;
+    }
   }
 
   private isValidPlayer(player: DirectedMatchPlayer): boolean {
     return player.userId.trim().length > 0 && player.displayName.trim().length > 0;
   }
 
-  private async ensurePlayersAvailable(
-    userA: string,
-    userB: string,
-  ): Promise<{ ok: true } | { ok: false; code: "PLAYER_ALREADY_IN_MATCH" }> {
-    const [matchA, matchB] = await Promise.all([
-      this.redisService.get(matchByUserKey(userA)),
-      this.redisService.get(matchByUserKey(userB)),
-    ]);
-
-    if (matchA || matchB) {
-      return { ok: false, code: "PLAYER_ALREADY_IN_MATCH" };
+  private async claimPlayers(userA: string, userB: string, matchId: string): Promise<boolean> {
+    const pairLockKey = matchmakingPairLockKey(userA, userB);
+    const lockAcquired = await this.redisService.setnx(
+      pairLockKey,
+      MATCHMAKING_PAIR_LOCK_TTL_SECONDS,
+    );
+    if (!lockAcquired) {
+      return false;
     }
 
-    const [inQueueA, inQueueB] = await Promise.all([
-      this.matchmakingService.isInQueue(userA),
-      this.matchmakingService.isInQueue(userB),
+    const claimed = await this.redisService.evalScript<number>(
+      CLAIM_DIRECTED_PLAYERS_SCRIPT,
+      [MATCHMAKING_QUEUE_KEY],
+      [pairLockKey, matchId, userA, userB, MATCH_BY_USER_PREFIX, String(MATCH_SESSION_TTL_SECONDS)],
+    );
+
+    return claimed === 1;
+  }
+
+  private async releasePlayerClaims(userA: string, userB: string): Promise<void> {
+    await Promise.all([
+      this.redisService.del(userMatchKey(userA)),
+      this.redisService.del(userMatchKey(userB)),
     ]);
-
-    if (inQueueA || inQueueB) {
-      return { ok: false, code: "PLAYER_ALREADY_IN_MATCH" };
-    }
-
-    return { ok: true };
   }
 
   private async toMatchPlayer(player: DirectedMatchPlayer): Promise<MatchPlayer> {
