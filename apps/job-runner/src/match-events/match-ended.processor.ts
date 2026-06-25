@@ -38,6 +38,7 @@ const matchEndedPayloadSchema = z
       b: z.number().int().nonnegative(),
     }),
     startedAt: z.string().datetime(),
+    tournamentMatchId: z.string().uuid().optional(),
   })
   .refine(
     (payload) =>

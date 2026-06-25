@@ -52,6 +52,9 @@ type MockTx = {
   eloHistory: {
     createMany: jest.Mock;
   };
+  tournamentMatch: {
+    update: jest.Mock;
+  };
 };
 
 function createTx(overrides: Partial<MockTx> = {}): MockTx {
@@ -69,6 +72,9 @@ function createTx(overrides: Partial<MockTx> = {}): MockTx {
     },
     eloHistory: {
       createMany: jest.fn(async () => ({})),
+    },
+    tournamentMatch: {
+      update: jest.fn(async () => ({})),
     },
     ...overrides,
   };
@@ -147,5 +153,18 @@ describe("MatchPersistenceService", () => {
     const persisted = await service.persistMatchEnded(createPayload());
 
     expect(persisted).toBe("already_exists");
+  });
+
+  it("links tournament_matches.match_id when tournamentMatchId is present", async () => {
+    const tournamentMatchId = "44444444-4444-4444-8444-444444444444";
+    const payload = { ...createPayload(), tournamentMatchId };
+
+    const persisted = await service.persistMatchEnded(payload);
+
+    expect(persisted).toBe("created");
+    expect(tx.tournamentMatch.update).toHaveBeenCalledWith({
+      where: { id: tournamentMatchId },
+      data: { matchId },
+    });
   });
 });

@@ -51,6 +51,13 @@ export class MatchPersistenceService {
           },
         });
 
+        if (payload.tournamentMatchId) {
+          await tx.tournamentMatch.update({
+            where: { id: payload.tournamentMatchId },
+            data: { matchId: payload.matchId },
+          });
+        }
+
         for (const round of payload.rounds) {
           await tx.round.upsert({
             where: {
