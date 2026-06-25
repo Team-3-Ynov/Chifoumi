@@ -3,6 +3,51 @@ import type { Tournament } from "@prisma/client";
 import { TournamentFormat, TournamentStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { TournamentsQueueService } from "../queues/tournaments-queue.service.js";
+import type { TournamentListQueryDto } from "./dto/tournament-query.dto.js";
+import type {
+  BracketMatchDto,
+  BracketRoundDto,
+  BracketSlotDto,
+  TournamentDetailDto,
+  TournamentListItemDto,
+  TournamentListResponseDto,
+  TournamentRegistrationDto,
+} from "./dto/tournament-read-response.dto.js";
+
+type TournamentListRecord = Tournament & {
+  _count: { registrations: number };
+};
+
+type TournamentRegistrationRecord = {
+  userId: string;
+  seed: number | null;
+  user: {
+    displayName: string;
+  };
+};
+
+type TournamentSlotRecord = {
+  id: string;
+  displayName: string;
+};
+
+type TournamentMatchRecord = {
+  id: string;
+  round: number;
+  matchId: string | null;
+  winnerSlot: "a" | "b" | null;
+  slotA: TournamentSlotRecord | null;
+  slotB: TournamentSlotRecord | null;
+  match: {
+    scoreA: number;
+    scoreB: number;
+  } | null;
+};
+
+type TournamentDetailRecord = TournamentListRecord & {
+  registrations: TournamentRegistrationRecord[];
+  matches: TournamentMatchRecord[];
+};
 
 @Injectable()
 export class TournamentsService {
@@ -28,6 +73,64 @@ export class TournamentsService {
         status: TournamentStatus.upcoming,
       },
     });
+  }
+
+  async listTournaments(query: TournamentListQueryDto): Promise<TournamentListResponseDto> {
+    const where = query.status ? { status: query.status } : {};
+    const skip = (query.page - 1) * query.limit;
+    const [items, total] = await Promise.all([
+      this.prisma.tournament.findMany({
+        where,
+        orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+        skip,
+        take: query.limit,
+        include: { _count: { select: { registrations: true } } },
+      }),
+      this.prisma.tournament.count({ where }),
+    ]);
+
+    return {
+      items: items.map((tournament) => this.toListItem(tournament as TournamentListRecord)),
+      page: query.page,
+      limit: query.limit,
+      total,
+    };
+  }
+
+  async getTournamentDetail(tournamentId: string): Promise<TournamentDetailDto> {
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: {
+        _count: { select: { registrations: true } },
+        registrations: {
+          include: {
+            user: { select: { displayName: true } },
+          },
+        },
+        matches: {
+          include: {
+            slotA: { select: { id: true, displayName: true } },
+            slotB: { select: { id: true, displayName: true } },
+            match: { select: { scoreA: true, scoreB: true } },
+          },
+          orderBy: [{ round: "asc" }, { id: "asc" }],
+        },
+      },
+    });
+
+    if (!tournament) {
+      throw new NotFoundException({ error: "TOURNAMENT_NOT_FOUND" });
+    }
+
+    const detail = tournament as TournamentDetailRecord;
+
+    return {
+      ...this.toListItem(detail),
+      registrationOpensAt: detail.registrationOpensAt,
+      endedAt: detail.endedAt,
+      registrations: this.toRegistrations(detail.registrations),
+      bracket: this.toBracket(detail.matches),
+    };
   }
 
   async openRegistration(tournamentId: string): Promise<Tournament> {
@@ -78,6 +181,80 @@ export class TournamentsService {
     }
 
     return this.requireTournament(tournament.id);
+  }
+
+  private toListItem(tournament: TournamentListRecord): TournamentListItemDto {
+    return {
+      id: tournament.id,
+      name: tournament.name,
+      format: tournament.format,
+      bracketSize: tournament.bracketSize,
+      status: tournament.status,
+      registrationsCount: tournament._count.registrations,
+      startsAt: tournament.startsAt,
+    };
+  }
+
+  private toRegistrations(
+    registrations: TournamentRegistrationRecord[],
+  ): TournamentRegistrationDto[] {
+    return [...registrations]
+      .sort((left, right) => {
+        if (left.seed === null && right.seed === null) {
+          return left.user.displayName.localeCompare(right.user.displayName);
+        }
+
+        if (left.seed === null) {
+          return 1;
+        }
+
+        if (right.seed === null) {
+          return -1;
+        }
+
+        return left.seed - right.seed;
+      })
+      .map((registration) => ({
+        userId: registration.userId,
+        displayName: registration.user.displayName,
+        seed: registration.seed,
+      }));
+  }
+
+  private toBracket(matches: TournamentMatchRecord[]): BracketRoundDto[] {
+    const rounds = new Map<number, BracketMatchDto[]>();
+
+    for (const match of matches) {
+      const roundMatches = rounds.get(match.round) ?? [];
+      roundMatches.push({
+        id: match.id,
+        matchId: match.matchId,
+        slotA: this.toSlot(match.slotA),
+        slotB: this.toSlot(match.slotB),
+        scoreA: match.match?.scoreA ?? null,
+        scoreB: match.match?.scoreB ?? null,
+        winnerSlot: match.winnerSlot,
+      });
+      rounds.set(match.round, roundMatches);
+    }
+
+    return [...rounds.entries()]
+      .sort(([leftRound], [rightRound]) => leftRound - rightRound)
+      .map(([round, roundMatches]) => ({
+        round,
+        matches: roundMatches,
+      }));
+  }
+
+  private toSlot(slot: TournamentSlotRecord | null): BracketSlotDto | null {
+    if (!slot) {
+      return null;
+    }
+
+    return {
+      userId: slot.id,
+      displayName: slot.displayName,
+    };
   }
 
   private async requireTournament(tournamentId: string): Promise<Tournament> {
