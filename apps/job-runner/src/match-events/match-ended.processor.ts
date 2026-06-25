@@ -2,6 +2,7 @@ import { type Job, UnrecoverableError } from "bullmq";
 import { z } from "zod";
 import type { MatchPersistenceService } from "../persistence/match-persistence.service.js";
 import type { RedisInvalidationService } from "../redis/redis-invalidation.service.js";
+import type { TournamentProgressionService } from "../tournaments/tournament-progression.service.js";
 import type { WorkerProcessor } from "../workers/worker-processors.js";
 import type { MatchEndedPayload } from "./match-ended.types.js";
 
@@ -11,6 +12,7 @@ const roundWinnerSchema = z.enum(["a", "b", "draw"]);
 const matchEndedPayloadSchema = z
   .object({
     matchId: z.string().uuid(),
+    tournamentMatchId: z.string().uuid().optional(),
     players: z.tuple([
       z.object({
         userId: z.string().uuid(),
@@ -53,6 +55,7 @@ const matchEndedPayloadSchema = z
 export type MatchEventsProcessorDependencies = {
   matchPersistence: MatchPersistenceService;
   redisInvalidation: RedisInvalidationService;
+  tournamentProgression: TournamentProgressionService;
 };
 
 export function createMatchEndedProcessor(deps: MatchEventsProcessorDependencies): WorkerProcessor {
@@ -72,5 +75,11 @@ export function createMatchEndedProcessor(deps: MatchEventsProcessorDependencies
     if (persistenceStatus === "created" || persistenceStatus === "already_exists") {
       await deps.redisInvalidation.invalidateLeaderboard();
     }
+
+    await deps.tournamentProgression.processMatchEnded({
+      matchId: parsed.data.matchId,
+      winnerId: parsed.data.winner,
+      tournamentMatchId: parsed.data.tournamentMatchId,
+    });
   };
 }

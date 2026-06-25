@@ -123,6 +123,7 @@ export class GenerateBracketService {
             id: match.id,
             tournamentId: tournament.id,
             round: match.round,
+            positionIndex: match.positionIndex,
             slotAId: match.slotAId,
             slotBId: match.slotBId,
             winnerSlot: match.winnerSlot,

@@ -15,6 +15,8 @@ import { SeasonResetService } from "./seasons/season-reset.service.js";
 import { SeasonResetLockService } from "./seasons/season-reset-lock.service.js";
 import { GenerateBracketService } from "./tournaments/generate-bracket.service.js";
 import { GenerateBracketLockService } from "./tournaments/generate-bracket-lock.service.js";
+import { TournamentMatchReadyService } from "./tournaments/tournament-match-ready.service.js";
+import { TournamentProgressionService } from "./tournaments/tournament-progression.service.js";
 import { WorkerFactory } from "./workers/worker-factory.js";
 
 @Module({
@@ -39,6 +41,8 @@ import { WorkerFactory } from "./workers/worker-factory.js";
     SeasonResetService,
     GenerateBracketLockService,
     GenerateBracketService,
+    TournamentMatchReadyService,
+    TournamentProgressionService,
     WorkerFactory,
     CronSchedulerService,
     RunnerService,

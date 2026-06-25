@@ -83,6 +83,52 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
     });
   }
 
+  async enqueueTournamentCompletedMail(input: {
+    tournamentId: string;
+    userId: string;
+    to: string;
+    displayName: string;
+    tournamentName: string;
+  }): Promise<void> {
+    const payload: SendMailJobPayload = {
+      to: input.to,
+      template: "tournament-completed",
+      data: {
+        displayName: input.displayName,
+        tournamentName: input.tournamentName,
+      },
+    };
+
+    await this.requireQueue().add(SEND_MAIL_JOB_NAME, payload, {
+      ...SEND_MAIL_JOB_OPTIONS,
+      jobId: `tournament-completed:${input.tournamentId}:${input.userId}`,
+    });
+  }
+
+  async enqueueTournamentMatchReadyMail(input: {
+    tournamentMatchId: string;
+    userId: string;
+    to: string;
+    displayName: string;
+    opponentDisplayName: string;
+    tournamentName: string;
+  }): Promise<void> {
+    const payload: SendMailJobPayload = {
+      to: input.to,
+      template: "tournament-match-ready",
+      data: {
+        displayName: input.displayName,
+        opponentDisplayName: input.opponentDisplayName,
+        tournamentName: input.tournamentName,
+      },
+    };
+
+    await this.requireQueue().add(SEND_MAIL_JOB_NAME, payload, {
+      ...SEND_MAIL_JOB_OPTIONS,
+      jobId: `tournament-match-ready:${input.tournamentMatchId}:${input.userId}`,
+    });
+  }
+
   private requireQueue(): Queue {
     if (!this.queue) {
       throw new Error("Notifications queue is not connected");
