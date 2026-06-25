@@ -134,6 +134,55 @@ describe("GenerateBracketService", () => {
     expect(generateBracketLock.acquire).not.toHaveBeenCalled();
   });
 
+  it("re-enqueues tournament notifications when matches already exist", async () => {
+    const tournament = {
+      id: tournamentId,
+      name: "Spring Cup",
+      bracketSize: 4,
+      status: TournamentStatus.in_progress,
+      registrations: [
+        {
+          userId: userAId,
+          user: { id: userAId, displayName: "alice", email: "alice@test.com" },
+        },
+        {
+          userId: userBId,
+          user: { id: userBId, displayName: "bob", email: "bob@test.com" },
+        },
+      ],
+    };
+    const notificationsQueue = {
+      enqueueTournamentStartedMail: jest.fn(async () => undefined),
+    };
+    const prisma = {
+      tournament: {
+        findUnique: jest.fn(async () => tournament),
+      },
+      tournamentMatch: {
+        count: jest.fn(async () => 2),
+      },
+    };
+
+    const service = createService({
+      prisma,
+      generateBracketLock: { acquire: jest.fn(), release: jest.fn() },
+      notificationsQueue,
+    });
+
+    await expect(service.processGenerateBracket({ tournamentId })).resolves.toBe(
+      "already_generated",
+    );
+
+    expect(notificationsQueue.enqueueTournamentStartedMail).toHaveBeenCalledTimes(2);
+    expect(notificationsQueue.enqueueTournamentStartedMail).toHaveBeenCalledWith({
+      tournamentId,
+      userId: userAId,
+      to: "alice@test.com",
+      displayName: "alice",
+      tournamentName: "Spring Cup",
+    });
+  });
+
   it("is idempotent after acquiring the lock", async () => {
     const tournament = {
       id: tournamentId,
@@ -181,6 +230,7 @@ describe("GenerateBracketService", () => {
       "already_generated",
     );
     expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(generateBracketLock.release).toHaveBeenCalledWith(tournamentId, "token");
   });
 
   it("throws when the distributed lock cannot be acquired", async () => {

@@ -49,6 +49,11 @@ export class GenerateBracketService {
       where: { tournamentId: tournament.id },
     });
     if (existingMatches > 0) {
+      await this.enqueueTournamentStartedNotifications(
+        tournament.id,
+        tournament.name,
+        tournament.registrations,
+      );
       return "already_generated";
     }
 
@@ -62,6 +67,11 @@ export class GenerateBracketService {
         where: { tournamentId: tournament.id },
       });
       if (matchesAfterLock > 0) {
+        await this.enqueueTournamentStartedNotifications(
+          tournament.id,
+          tournament.name,
+          tournament.registrations,
+        );
         return "already_generated";
       }
 
@@ -121,7 +131,11 @@ export class GenerateBracketService {
         });
       });
 
-      await this.enqueueTournamentStartedNotifications(tournament.name, tournament.registrations);
+      await this.enqueueTournamentStartedNotifications(
+        tournament.id,
+        tournament.name,
+        tournament.registrations,
+      );
 
       return "generated";
     } finally {
@@ -130,13 +144,17 @@ export class GenerateBracketService {
   }
 
   private async enqueueTournamentStartedNotifications(
+    tournamentId: string,
     tournamentName: string,
     registrations: Array<{
+      userId: string;
       user: { email: string; displayName: string };
     }>,
   ): Promise<void> {
     for (const registration of registrations) {
       await this.notificationsQueue.enqueueTournamentStartedMail({
+        tournamentId,
+        userId: registration.userId,
         to: registration.user.email,
         displayName: GenerateBracketService.sanitizeForTemplate(registration.user.displayName),
         tournamentName,

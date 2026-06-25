@@ -101,7 +101,7 @@ export function buildBracketStructure(
 
     if (pairing.player2 === null) {
       match.winnerSlot = WinnerSlot.a;
-      advanceByeWinner(match, roundTwo);
+      advanceWinner(match, roundTwo, pairing.player1.id);
       continue;
     }
 
@@ -112,17 +112,21 @@ export function buildBracketStructure(
     });
   }
 
+  advanceUnopposedPlayers(rounds);
+  prunePlayableMatchesWithEmptySibling(rounds);
+
   return {
     matches: rounds.flat(),
     roundOnePlayable,
   };
 }
 
-function advanceByeWinner(
+function advanceWinner(
   match: BracketMatchDraft,
   nextRound: BracketMatchDraft[] | undefined,
+  winnerId: string,
 ): void {
-  if (!nextRound || !match.slotAId) {
+  if (!nextRound) {
     return;
   }
 
@@ -132,11 +136,116 @@ function advanceByeWinner(
   }
 
   if (match.positionIndex % 2 === 0) {
-    parent.slotAId = match.slotAId;
+    parent.slotAId = winnerId;
     return;
   }
 
-  parent.slotBId = match.slotAId;
+  parent.slotBId = winnerId;
+}
+
+function advanceUnopposedPlayers(rounds: BracketMatchDraft[][]): void {
+  let advanced = true;
+
+  while (advanced) {
+    advanced = false;
+
+    for (let roundIndex = 1; roundIndex < rounds.length; roundIndex++) {
+      const currentRound = rounds[roundIndex];
+      const nextRound = rounds[roundIndex + 1];
+      if (!currentRound) {
+        continue;
+      }
+
+      for (const match of currentRound) {
+        if (match.winnerSlot !== null) {
+          continue;
+        }
+
+        const hasSlotA = match.slotAId !== null;
+        const hasSlotB = match.slotBId !== null;
+        if (hasSlotA === hasSlotB) {
+          continue;
+        }
+
+        const missingSlot = hasSlotA ? WinnerSlot.b : WinnerSlot.a;
+        if (hasPendingFeeder(rounds, roundIndex, match.positionIndex, missingSlot)) {
+          continue;
+        }
+
+        match.winnerSlot = hasSlotA ? WinnerSlot.a : WinnerSlot.b;
+        const winnerId = hasSlotA ? match.slotAId : match.slotBId;
+        if (winnerId) {
+          advanceWinner(match, nextRound, winnerId);
+        }
+        advanced = true;
+      }
+    }
+  }
+}
+
+function hasPendingFeeder(
+  rounds: BracketMatchDraft[][],
+  roundIndex: number,
+  positionIndex: number,
+  slot: WinnerSlot,
+): boolean {
+  const previousRound = rounds[roundIndex - 1];
+  if (!previousRound) {
+    return false;
+  }
+
+  const feederPosition = positionIndex * 2 + (slot === WinnerSlot.a ? 0 : 1);
+  const feeder = previousRound[feederPosition];
+  return feeder ? !isBranchEmpty(rounds, roundIndex - 1, feeder.positionIndex) : false;
+}
+
+function prunePlayableMatchesWithEmptySibling(rounds: BracketMatchDraft[][]): void {
+  for (let roundIndex = 0; roundIndex < rounds.length - 1; roundIndex++) {
+    const currentRound = rounds[roundIndex];
+    if (!currentRound) {
+      continue;
+    }
+
+    for (const match of currentRound) {
+      if (match.nextMatchId === null || match.winnerSlot !== null) {
+        continue;
+      }
+
+      if (match.slotAId === null || match.slotBId === null) {
+        continue;
+      }
+
+      const siblingPosition =
+        match.positionIndex % 2 === 0 ? match.positionIndex + 1 : match.positionIndex - 1;
+      if (isBranchEmpty(rounds, roundIndex, siblingPosition)) {
+        match.nextMatchId = null;
+      }
+    }
+  }
+}
+
+function isBranchEmpty(
+  rounds: BracketMatchDraft[][],
+  roundIndex: number,
+  positionIndex: number,
+): boolean {
+  const match = rounds[roundIndex]?.[positionIndex];
+  if (!match) {
+    return true;
+  }
+
+  if (match.slotAId !== null || match.slotBId !== null) {
+    return false;
+  }
+
+  if (roundIndex === 0) {
+    return true;
+  }
+
+  return (
+    isBranchEmpty(rounds, roundIndex - 1, positionIndex * 2) &&
+    isBranchEmpty(rounds, roundIndex - 1, positionIndex * 2 + 1)
+  );
 }
 
 export function defaultRatingForUser(rating: number | undefined): number {

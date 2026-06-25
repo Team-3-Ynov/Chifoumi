@@ -81,4 +81,34 @@ describe("buildBracketStructure", () => {
     expect(built.roundOnePlayable).toHaveLength(1);
     expect(built.matches).toHaveLength(7);
   });
+
+  it("does not leave a playable match pointing to an empty final branch", () => {
+    const seeded = makeSeeded([1800, 1700]);
+    const firstRound = generateFirstRound(seeded, 8);
+    const built = buildBracketStructure(seeded, 8, firstRound);
+
+    const playableMatches = built.matches.filter(
+      (match) => match.slotAId !== null && match.slotBId !== null && match.winnerSlot === null,
+    );
+
+    expect(playableMatches).toHaveLength(1);
+    expect(playableMatches[0]).toMatchObject({
+      slotAId: "player-1",
+      slotBId: "player-2",
+      nextMatchId: null,
+    });
+  });
+
+  it("propagates a multi-round bye into the final", () => {
+    const seeded = makeSeeded([1800, 1700, 1600]);
+    const firstRound = generateFirstRound(seeded, 8);
+    const built = buildBracketStructure(seeded, 8, firstRound);
+
+    const finalMatch = built.matches.find((match) => match.round === 3);
+
+    expect(finalMatch).toMatchObject({
+      slotAId: null,
+      slotBId: "player-3",
+    });
+  });
 });

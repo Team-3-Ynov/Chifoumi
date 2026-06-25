@@ -62,6 +62,8 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
   }
 
   async enqueueTournamentStartedMail(input: {
+    tournamentId: string;
+    userId: string;
     to: string;
     displayName: string;
     tournamentName: string;
@@ -75,7 +77,10 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
       },
     };
 
-    await this.requireQueue().add(SEND_MAIL_JOB_NAME, payload, SEND_MAIL_JOB_OPTIONS);
+    await this.requireQueue().add(SEND_MAIL_JOB_NAME, payload, {
+      ...SEND_MAIL_JOB_OPTIONS,
+      jobId: `tournament-started:${input.tournamentId}:${input.userId}`,
+    });
   }
 
   private requireQueue(): Queue {
