@@ -93,6 +93,15 @@ describe("DirectedMatchService", () => {
 
     expect(redisService.setnx).toHaveBeenCalledTimes(1);
     expect(redisService.evalScript).toHaveBeenCalledTimes(1);
+    expect(redisService.evalScript).toHaveBeenCalledWith(
+      expect.any(String),
+      ["matchmaking:queue"],
+      expect.arrayContaining([
+        "match:byUser:",
+        "matchmaking:meta:",
+        `tournament-match:${tournamentMatchId}:match`,
+      ]),
+    );
     expect(matchSessionService.create).toHaveBeenCalledWith({
       players: [
         { userId: slotAId, displayName: "Ace", rating: 1000 },
@@ -102,6 +111,19 @@ describe("DirectedMatchService", () => {
       tournamentMatchId,
     });
     expect(matchPlayService.onMatchStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows directed matches to pull players out of the matchmaking queue", async () => {
+    await service.startMatch({
+      tournamentMatchId,
+      slotA: { userId: slotAId, displayName: "Ace" },
+      slotB: { userId: slotBId, displayName: "Bob" },
+    });
+
+    const script = redisService.evalScript.mock.calls[0]?.[0] ?? "";
+    expect(script).toContain('redis.call("ZREM", queueKey, userA, userB)');
+    expect(script).toContain('redis.call("DEL", metaPrefix .. userA, metaPrefix .. userB)');
+    expect(script).not.toContain('redis.call("ZSCORE", queueKey');
   });
 
   it("rejects when atomic player claim fails", async () => {
@@ -114,6 +136,19 @@ describe("DirectedMatchService", () => {
     });
 
     expect(result).toEqual({ ok: false, code: "PLAYER_ALREADY_IN_MATCH" });
+    expect(matchSessionService.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the tournament match is already claimed", async () => {
+    redisService.evalScript.mockResolvedValue(2);
+
+    const result = await service.startMatch({
+      tournamentMatchId,
+      slotA: { userId: slotAId, displayName: "Ace" },
+      slotB: { userId: slotBId, displayName: "Bob" },
+    });
+
+    expect(result).toEqual({ ok: false, code: "TOURNAMENT_MATCH_ALREADY_STARTED" });
     expect(matchSessionService.create).not.toHaveBeenCalled();
   });
 
@@ -164,6 +199,7 @@ describe("DirectedMatchService", () => {
       }),
     ).rejects.toThrow("redis unavailable");
 
-    expect(redisService.del).toHaveBeenCalledTimes(2);
+    expect(redisService.del).toHaveBeenCalledTimes(3);
+    expect(redisService.del).toHaveBeenCalledWith(`tournament-match:${tournamentMatchId}:match`);
   });
 });

@@ -10,6 +10,7 @@ import {
 } from "../match-session/match-session.types.js";
 import {
   MATCH_BY_USER_PREFIX,
+  MATCHMAKING_META_PREFIX,
   MATCHMAKING_PAIR_LOCK_TTL_SECONDS,
   MATCHMAKING_QUEUE_KEY,
   matchmakingPairLockKey,
@@ -33,7 +34,8 @@ export type StartDirectedMatchErrorCode =
   | "SAME_PLAYER"
   | "PLAYER_ALREADY_IN_MATCH"
   | "INVALID_PLAYER"
-  | "INVALID_TOURNAMENT_MATCH";
+  | "INVALID_TOURNAMENT_MATCH"
+  | "TOURNAMENT_MATCH_ALREADY_STARTED";
 
 export type StartDirectedMatchResult =
   | { ok: true; matchId: string }
@@ -69,8 +71,16 @@ export class DirectedMatchService {
     ]);
 
     const matchId = uuidv4();
-    const claimed = await this.claimPlayers(playerA.userId, playerB.userId, matchId);
-    if (!claimed) {
+    const claim = await this.claimPlayers(
+      playerA.userId,
+      playerB.userId,
+      tournamentMatchId,
+      matchId,
+    );
+    if (claim === "tournament_already_started") {
+      return { ok: false, code: "TOURNAMENT_MATCH_ALREADY_STARTED" };
+    }
+    if (claim === "players_busy") {
       return { ok: false, code: "PLAYER_ALREADY_IN_MATCH" };
     }
 
@@ -95,7 +105,7 @@ export class DirectedMatchService {
 
       return { ok: true, matchId: state.matchId };
     } catch (error) {
-      await this.releasePlayerClaims(playerA.userId, playerB.userId);
+      await this.releaseClaims(playerA.userId, playerB.userId, tournamentMatchId);
       throw error;
     }
   }
@@ -104,29 +114,54 @@ export class DirectedMatchService {
     return player.userId.trim().length > 0 && player.displayName.trim().length > 0;
   }
 
-  private async claimPlayers(userA: string, userB: string, matchId: string): Promise<boolean> {
+  private async claimPlayers(
+    userA: string,
+    userB: string,
+    tournamentMatchId: string,
+    matchId: string,
+  ): Promise<"claimed" | "players_busy" | "tournament_already_started"> {
     const pairLockKey = matchmakingPairLockKey(userA, userB);
     const lockAcquired = await this.redisService.setnx(
       pairLockKey,
       MATCHMAKING_PAIR_LOCK_TTL_SECONDS,
     );
     if (!lockAcquired) {
-      return false;
+      return "players_busy";
     }
 
     const claimed = await this.redisService.evalScript<number>(
       CLAIM_DIRECTED_PLAYERS_SCRIPT,
       [MATCHMAKING_QUEUE_KEY],
-      [pairLockKey, matchId, userA, userB, MATCH_BY_USER_PREFIX, String(MATCH_SESSION_TTL_SECONDS)],
+      [
+        pairLockKey,
+        matchId,
+        userA,
+        userB,
+        MATCH_BY_USER_PREFIX,
+        MATCHMAKING_META_PREFIX,
+        tournamentMatchKey(tournamentMatchId),
+        String(MATCH_SESSION_TTL_SECONDS),
+      ],
     );
 
-    return claimed === 1;
+    if (claimed === 1) {
+      return "claimed";
+    }
+    if (claimed === 2) {
+      return "tournament_already_started";
+    }
+    return "players_busy";
   }
 
-  private async releasePlayerClaims(userA: string, userB: string): Promise<void> {
+  private async releaseClaims(
+    userA: string,
+    userB: string,
+    tournamentMatchId: string,
+  ): Promise<void> {
     await Promise.all([
       this.redisService.del(userMatchKey(userA)),
       this.redisService.del(userMatchKey(userB)),
+      this.redisService.del(tournamentMatchKey(tournamentMatchId)),
     ]);
   }
 
@@ -138,4 +173,8 @@ export class DirectedMatchService {
       rating,
     };
   }
+}
+
+function tournamentMatchKey(tournamentMatchId: string): string {
+  return `tournament-match:${tournamentMatchId}:match`;
 }
