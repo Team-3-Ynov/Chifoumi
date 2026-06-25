@@ -1,5 +1,5 @@
+import { TournamentFormat, TournamentStatus } from "@chifoumi/db";
 import { ApiProperty } from "@nestjs/swagger";
-import { TournamentFormat, TournamentStatus } from "@prisma/client";
 
 export class TournamentResponseDto {
   @ApiProperty({ type: String, format: "uuid", example: "9b6f7c2a-4e8c-4b1a-9f24-5a7a7a8e6c4a" })

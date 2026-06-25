@@ -1,5 +1,5 @@
+import { TournamentStatus } from "@chifoumi/db";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { TournamentStatus } from "@prisma/client";
 import { Type } from "class-transformer";
 import { IsEnum, IsInt, IsOptional, Max, Min } from "class-validator";
 

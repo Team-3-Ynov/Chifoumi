@@ -1,5 +1,5 @@
+import { TournamentFormat } from "@chifoumi/db";
 import { ApiProperty } from "@nestjs/swagger";
-import { TournamentFormat } from "@prisma/client";
 import { Type } from "class-transformer";
 import { IsDate, IsEnum, IsIn, IsInt, IsString, Length } from "class-validator";
 

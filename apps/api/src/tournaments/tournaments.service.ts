@@ -1,6 +1,11 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { Tournament } from "@prisma/client";
-import { TournamentFormat, TournamentStatus } from "@prisma/client";
+import { Prisma, type Tournament, TournamentFormat, TournamentStatus } from "@chifoumi/db";
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { TournamentsQueueService } from "../queues/tournaments-queue.service.js";
 import type { TournamentListQueryDto } from "./dto/tournament-query.dto.js";
@@ -56,13 +61,17 @@ export class TournamentsService {
     @Inject(TournamentsQueueService) private readonly tournamentsQueue: TournamentsQueueService,
   ) {}
 
-  createTournament(input: {
+  async createTournament(input: {
     name: string;
     format: TournamentFormat;
     bracketSize: number;
     registrationOpensAt: Date;
     startsAt: Date;
   }): Promise<Tournament> {
+    if (input.startsAt < input.registrationOpensAt) {
+      throw new BadRequestException({ error: "INVALID_TOURNAMENT_SCHEDULE" });
+    }
+
     return this.prisma.tournament.create({
       data: {
         name: input.name,
@@ -262,6 +271,75 @@ export class TournamentsService {
 
     if (!tournament) {
       throw new NotFoundException({ error: "TOURNAMENT_NOT_FOUND" });
+    }
+
+    return tournament;
+  }
+
+  async registerPlayer(tournamentId: string, userId: string): Promise<void> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.assertRegistrationSlotAvailable(tx, tournamentId);
+
+        await tx.tournamentRegistration.create({
+          data: { tournamentId, userId },
+        });
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ConflictException) {
+        throw error;
+      }
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException({ error: "ALREADY_REGISTERED" });
+      }
+      throw error;
+    }
+  }
+
+  async unregisterPlayer(tournamentId: string, userId: string): Promise<void> {
+    const tournament = await this.requireTournament(tournamentId);
+
+    if (tournament.status !== TournamentStatus.registration_open) {
+      throw new ConflictException({ error: "REGISTRATION_CLOSED" });
+    }
+
+    await this.prisma.tournamentRegistration.deleteMany({
+      where: { tournamentId, userId },
+    });
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+  }
+
+  private async assertRegistrationSlotAvailable(
+    tx: Pick<PrismaService, "tournament" | "tournamentRegistration" | "$queryRaw">,
+    tournamentId: string,
+  ): Promise<Tournament> {
+    const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM tournaments WHERE id = ${tournamentId}::uuid FOR UPDATE
+    `;
+
+    if (lockedRows.length === 0) {
+      throw new NotFoundException({ error: "TOURNAMENT_NOT_FOUND" });
+    }
+
+    const tournament = await tx.tournament.findUnique({ where: { id: tournamentId } });
+
+    if (!tournament) {
+      throw new NotFoundException({ error: "TOURNAMENT_NOT_FOUND" });
+    }
+
+    if (tournament.status !== TournamentStatus.registration_open) {
+      throw new ConflictException({ error: "REGISTRATION_CLOSED" });
+    }
+
+    const registrationCount = await tx.tournamentRegistration.count({
+      where: { tournamentId },
+    });
+
+    if (registrationCount >= tournament.bracketSize) {
+      throw new ConflictException({ error: "TOURNAMENT_FULL" });
     }
 
     return tournament;
