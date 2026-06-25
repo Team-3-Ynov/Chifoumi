@@ -21,4 +21,5 @@ export type MatchEndedPayload = {
   winner: string | null;
   finalScore: { a: number; b: number };
   startedAt: string;
+  tournamentMatchId?: string;
 };

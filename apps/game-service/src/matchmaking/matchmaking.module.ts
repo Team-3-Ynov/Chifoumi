@@ -17,6 +17,6 @@ import { RatingService } from "./rating.service.js";
     MatchmakingEventsService,
     MatchmakingGateway,
   ],
-  exports: [MatchmakingService, MatchmakingEventsService],
+  exports: [MatchmakingService, MatchmakingEventsService, RatingService],
 })
 export class MatchmakingModule {}

@@ -24,6 +24,16 @@ export class MatchPersistenceService {
           return "already_exists";
         }
 
+        if (payload.tournamentMatchId) {
+          const tournamentMatch = await tx.tournamentMatch.findUnique({
+            where: { id: payload.tournamentMatchId },
+            select: { matchId: true },
+          });
+          if (tournamentMatch?.matchId) {
+            return "already_exists";
+          }
+        }
+
         const [playerA, playerB] = payload.players;
         const [ratingA, ratingB] = await Promise.all([
           this.findOrCreateRating(tx, playerA.userId),
@@ -50,6 +60,16 @@ export class MatchPersistenceService {
             status: MatchStatus.ended,
           },
         });
+
+        if (payload.tournamentMatchId) {
+          const linked = await tx.tournamentMatch.updateMany({
+            where: { id: payload.tournamentMatchId, matchId: null },
+            data: { matchId: payload.matchId },
+          });
+          if (linked.count === 0) {
+            throw new TournamentMatchLinkConflictError(payload.tournamentMatchId);
+          }
+        }
 
         for (const round of payload.rounds) {
           await tx.round.upsert({
@@ -152,5 +172,12 @@ export class MatchPersistenceService {
 
   private isUniqueMatchConflict(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+  }
+}
+
+class TournamentMatchLinkConflictError extends Error {
+  constructor(tournamentMatchId: string) {
+    super(`Tournament match is already linked or missing: ${tournamentMatchId}`);
+    this.name = "TournamentMatchLinkConflictError";
   }
 }

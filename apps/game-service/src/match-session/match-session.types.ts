@@ -66,6 +66,7 @@ export type MatchState = {
   rounds?: ResolvedRound[];
   winnerId?: string;
   endReason?: MatchEndReason;
+  tournamentMatchId?: string;
 };
 
 export type MatchFoundPayload = {

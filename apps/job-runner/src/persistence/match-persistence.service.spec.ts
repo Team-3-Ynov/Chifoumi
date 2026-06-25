@@ -52,6 +52,10 @@ type MockTx = {
   eloHistory: {
     createMany: jest.Mock;
   };
+  tournamentMatch: {
+    findUnique: jest.Mock;
+    updateMany: jest.Mock;
+  };
 };
 
 function createTx(overrides: Partial<MockTx> = {}): MockTx {
@@ -69,6 +73,10 @@ function createTx(overrides: Partial<MockTx> = {}): MockTx {
     },
     eloHistory: {
       createMany: jest.fn(async () => ({})),
+    },
+    tournamentMatch: {
+      findUnique: jest.fn(async () => ({ matchId: null })),
+      updateMany: jest.fn(async () => ({ count: 1 })),
     },
     ...overrides,
   };
@@ -147,5 +155,34 @@ describe("MatchPersistenceService", () => {
     const persisted = await service.persistMatchEnded(createPayload());
 
     expect(persisted).toBe("already_exists");
+  });
+
+  it("links tournament_matches.match_id when tournamentMatchId is present", async () => {
+    const tournamentMatchId = "44444444-4444-4444-8444-444444444444";
+    const payload = { ...createPayload(), tournamentMatchId };
+
+    const persisted = await service.persistMatchEnded(payload);
+
+    expect(persisted).toBe("created");
+    expect(tx.tournamentMatch.updateMany).toHaveBeenCalledWith({
+      where: { id: tournamentMatchId, matchId: null },
+      data: { matchId },
+    });
+  });
+
+  it("skips all match and ELO writes when tournament match is already linked", async () => {
+    const tournamentMatchId = "44444444-4444-4444-8444-444444444444";
+    tx.tournamentMatch.findUnique.mockImplementation(async () => ({
+      matchId: "55555555-5555-4555-8555-555555555555",
+    }));
+
+    const persisted = await service.persistMatchEnded({ ...createPayload(), tournamentMatchId });
+
+    expect(persisted).toBe("already_exists");
+    expect(tx.match.create).not.toHaveBeenCalled();
+    expect(tx.round.upsert).not.toHaveBeenCalled();
+    expect(tx.eloRating.update).not.toHaveBeenCalled();
+    expect(tx.eloHistory.createMany).not.toHaveBeenCalled();
+    expect(tx.tournamentMatch.updateMany).not.toHaveBeenCalled();
   });
 });

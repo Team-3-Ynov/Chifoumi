@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { jest } from "@jest/globals";
-import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import { ForbiddenException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { MatchStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service.js";
@@ -94,6 +94,11 @@ describe("AuditService", () => {
     it("should return audit trail for ended match", async () => {
       jest.spyOn(prisma.match, "findUnique").mockResolvedValue(mockMatch);
 
+      const [round0, round1, round2] = mockMatch.rounds;
+      if (round0 === undefined || round1 === undefined || round2 === undefined) {
+        throw new Error("mockMatch must define three rounds");
+      }
+
       const result = await service.buildAudit("123");
 
       expect(result).toEqual({
@@ -105,9 +110,8 @@ describe("AuditService", () => {
         rounds: [
           {
             roundNumber: 1,
-            // Non-null assertions safe: mockMatch.rounds is always populated
-            commitA: mockMatch.rounds[0]!.commitA,
-            commitB: mockMatch.rounds[0]!.commitB,
+            commitA: round0.commitA,
+            commitB: round0.commitB,
             moveA: "rock",
             moveB: "paper",
             nonceA: "nonce-a",
@@ -116,8 +120,8 @@ describe("AuditService", () => {
           },
           {
             roundNumber: 2,
-            commitA: mockMatch.rounds[1]!.commitA,
-            commitB: mockMatch.rounds[1]!.commitB,
+            commitA: round1.commitA,
+            commitB: round1.commitB,
             moveA: "scissors",
             moveB: "rock",
             nonceA: "nonce-a2",
@@ -126,8 +130,8 @@ describe("AuditService", () => {
           },
           {
             roundNumber: 3,
-            commitA: mockMatch.rounds[2]!.commitA,
-            commitB: mockMatch.rounds[2]!.commitB,
+            commitA: round2.commitA,
+            commitB: round2.commitB,
             moveA: "paper",
             moveB: "scissors",
             nonceA: "nonce-a3",
@@ -177,9 +181,13 @@ describe("AuditService", () => {
       jest.spyOn(prisma.match, "findUnique").mockResolvedValue(mismatchMatch);
 
       const result = await service.buildAudit("123");
+      const firstRound = result.rounds[0];
+      if (firstRound === undefined) {
+        throw new Error("expected first round in audit result");
+      }
 
-      expect(result.rounds[0]!.hashCheck.a).toBe("mismatch");
-      expect(result.rounds[0]!.hashCheck.b).toBe("match");
+      expect(firstRound.hashCheck.a).toBe("mismatch");
+      expect(firstRound.hashCheck.b).toBe("match");
     });
 
     it("should include rounds with null fields as mismatch in hashCheck", async () => {
@@ -197,8 +205,12 @@ describe("AuditService", () => {
       const result = await service.buildAudit("123");
 
       expect(result.rounds).toHaveLength(1);
-      expect(result.rounds[0]!.hashCheck.a).toBe("mismatch");
-      expect(result.rounds[0]!.hashCheck.b).toBe("match");
+      const firstRound = result.rounds[0];
+      if (firstRound === undefined) {
+        throw new Error("expected first round in audit result");
+      }
+      expect(firstRound.hashCheck.a).toBe("mismatch");
+      expect(firstRound.hashCheck.b).toBe("match");
     });
   });
 });
