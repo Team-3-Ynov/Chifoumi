@@ -13,6 +13,8 @@ const TEMPLATE_SUBJECTS: Record<string, string> = {
   welcome: "Bienvenue sur Chifoumi",
   "reset-password": "Réinitialisation de votre mot de passe Chifoumi",
   "season-reward": "Fin de saison Chifoumi — tes résultats",
+  "tournament-completed": "Tournoi Chifoumi — victoire !",
+  "tournament-match-ready": "Tournoi Chifoumi — ton prochain match est prêt",
 };
 
 @Injectable()

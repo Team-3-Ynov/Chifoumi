@@ -1,0 +1,5 @@
+Bonjour __DISPLAY_NAME__,
+
+Félicitations ! Tu as remporté le tournoi « __TOURNAMENT_NAME__ ».
+
+Consulte le bracket pour revoir ton parcours.

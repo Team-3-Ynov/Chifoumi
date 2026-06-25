@@ -61,6 +61,42 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
     await this.requireQueue().add(SEND_MAIL_JOB_NAME, payload, SEND_MAIL_JOB_OPTIONS);
   }
 
+  async enqueueTournamentCompletedMail(input: {
+    to: string;
+    displayName: string;
+    tournamentName: string;
+  }): Promise<void> {
+    const payload: SendMailJobPayload = {
+      to: input.to,
+      template: "tournament-completed",
+      data: {
+        displayName: input.displayName,
+        tournamentName: input.tournamentName,
+      },
+    };
+
+    await this.requireQueue().add(SEND_MAIL_JOB_NAME, payload, SEND_MAIL_JOB_OPTIONS);
+  }
+
+  async enqueueTournamentMatchReadyMail(input: {
+    to: string;
+    displayName: string;
+    opponentDisplayName: string;
+    tournamentName: string;
+  }): Promise<void> {
+    const payload: SendMailJobPayload = {
+      to: input.to,
+      template: "tournament-match-ready",
+      data: {
+        displayName: input.displayName,
+        opponentDisplayName: input.opponentDisplayName,
+        tournamentName: input.tournamentName,
+      },
+    };
+
+    await this.requireQueue().add(SEND_MAIL_JOB_NAME, payload, SEND_MAIL_JOB_OPTIONS);
+  }
+
   private requireQueue(): Queue {
     if (!this.queue) {
       throw new Error("Notifications queue is not connected");

@@ -50,6 +50,14 @@ function createSeasonReset(): { processSeasonReset: () => Promise<"noop"> } {
   };
 }
 
+function createTournamentProgression(): {
+  processMatchEnded: () => Promise<"not_tournament_match">;
+} {
+  return {
+    processMatchEnded: jest.fn(async (): Promise<"not_tournament_match"> => "not_tournament_match"),
+  };
+}
+
 function createMailService(): { send: () => Promise<void> } {
   return {
     send: jest.fn(async () => undefined),
@@ -75,6 +83,7 @@ describe("WorkerFactory", () => {
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
       createSeasonReset() as never,
+      createTournamentProgression() as never,
       createMailService() as never,
       logger,
     );
@@ -120,6 +129,7 @@ describe("WorkerFactory", () => {
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
       createSeasonReset() as never,
+      createTournamentProgression() as never,
       createMailService() as never,
       { log: jest.fn(), error: jest.fn() } as unknown as Logger,
     );
@@ -164,6 +174,7 @@ describe("WorkerFactory", () => {
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
       createSeasonReset() as never,
+      createTournamentProgression() as never,
       createMailService() as never,
       logger,
     );

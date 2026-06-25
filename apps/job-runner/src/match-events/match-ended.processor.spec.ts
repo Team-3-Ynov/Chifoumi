@@ -30,6 +30,14 @@ function createJob(overrides: Partial<Job> = {}): Job {
   } as Job;
 }
 
+function createTournamentProgression(): {
+  processMatchEnded: () => Promise<"not_tournament_match">;
+} {
+  return {
+    processMatchEnded: jest.fn(async (): Promise<"not_tournament_match"> => "not_tournament_match"),
+  };
+}
+
 describe("createMatchEndedProcessor", () => {
   it("persists valid match-ended jobs and invalidates the leaderboard", async () => {
     const matchPersistence = {
@@ -38,15 +46,24 @@ describe("createMatchEndedProcessor", () => {
     const redisInvalidation = {
       invalidateLeaderboard: jest.fn(async () => undefined),
     };
+    const tournamentProgression = {
+      processMatchEnded: jest.fn(async () => "not_tournament_match"),
+    };
     const processor = createMatchEndedProcessor({
       matchPersistence: matchPersistence as never,
       redisInvalidation: redisInvalidation as never,
+      tournamentProgression: tournamentProgression as never,
     });
 
     await processor(createJob());
 
     expect(matchPersistence.persistMatchEnded).toHaveBeenCalledWith(validPayload);
     expect(redisInvalidation.invalidateLeaderboard).toHaveBeenCalledTimes(1);
+    expect(tournamentProgression.processMatchEnded).toHaveBeenCalledWith({
+      matchId: validPayload.matchId,
+      winnerId: validPayload.winner,
+      tournamentMatchId: undefined,
+    });
   });
 
   it("invalidates leaderboard for idempotent replays", async () => {
@@ -59,6 +76,7 @@ describe("createMatchEndedProcessor", () => {
     const processor = createMatchEndedProcessor({
       matchPersistence: matchPersistence as never,
       redisInvalidation: redisInvalidation as never,
+      tournamentProgression: createTournamentProgression() as never,
     });
 
     await processor(createJob());
@@ -70,6 +88,7 @@ describe("createMatchEndedProcessor", () => {
     const processor = createMatchEndedProcessor({
       matchPersistence: { persistMatchEnded: jest.fn() } as never,
       redisInvalidation: { invalidateLeaderboard: jest.fn() } as never,
+      tournamentProgression: createTournamentProgression() as never,
     });
 
     await expect(processor(createJob({ data: { invalid: true } }))).rejects.toBeInstanceOf(
@@ -81,6 +100,7 @@ describe("createMatchEndedProcessor", () => {
     const processor = createMatchEndedProcessor({
       matchPersistence: { persistMatchEnded: jest.fn() } as never,
       redisInvalidation: { invalidateLeaderboard: jest.fn() } as never,
+      tournamentProgression: createTournamentProgression() as never,
     });
 
     await expect(
@@ -104,6 +124,7 @@ describe("createMatchEndedProcessor", () => {
         }),
       } as never,
       redisInvalidation: { invalidateLeaderboard: jest.fn() } as never,
+      tournamentProgression: createTournamentProgression() as never,
     });
 
     await expect(processor(createJob())).rejects.toBe(error);
