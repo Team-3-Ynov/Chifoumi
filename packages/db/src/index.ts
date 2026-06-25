@@ -7,6 +7,7 @@ export type {
   Round,
   Season,
   SeasonStanding,
+  Tournament,
   User,
 } from "@prisma/client";
 export {
@@ -16,5 +17,7 @@ export {
   PrismaClient,
   RoundWinner,
   SeasonStatus,
+  TournamentFormat,
+  TournamentStatus,
   UserRole,
 } from "@prisma/client";

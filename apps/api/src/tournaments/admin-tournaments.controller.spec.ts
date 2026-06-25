@@ -1,7 +1,7 @@
+import { TournamentFormat, TournamentStatus } from "@chifoumi/db";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { type ExecutionContext, ForbiddenException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { TournamentFormat, TournamentStatus } from "@prisma/client";
 import { RolesGuard } from "../auth/guards/roles.guard.js";
 import { AdminTournamentsController } from "./admin-tournaments.controller.js";
 import { CreateTournamentDto } from "./dto/create-tournament.dto.js";

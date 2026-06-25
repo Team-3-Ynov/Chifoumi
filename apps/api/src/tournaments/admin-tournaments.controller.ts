@@ -1,3 +1,4 @@
+import type { Tournament } from "@chifoumi/db";
 import {
   Body,
   Controller,
@@ -22,7 +23,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
-import type { Tournament } from "@prisma/client";
 import { Roles } from "../auth/decorators/roles.decorator.js";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
 import { RolesGuard } from "../auth/guards/roles.guard.js";
@@ -88,8 +88,13 @@ export class AdminTournamentsController {
     schema: { example: { error: "TOURNAMENT_NOT_FOUND" } },
   })
   @ApiConflictResponse({
-    description: "Tournament is not in the upcoming state",
-    schema: { example: { error: "TOURNAMENT_NOT_UPCOMING" } },
+    description: "Tournament is not in the upcoming state or registration is already open",
+    schema: {
+      oneOf: [
+        { example: { error: "TOURNAMENT_NOT_UPCOMING" } },
+        { example: { error: "TOURNAMENT_ALREADY_OPEN" } },
+      ],
+    },
   })
   async openRegistration(
     @Param("id", new ParseUUIDPipe()) tournamentId: string,
@@ -128,6 +133,7 @@ export class AdminTournamentsController {
     schema: {
       oneOf: [
         { example: { error: "TOURNAMENT_ALREADY_STARTED" } },
+        { example: { error: "TOURNAMENT_NOT_REGISTRATION_OPEN" } },
         { example: { error: "NOT_ENOUGH_PLAYERS" } },
       ],
     },
