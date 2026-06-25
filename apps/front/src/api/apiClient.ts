@@ -1,4 +1,9 @@
-import type { RefreshResponse } from "./types.js";
+import type {
+  RefreshResponse,
+  TournamentDetail,
+  TournamentListResponse,
+  TournamentStatus,
+} from "./types.js";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -133,6 +138,31 @@ export async function resetPassword(token: string, newPassword: string): Promise
     method: "POST",
     body: JSON.stringify({ token, newPassword }),
   });
+}
+
+export function buildTournamentsPath(status?: TournamentStatus): string {
+  if (!status) {
+    return "/tournaments";
+  }
+
+  const params = new URLSearchParams({ status });
+  return `/tournaments?${params.toString()}`;
+}
+
+export function listTournaments(status?: TournamentStatus): Promise<TournamentListResponse> {
+  return apiRequest<TournamentListResponse>(buildTournamentsPath(status));
+}
+
+export function getTournament(tournamentId: string): Promise<TournamentDetail> {
+  return apiRequest<TournamentDetail>(`/tournaments/${tournamentId}`);
+}
+
+export function registerForTournament(tournamentId: string): Promise<void> {
+  return apiRequest<void>(`/tournaments/${tournamentId}/register`, { method: "POST" });
+}
+
+export function unregisterFromTournament(tournamentId: string): Promise<void> {
+  return apiRequest<void>(`/tournaments/${tournamentId}/register`, { method: "DELETE" });
 }
 
 export async function refreshTokens(refreshToken: string): Promise<RefreshResponse> {

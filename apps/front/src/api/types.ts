@@ -132,6 +132,62 @@ export type MeHistoryResponse = {
   nextCursor: string | null;
 };
 
+export type TournamentFormat = "single_elim" | "double_elim";
+
+export type TournamentStatus = "upcoming" | "registration_open" | "in_progress" | "completed";
+
+export type TournamentSummary = {
+  id: string;
+  name: string;
+  format: TournamentFormat;
+  status: TournamentStatus;
+  bracketSize: number;
+  registrationsCount: number;
+  startsAt: string;
+};
+
+export type TournamentListResponse = {
+  items: TournamentSummary[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
+export type TournamentRegistration = {
+  userId: string;
+  displayName: string;
+  seed: number | null;
+};
+
+export type BracketSlot = {
+  userId: string;
+  displayName: string;
+};
+
+export type WinnerSlot = "a" | "b";
+
+export type BracketMatch = {
+  id: string;
+  matchId: string | null;
+  slotA: BracketSlot | null;
+  slotB: BracketSlot | null;
+  scoreA: number | null;
+  scoreB: number | null;
+  winnerSlot: WinnerSlot | null;
+};
+
+export type BracketRound = {
+  round: number;
+  matches: BracketMatch[];
+};
+
+export type TournamentDetail = TournamentSummary & {
+  registrationOpensAt: string;
+  endedAt: string | null;
+  registrations: TournamentRegistration[];
+  bracket: BracketRound[];
+};
+
 export type AdminUser = {
   id: string;
   email: string;
