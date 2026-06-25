@@ -35,6 +35,8 @@ describe("TournamentsService", () => {
       create: ReturnType<typeof jest.fn>;
       deleteMany: ReturnType<typeof jest.fn>;
     };
+    $queryRaw: ReturnType<typeof jest.fn>;
+    $transaction: ReturnType<typeof jest.fn>;
   };
   let enqueueGenerateBracket: ReturnType<typeof jest.fn>;
 
@@ -50,6 +52,10 @@ describe("TournamentsService", () => {
         create: jest.fn(),
         deleteMany: jest.fn(),
       },
+      $queryRaw: jest.fn(),
+      $transaction: jest.fn(async (callback: (tx: typeof prisma) => Promise<unknown>) =>
+        callback(prisma),
+      ),
     };
     enqueueGenerateBracket = jest.fn();
     enqueueGenerateBracket.mockResolvedValue(undefined);
@@ -279,6 +285,10 @@ describe("TournamentsService", () => {
   });
 
   describe("registerPlayer", () => {
+    beforeEach(() => {
+      prisma.$queryRaw.mockResolvedValue([{ id: "tournament-1" }]);
+    });
+
     it("creates a registration when tournament is open and has capacity", async () => {
       prisma.tournament.findUnique.mockResolvedValue(
         makeTournament({ status: TournamentStatus.registration_open, bracketSize: 16 }),
@@ -288,6 +298,27 @@ describe("TournamentsService", () => {
 
       await service.registerPlayer("tournament-1", "user-1");
 
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.$queryRaw).toHaveBeenCalled();
+      expect(prisma.tournamentRegistration.create).toHaveBeenCalledWith({
+        data: { tournamentId: "tournament-1", userId: "user-1" },
+      });
+    });
+
+    it("locks the tournament row before counting registrations to prevent overbooking", async () => {
+      prisma.tournament.findUnique.mockResolvedValue(
+        makeTournament({ status: TournamentStatus.registration_open, bracketSize: 8 }),
+      );
+      prisma.tournamentRegistration.count.mockResolvedValue(7);
+      prisma.tournamentRegistration.create.mockResolvedValue({});
+
+      await service.registerPlayer("tournament-1", "user-1");
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.$queryRaw).toHaveBeenCalled();
+      expect(prisma.tournamentRegistration.count).toHaveBeenCalledWith({
+        where: { tournamentId: "tournament-1" },
+      });
       expect(prisma.tournamentRegistration.create).toHaveBeenCalledWith({
         data: { tournamentId: "tournament-1", userId: "user-1" },
       });
@@ -352,7 +383,7 @@ describe("TournamentsService", () => {
     });
 
     it("throws 404 TOURNAMENT_NOT_FOUND when the tournament does not exist", async () => {
-      prisma.tournament.findUnique.mockResolvedValue(null);
+      prisma.$queryRaw.mockResolvedValue([]);
 
       await expect(service.registerPlayer("missing", "user-1")).rejects.toBeInstanceOf(
         NotFoundException,

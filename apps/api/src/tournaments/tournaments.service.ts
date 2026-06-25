@@ -100,25 +100,18 @@ export class TournamentsService {
   }
 
   async registerPlayer(tournamentId: string, userId: string): Promise<void> {
-    const tournament = await this.requireTournament(tournamentId);
-
-    if (tournament.status !== TournamentStatus.registration_open) {
-      throw new ConflictException({ error: "REGISTRATION_CLOSED" });
-    }
-
-    const registrationCount = await this.prisma.tournamentRegistration.count({
-      where: { tournamentId },
-    });
-
-    if (registrationCount >= tournament.bracketSize) {
-      throw new ConflictException({ error: "TOURNAMENT_FULL" });
-    }
-
     try {
-      await this.prisma.tournamentRegistration.create({
-        data: { tournamentId, userId },
+      await this.prisma.$transaction(async (tx) => {
+        await this.assertRegistrationSlotAvailable(tx, tournamentId);
+
+        await tx.tournamentRegistration.create({
+          data: { tournamentId, userId },
+        });
       });
     } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ConflictException) {
+        throw error;
+      }
       if (this.isUniqueConstraintError(error)) {
         throw new ConflictException({ error: "ALREADY_REGISTERED" });
       }
@@ -140,6 +133,39 @@ export class TournamentsService {
 
   private isUniqueConstraintError(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+  }
+
+  private async assertRegistrationSlotAvailable(
+    tx: Pick<PrismaService, "tournament" | "tournamentRegistration" | "$queryRaw">,
+    tournamentId: string,
+  ): Promise<Tournament> {
+    const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM tournaments WHERE id = ${tournamentId}::uuid FOR UPDATE
+    `;
+
+    if (lockedRows.length === 0) {
+      throw new NotFoundException({ error: "TOURNAMENT_NOT_FOUND" });
+    }
+
+    const tournament = await tx.tournament.findUnique({ where: { id: tournamentId } });
+
+    if (!tournament) {
+      throw new NotFoundException({ error: "TOURNAMENT_NOT_FOUND" });
+    }
+
+    if (tournament.status !== TournamentStatus.registration_open) {
+      throw new ConflictException({ error: "REGISTRATION_CLOSED" });
+    }
+
+    const registrationCount = await tx.tournamentRegistration.count({
+      where: { tournamentId },
+    });
+
+    if (registrationCount >= tournament.bracketSize) {
+      throw new ConflictException({ error: "TOURNAMENT_FULL" });
+    }
+
+    return tournament;
   }
 
   private async requireOpenableTournament(tournamentId: string): Promise<Tournament> {
