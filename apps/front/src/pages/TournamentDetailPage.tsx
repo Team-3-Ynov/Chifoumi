@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.js";
 import { AsyncPanel, ProfileSkeleton } from "../components/AsyncState.js";
+import { BracketView } from "../components/BracketView.js";
 import { TournamentErrorNotice } from "../components/TournamentErrorNotice.js";
 import { useTournament, useTournamentRegistration } from "../hooks/useTournaments.js";
 import {
@@ -127,6 +128,15 @@ export function TournamentDetailPage() {
                   <p className="muted">Aucun joueur inscrit pour le moment.</p>
                 )}
               </section>
+
+              {data.bracket.length > 0 ? (
+                <section className="bracket-section" aria-labelledby="bracket-title">
+                  <h2 id="bracket-title" className="section-title">
+                    Bracket
+                  </h2>
+                  <BracketView bracket={data.bracket} currentUserId={user?.id} />
+                </section>
+              ) : null}
             </>
           ) : null}
         </AsyncPanel>
