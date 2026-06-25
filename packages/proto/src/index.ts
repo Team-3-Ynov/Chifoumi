@@ -6,6 +6,9 @@ const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const AUTH_PROTO_PATH = join(packageRoot, "proto", "auth.proto");
 export const AUTH_PROTO_PACKAGE = "chifoumi.auth.v1";
 
+export const TOURNAMENTS_PROTO_PATH = join(packageRoot, "proto", "tournaments.proto");
+export const TOURNAMENTS_PROTO_PACKAGE = "chifoumi.tournaments.v1";
+
 export type VerifyTokenReason = "INVALID" | "EXPIRED" | "REVOKED" | "UNAVAILABLE";
 
 export type VerifyTokenResponse = {
