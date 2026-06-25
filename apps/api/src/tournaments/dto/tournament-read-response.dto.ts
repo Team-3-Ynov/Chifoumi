@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty } from "@nestjs/swagger";
 import { TournamentFormat, TournamentStatus, WinnerSlot } from "@prisma/client";
 
 export class TournamentListItemDto {
@@ -45,7 +45,7 @@ export class TournamentRegistrationDto {
   @ApiProperty({ type: String, example: "Ada" })
   displayName!: string;
 
-  @ApiPropertyOptional({ type: Number, example: 1, nullable: true })
+  @ApiProperty({ type: Number, example: 1, nullable: true })
   seed!: number | null;
 }
 
@@ -61,7 +61,7 @@ export class BracketMatchDto {
   @ApiProperty({ type: String, format: "uuid", example: "d91fdde2-e4c2-4e89-a80e-328245385d2d" })
   id!: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     type: String,
     format: "uuid",
     nullable: true,
@@ -69,19 +69,19 @@ export class BracketMatchDto {
   })
   matchId!: string | null;
 
-  @ApiPropertyOptional({ type: BracketSlotDto, nullable: true })
+  @ApiProperty({ type: BracketSlotDto, nullable: true })
   slotA!: BracketSlotDto | null;
 
-  @ApiPropertyOptional({ type: BracketSlotDto, nullable: true })
+  @ApiProperty({ type: BracketSlotDto, nullable: true })
   slotB!: BracketSlotDto | null;
 
-  @ApiPropertyOptional({ type: Number, nullable: true, example: 2 })
+  @ApiProperty({ type: Number, nullable: true, example: 2 })
   scoreA!: number | null;
 
-  @ApiPropertyOptional({ type: Number, nullable: true, example: 1 })
+  @ApiProperty({ type: Number, nullable: true, example: 1 })
   scoreB!: number | null;
 
-  @ApiPropertyOptional({ enum: WinnerSlot, nullable: true, example: WinnerSlot.a })
+  @ApiProperty({ enum: WinnerSlot, nullable: true, example: WinnerSlot.a })
   winnerSlot!: WinnerSlot | null;
 }
 
@@ -97,7 +97,7 @@ export class TournamentDetailDto extends TournamentListItemDto {
   @ApiProperty({ type: String, format: "date-time", example: "2026-07-01T00:00:00.000Z" })
   registrationOpensAt!: Date;
 
-  @ApiPropertyOptional({ type: String, format: "date-time", nullable: true })
+  @ApiProperty({ type: String, format: "date-time", nullable: true, example: null })
   endedAt!: Date | null;
 
   @ApiProperty({ type: [TournamentRegistrationDto] })
