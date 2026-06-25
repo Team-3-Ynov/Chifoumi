@@ -31,6 +31,7 @@ type BracketMatch = {
   id: string;
   tournamentId: string;
   round: number;
+  positionIndex: number;
   matchId: string | null;
   slotAId: string | null;
   slotBId: string | null;
@@ -48,6 +49,7 @@ function createFourPlayerBracket(): BracketMatch[] {
     id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     tournamentId,
     round: 1,
+    positionIndex: 0,
     matchId: "match-semi-a",
     slotAId: playerA.id,
     slotBId: playerB.id,
@@ -59,6 +61,7 @@ function createFourPlayerBracket(): BracketMatch[] {
     id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     tournamentId,
     round: 1,
+    positionIndex: 1,
     matchId: "match-semi-b",
     slotAId: playerC.id,
     slotBId: playerD.id,
@@ -70,6 +73,7 @@ function createFourPlayerBracket(): BracketMatch[] {
     id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
     tournamentId,
     round: 2,
+    positionIndex: 0,
     matchId: null,
     slotAId: null,
     slotBId: null,
@@ -83,6 +87,7 @@ function createFourPlayerBracket(): BracketMatch[] {
 
 function createEightPlayerRoundOneMatch(
   id: string,
+  positionIndex: number,
   slotAId: string,
   slotBId: string | null,
   nextMatchId: string,
@@ -92,6 +97,7 @@ function createEightPlayerRoundOneMatch(
     id,
     tournamentId,
     round: 1,
+    positionIndex,
     matchId: slotBId ? `match-${id}` : null,
     slotAId,
     slotBId,
@@ -276,6 +282,22 @@ describe("TournamentProgressionService", () => {
     expect(tournamentMatchReady.notifyPlayersMatchReady).not.toHaveBeenCalled();
   });
 
+  it("places winners in the correct parent slot when feeders complete out of order", async () => {
+    const { service, matchById } = createService(createFourPlayerBracket());
+
+    await service.processMatchEnded({ matchId: "match-semi-b", winnerId: playerC.id });
+
+    const finalAfterSemiB = matchById.get("ffffffff-ffff-4fff-8fff-ffffffffffff");
+    expect(finalAfterSemiB?.slotAId).toBeNull();
+    expect(finalAfterSemiB?.slotBId).toBe(playerC.id);
+
+    await service.processMatchEnded({ matchId: "match-semi-a", winnerId: playerA.id });
+
+    const finalMatch = matchById.get("ffffffff-ffff-4fff-8fff-ffffffffffff");
+    expect(finalMatch?.slotAId).toBe(playerA.id);
+    expect(finalMatch?.slotBId).toBe(playerC.id);
+  });
+
   it("notifies both players when the next match becomes ready", async () => {
     const { service, tournamentMatchReady } = createService(createFourPlayerBracket());
 
@@ -339,12 +361,14 @@ describe("TournamentProgressionService", () => {
   it("handles bye propagation when only one feeder completes in an 8-player bracket", async () => {
     const quarterA = createEightPlayerRoundOneMatch(
       "11111111-1111-4111-8111-111111111111",
+      0,
       playerA.id,
       playerB.id,
       "55555555-5555-4555-8555-555555555555",
     );
     const quarterB = createEightPlayerRoundOneMatch(
       "22222222-2222-4222-8222-222222222222",
+      1,
       playerC.id,
       null,
       "55555555-5555-4555-8555-555555555555",
@@ -356,6 +380,7 @@ describe("TournamentProgressionService", () => {
       id: "55555555-5555-4555-8555-555555555555",
       tournamentId,
       round: 2,
+      positionIndex: 0,
       matchId: null,
       slotAId: playerC.id,
       slotBId: null,
@@ -367,6 +392,7 @@ describe("TournamentProgressionService", () => {
       id: "33333333-3333-4333-8333-333333333333",
       tournamentId,
       round: 2,
+      positionIndex: 1,
       matchId: null,
       slotAId: null,
       slotBId: null,
@@ -378,6 +404,7 @@ describe("TournamentProgressionService", () => {
       id: "66666666-6666-4666-8666-666666666666",
       tournamentId,
       round: 3,
+      positionIndex: 0,
       matchId: null,
       slotAId: null,
       slotBId: null,

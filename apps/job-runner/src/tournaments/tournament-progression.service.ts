@@ -2,7 +2,7 @@ import { TournamentStatus, WinnerSlot } from "@chifoumi/db";
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { NotificationsQueueService } from "../queues/notifications-queue.service.js";
-import { resolveNextMatchSlotUpdate } from "./resolve-next-match-slot.js";
+import { resolveFeederTargetSlotUpdate } from "./resolve-feeder-target-slot.js";
 import { TournamentMatchReadyService } from "./tournament-match-ready.service.js";
 import type { TournamentProgressionResult } from "./tournament-progression.types.js";
 
@@ -16,6 +16,7 @@ type TournamentMatchRecord = {
   id: string;
   tournamentId: string;
   round: number;
+  positionIndex: number;
   matchId: string | null;
   slotAId: string | null;
   slotBId: string | null;
@@ -153,7 +154,11 @@ export class TournamentProgressionService {
         throw new Error(`Next tournament match ${tournamentMatch.nextMatchId} not found`);
       }
 
-      const slotUpdate = resolveNextMatchSlotUpdate(parentMatch, winnerId);
+      const slotUpdate = resolveFeederTargetSlotUpdate(
+        { positionIndex: tournamentMatch.positionIndex },
+        parentMatch,
+        winnerId,
+      );
       if (!slotUpdate) {
         return null;
       }
