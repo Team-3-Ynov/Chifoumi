@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext.js";
 import { AsyncPanel, ProfileSkeleton } from "../components/AsyncState.js";
 import { MatchHistoryList } from "../components/MatchHistoryList.js";
 import { ProfileHeader } from "../components/ProfileHeader.js";
+import { useCurrentSeason } from "../hooks/useCurrentSeason.js";
 import { useMyHistory } from "../hooks/useMyHistory.js";
 import { useProfile } from "../hooks/useProfile.js";
 
@@ -17,6 +18,7 @@ export function ProfilePage() {
   const profileUserId = isOwnProfile ? user?.id : id;
 
   const profileQuery = useProfile(profileUserId, isOwnProfile);
+  const currentSeasonQuery = useCurrentSeason(Boolean(profileUserId) && isOwnProfile);
   const historyQuery = useMyHistory(user?.id, isOwnProfile && activeTab === "history");
 
   const historyItems = useMemo(
@@ -46,7 +48,10 @@ export function ProfilePage() {
         >
           {profileQuery.data ? (
             <>
-              <ProfileHeader profile={profileQuery.data} />
+              <ProfileHeader
+                profile={profileQuery.data}
+                progressToNextLeague={currentSeasonQuery.data?.me.progressToNextLeague}
+              />
 
               {isOwnProfile ? (
                 <div className="tabs" role="tablist" aria-label="Profil">

@@ -27,6 +27,11 @@ export const TournamentStatus = {
   completed: "completed",
 } as const;
 
+export const WinnerSlot = {
+  a: "a",
+  b: "b",
+} as const;
+
 export type User = {
   id: string;
   email: string;

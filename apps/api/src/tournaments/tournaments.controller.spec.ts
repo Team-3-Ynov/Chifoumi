@@ -5,6 +5,8 @@ import type { TournamentsService } from "./tournaments.service.js";
 describe("TournamentsController", () => {
   let controller: TournamentsController;
   let tournamentsService: {
+    listTournaments: ReturnType<typeof jest.fn>;
+    getTournamentDetail: ReturnType<typeof jest.fn>;
     registerPlayer: ReturnType<typeof jest.fn>;
     unregisterPlayer: ReturnType<typeof jest.fn>;
   };
@@ -20,10 +22,36 @@ describe("TournamentsController", () => {
 
   beforeEach(() => {
     tournamentsService = {
+      listTournaments: jest.fn(),
+      getTournamentDetail: jest.fn(),
       registerPlayer: jest.fn(),
       unregisterPlayer: jest.fn(),
     };
     controller = new TournamentsController(tournamentsService as unknown as TournamentsService);
+  });
+
+  describe("listTournaments", () => {
+    it("delegates to the service with query parameters", async () => {
+      const response = { items: [], page: 1, limit: 20, total: 0 };
+      tournamentsService.listTournaments.mockResolvedValue(response);
+
+      const result = await controller.listTournaments({ page: 1, limit: 20 });
+
+      expect(result).toBe(response);
+      expect(tournamentsService.listTournaments).toHaveBeenCalledWith({ page: 1, limit: 20 });
+    });
+  });
+
+  describe("getTournamentDetail", () => {
+    it("delegates to the service with the tournament id", async () => {
+      const response = { id: "tournament-1" };
+      tournamentsService.getTournamentDetail.mockResolvedValue(response);
+
+      const result = await controller.getTournamentDetail("tournament-1");
+
+      expect(result).toBe(response);
+      expect(tournamentsService.getTournamentDetail).toHaveBeenCalledWith("tournament-1");
+    });
   });
 
   describe("register", () => {

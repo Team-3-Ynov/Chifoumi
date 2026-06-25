@@ -20,4 +20,5 @@ export {
   TournamentFormat,
   TournamentStatus,
   UserRole,
+  WinnerSlot,
 } from "@prisma/client";

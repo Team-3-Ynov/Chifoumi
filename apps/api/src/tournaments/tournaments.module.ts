@@ -6,7 +6,7 @@ import { TournamentsService } from "./tournaments.service.js";
 
 @Module({
   imports: [AuthModule],
-  controllers: [TournamentsController, AdminTournamentsController],
+  controllers: [AdminTournamentsController, TournamentsController],
   providers: [TournamentsService],
   exports: [TournamentsService],
 })
