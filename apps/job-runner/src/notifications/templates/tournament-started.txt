@@ -1,0 +1,5 @@
+Bonjour __DISPLAY_NAME__,
+
+Le tournoi « __TOURNAMENT_NAME__ » vient de démarrer. Consulte le bracket pour connaître ton prochain match.
+
+Bonne chance !
