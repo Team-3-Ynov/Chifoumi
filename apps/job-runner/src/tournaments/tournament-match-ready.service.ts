@@ -12,6 +12,8 @@ export class TournamentMatchReadyService {
   async notifyPlayersMatchReady(input: TournamentMatchReadyInput): Promise<void> {
     await Promise.all([
       this.notificationsQueue.enqueueTournamentMatchReadyMail({
+        tournamentMatchId: input.tournamentMatchId,
+        userId: input.slotA.userId,
         to: input.slotA.email,
         displayName: TournamentMatchReadyService.sanitizeForTemplate(input.slotA.displayName),
         opponentDisplayName: TournamentMatchReadyService.sanitizeForTemplate(
@@ -20,6 +22,8 @@ export class TournamentMatchReadyService {
         tournamentName: input.tournamentName,
       }),
       this.notificationsQueue.enqueueTournamentMatchReadyMail({
+        tournamentMatchId: input.tournamentMatchId,
+        userId: input.slotB.userId,
         to: input.slotB.email,
         displayName: TournamentMatchReadyService.sanitizeForTemplate(input.slotB.displayName),
         opponentDisplayName: TournamentMatchReadyService.sanitizeForTemplate(

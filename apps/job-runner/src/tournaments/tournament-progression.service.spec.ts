@@ -341,6 +341,8 @@ describe("TournamentProgressionService", () => {
       TournamentStatus.completed,
     );
     expect(notificationsQueue.enqueueTournamentCompletedMail).toHaveBeenCalledWith({
+      tournamentId,
+      userId: playerA.id,
       to: playerA.email,
       displayName: playerA.displayName,
       tournamentName,

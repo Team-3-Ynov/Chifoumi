@@ -130,7 +130,11 @@ export class TournamentProgressionService {
       });
     });
 
-    await this.enqueueTournamentCompletedNotification(tournamentMatch.tournament.name, winnerId);
+    await this.enqueueTournamentCompletedNotification(
+      tournamentMatch.tournamentId,
+      tournamentMatch.tournament.name,
+      winnerId,
+    );
 
     return "tournament_completed";
   }
@@ -215,6 +219,7 @@ export class TournamentProgressionService {
   }
 
   private async enqueueTournamentCompletedNotification(
+    tournamentId: string,
     tournamentName: string,
     winnerId: string,
   ): Promise<void> {
@@ -228,6 +233,8 @@ export class TournamentProgressionService {
     }
 
     await this.notificationsQueue.enqueueTournamentCompletedMail({
+      tournamentId,
+      userId: winnerId,
       to: winner.email,
       displayName: TournamentProgressionService.sanitizeForTemplate(winner.displayName),
       tournamentName,

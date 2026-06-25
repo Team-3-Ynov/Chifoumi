@@ -7,6 +7,7 @@ import { MailService } from "../notifications/mail.service.js";
 import { MatchPersistenceService } from "../persistence/match-persistence.service.js";
 import { RedisInvalidationService } from "../redis/redis-invalidation.service.js";
 import { SeasonResetService } from "../seasons/season-reset.service.js";
+import { GenerateBracketService } from "../tournaments/generate-bracket.service.js";
 import { TournamentProgressionService } from "../tournaments/tournament-progression.service.js";
 import { getProcessorForQueue } from "./worker-processors.js";
 
@@ -24,6 +25,7 @@ export class WorkerFactory {
     private readonly redisInvalidation: RedisInvalidationService,
     private readonly seasonReset: SeasonResetService,
     private readonly tournamentProgression: TournamentProgressionService,
+    private readonly generateBracket: GenerateBracketService,
     private readonly mailService: MailService,
     private readonly logger: Logger,
   ) {}
@@ -44,6 +46,7 @@ export class WorkerFactory {
       redisInvalidation: this.redisInvalidation,
       seasonReset: this.seasonReset,
       tournamentProgression: this.tournamentProgression,
+      generateBracket: this.generateBracket,
       mailService: this.mailService,
     });
 

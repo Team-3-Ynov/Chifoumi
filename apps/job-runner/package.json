@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "prebuild": "pnpm run prepare:workspace",
     "build": "tsc -p tsconfig.json && node scripts/copy-notification-templates.mjs",
     "start": "node dist/main.js",
+    "prepare:workspace": "pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/bracket build && pnpm --filter @chifoumi/elo build && pnpm --filter @chifoumi/leagues build",
+    "pretypecheck": "pnpm run prepare:workspace",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretest": "pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/elo build && pnpm --filter @chifoumi/leagues build",
+    "pretest": "pnpm run prepare:workspace",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "preintegration": "pnpm --filter @chifoumi/elo build && pnpm --filter @chifoumi/db build",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./jest-e2e.config.cjs --runInBand"
@@ -25,6 +28,7 @@
     "typescript": "~5.7.3"
   },
   "dependencies": {
+    "@chifoumi/bracket": "workspace:*",
     "@chifoumi/db": "workspace:*",
     "@chifoumi/elo": "workspace:*",
     "@chifoumi/leagues": "workspace:*",
