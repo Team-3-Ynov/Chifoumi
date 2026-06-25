@@ -10,23 +10,17 @@ import {
   createSeasonResetProcessor,
   type SeasonResetProcessorDependencies,
 } from "../seasons/season-reset.processor.js";
+import {
+  createGenerateBracketProcessor,
+  type GenerateBracketProcessorDependencies,
+} from "../tournaments/generate-bracket.processor.js";
 
 export type WorkerProcessor = (job: Job) => Promise<void>;
 export type ProcessorDependencies = MatchEventsProcessorDependencies &
-  SeasonResetProcessorDependencies & {
+  SeasonResetProcessorDependencies &
+  GenerateBracketProcessorDependencies & {
     mailService: MailService;
   };
-
-const STUB_PROCESSORS: Record<
-  Exclude<WorkerQueueName, "match-events" | "notifications" | "seasons">,
-  WorkerProcessor
-> = {
-  tournaments: async (job) => {
-    if (job.name !== "generate-bracket") {
-      throw new Error(`Unsupported job name on tournaments: ${job.name}`);
-    }
-  },
-};
 
 export function getProcessorForQueue(
   queue: WorkerQueueName,
@@ -44,5 +38,9 @@ export function getProcessorForQueue(
     return createSeasonResetProcessor(deps);
   }
 
-  return STUB_PROCESSORS[queue];
+  if (queue === "tournaments") {
+    return createGenerateBracketProcessor(deps);
+  }
+
+  throw new Error(`Unsupported worker queue: ${queue satisfies never}`);
 }

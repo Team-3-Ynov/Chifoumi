@@ -56,6 +56,12 @@ function createMailService(): { send: () => Promise<void> } {
   };
 }
 
+function createGenerateBracket(): { processGenerateBracket: () => Promise<"generated"> } {
+  return {
+    processGenerateBracket: jest.fn(async (): Promise<"generated"> => "generated"),
+  };
+}
+
 describe("WorkerFactory", () => {
   beforeEach(() => {
     workerCtor.mockReset();
@@ -75,6 +81,7 @@ describe("WorkerFactory", () => {
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
       createSeasonReset() as never,
+      createGenerateBracket() as never,
       createMailService() as never,
       logger,
     );
@@ -120,6 +127,7 @@ describe("WorkerFactory", () => {
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
       createSeasonReset() as never,
+      createGenerateBracket() as never,
       createMailService() as never,
       { log: jest.fn(), error: jest.fn() } as unknown as Logger,
     );
@@ -164,6 +172,7 @@ describe("WorkerFactory", () => {
       createMatchPersistence() as never,
       createRedisInvalidation() as never,
       createSeasonReset() as never,
+      createGenerateBracket() as never,
       createMailService() as never,
       logger,
     );

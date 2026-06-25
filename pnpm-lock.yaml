@@ -314,6 +314,9 @@ importers:
 
   apps/job-runner:
     dependencies:
+      '@chifoumi/bracket':
+        specifier: workspace:*
+        version: link:../../packages/bracket
       '@chifoumi/db':
         specifier: workspace:*
         version: link:../../packages/db

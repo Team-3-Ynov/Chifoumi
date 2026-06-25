@@ -7,6 +7,7 @@ import { MailService } from "../notifications/mail.service.js";
 import { MatchPersistenceService } from "../persistence/match-persistence.service.js";
 import { RedisInvalidationService } from "../redis/redis-invalidation.service.js";
 import { SeasonResetService } from "../seasons/season-reset.service.js";
+import { GenerateBracketService } from "../tournaments/generate-bracket.service.js";
 import { getProcessorForQueue } from "./worker-processors.js";
 
 export type ManagedWorker = {
@@ -22,6 +23,7 @@ export class WorkerFactory {
     private readonly matchPersistence: MatchPersistenceService,
     private readonly redisInvalidation: RedisInvalidationService,
     private readonly seasonReset: SeasonResetService,
+    private readonly generateBracket: GenerateBracketService,
     private readonly mailService: MailService,
     private readonly logger: Logger,
   ) {}
@@ -41,6 +43,7 @@ export class WorkerFactory {
       matchPersistence: this.matchPersistence,
       redisInvalidation: this.redisInvalidation,
       seasonReset: this.seasonReset,
+      generateBracket: this.generateBracket,
       mailService: this.mailService,
     });
 

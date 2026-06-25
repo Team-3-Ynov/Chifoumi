@@ -13,6 +13,8 @@ import { RedisInvalidationService } from "./redis/redis-invalidation.service.js"
 import { RunnerService } from "./runner.service.js";
 import { SeasonResetService } from "./seasons/season-reset.service.js";
 import { SeasonResetLockService } from "./seasons/season-reset-lock.service.js";
+import { GenerateBracketService } from "./tournaments/generate-bracket.service.js";
+import { GenerateBracketLockService } from "./tournaments/generate-bracket-lock.service.js";
 import { WorkerFactory } from "./workers/worker-factory.js";
 
 @Module({
@@ -35,6 +37,8 @@ import { WorkerFactory } from "./workers/worker-factory.js";
     NotificationsQueueService,
     SeasonResetLockService,
     SeasonResetService,
+    GenerateBracketLockService,
+    GenerateBracketService,
     WorkerFactory,
     CronSchedulerService,
     RunnerService,
