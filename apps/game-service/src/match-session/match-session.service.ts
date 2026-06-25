@@ -47,6 +47,7 @@ export class MatchSessionService {
     playerB: MatchPlayer,
     matchId = uuidv4(),
     now = new Date(),
+    tournamentMatchId?: string,
   ): MatchState {
     return {
       matchId,
@@ -58,6 +59,7 @@ export class MatchSessionService {
       startedAt: now.toISOString(),
       roundDeadline: new Date(now.getTime() + ROUND_DEADLINE_MS).toISOString(),
       roundPlays: emptyRoundPlays(),
+      ...(tournamentMatchId ? { tournamentMatchId } : {}),
     };
   }
 
@@ -65,9 +67,16 @@ export class MatchSessionService {
     players: [MatchPlayer, MatchPlayer];
     matchId?: string;
     now?: Date;
+    tournamentMatchId?: string;
   }): Promise<MatchState> {
     const now = input.now ?? new Date();
-    const state = this.buildInitialState(input.players[0], input.players[1], input.matchId, now);
+    const state = this.buildInitialState(
+      input.players[0],
+      input.players[1],
+      input.matchId,
+      now,
+      input.tournamentMatchId,
+    );
 
     await this.saveState(state);
     await Promise.all(

@@ -48,6 +48,7 @@ export class MatchEndedPublisher implements OnModuleInit, OnModuleDestroy {
       rounds: state.rounds ?? [],
       endReason: state.endReason,
       startedAt: state.startedAt,
+      ...(state.tournamentMatchId ? { tournamentMatchId: state.tournamentMatchId } : {}),
     };
 
     await this.queue.add("match-ended", payload, {
