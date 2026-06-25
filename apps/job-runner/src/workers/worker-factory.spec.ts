@@ -50,10 +50,42 @@ function createSeasonReset(): { processSeasonReset: () => Promise<"noop"> } {
   };
 }
 
+function createTournamentProgression(): {
+  processMatchEnded: () => Promise<"not_tournament_match">;
+} {
+  return {
+    processMatchEnded: jest.fn(async (): Promise<"not_tournament_match"> => "not_tournament_match"),
+  };
+}
+
+function createGenerateBracket(): { processGenerateBracket: () => Promise<"generated"> } {
+  return {
+    processGenerateBracket: jest.fn(async (): Promise<"generated"> => "generated"),
+  };
+}
+
 function createMailService(): { send: () => Promise<void> } {
   return {
     send: jest.fn(async () => undefined),
   };
+}
+
+function createWorkerFactory(
+  config: JobRunnerConfig,
+  metrics: WorkerMetricsService,
+  logger: Logger,
+): InstanceType<typeof WorkerFactoryClass> {
+  return new WorkerFactoryClass(
+    config,
+    metrics,
+    createMatchPersistence() as never,
+    createRedisInvalidation() as never,
+    createSeasonReset() as never,
+    createTournamentProgression() as never,
+    createGenerateBracket() as never,
+    createMailService() as never,
+    logger,
+  );
 }
 
 describe("WorkerFactory", () => {
@@ -69,15 +101,7 @@ describe("WorkerFactory", () => {
     const config = createConfig({ WORKER_QUEUES: ["match-events"] });
     const metrics = new WorkerMetricsService();
     const logger = { log: jest.fn() } as unknown as Logger;
-    const factory = new WorkerFactoryClass(
-      config,
-      metrics,
-      createMatchPersistence() as never,
-      createRedisInvalidation() as never,
-      createSeasonReset() as never,
-      createMailService() as never,
-      logger,
-    );
+    const factory = createWorkerFactory(config, metrics, logger);
 
     const workers = factory.createWorkers();
 
@@ -114,15 +138,10 @@ describe("WorkerFactory", () => {
       close: jest.fn(async () => undefined),
     }));
 
-    const factory = new WorkerFactoryClass(
-      config,
-      metrics,
-      createMatchPersistence() as never,
-      createRedisInvalidation() as never,
-      createSeasonReset() as never,
-      createMailService() as never,
-      { log: jest.fn(), error: jest.fn() } as unknown as Logger,
-    );
+    const factory = createWorkerFactory(config, metrics, {
+      log: jest.fn(),
+      error: jest.fn(),
+    } as unknown as Logger);
 
     factory.createWorkers();
 
@@ -158,15 +177,7 @@ describe("WorkerFactory", () => {
     });
     const metrics = new WorkerMetricsService();
     const logger = { log: jest.fn() } as unknown as Logger;
-    const factory = new WorkerFactoryClass(
-      config,
-      metrics,
-      createMatchPersistence() as never,
-      createRedisInvalidation() as never,
-      createSeasonReset() as never,
-      createMailService() as never,
-      logger,
-    );
+    const factory = createWorkerFactory(config, metrics, logger);
 
     const workers = factory.createWorkers();
 
