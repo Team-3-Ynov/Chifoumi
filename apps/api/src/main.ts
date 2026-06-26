@@ -6,6 +6,7 @@ import { AUTH_PROTO_PACKAGE, AUTH_PROTO_PATH } from "@chifoumi/proto";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { type MicroserviceOptions, Transport } from "@nestjs/microservices";
+import helmet from "helmet";
 import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module.js";
 import { resolveCorsOrigins } from "./cors.js";
@@ -38,6 +39,7 @@ async function bootstrap() {
       transform: true,
     }),
   );
+  app.use(helmet());
   app.enableCors({
     origin: resolveCorsOrigins(),
   });

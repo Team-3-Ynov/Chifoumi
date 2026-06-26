@@ -1,7 +1,9 @@
 import { createPublicKey } from "node:crypto";
 import { Controller, Get, Inject } from "@nestjs/common";
+import { Public } from "../auth/decorators/public.decorator.js";
 import { JWT_CONFIG, type JwtConfig } from "../config/jwt.config.js";
 
+@Public()
 @Controller(".well-known")
 export class JwksController {
   constructor(@Inject(JWT_CONFIG) private readonly jwtConfig: JwtConfig) {}

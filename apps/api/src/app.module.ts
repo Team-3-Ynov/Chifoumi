@@ -3,6 +3,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { AuthModule } from "./auth/auth.module.js";
+import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard.js";
 import { AppConfigModule } from "./config/config.module.js";
 import { GrpcModule } from "./grpc/grpc.module.js";
 import { HealthModule } from "./health/health.module.js";
@@ -22,7 +23,13 @@ import { UsersModule } from "./users/users.module.js";
   imports: [
     LoggerModule.forRoot({
       pinoHttp: {
-        redact: ["req.headers.authorization", "req.body.password", "req.body.refreshToken"],
+        redact: [
+          "req.headers.authorization",
+          "req.body.password",
+          "req.body.newPassword",
+          "req.body.refreshToken",
+          "req.body.token",
+        ],
       },
     }),
     ThrottlerModule.forRoot([
@@ -57,6 +64,10 @@ import { UsersModule } from "./users/users.module.js";
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
     },
   ],
 })

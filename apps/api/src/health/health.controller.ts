@@ -1,5 +1,6 @@
 import { createConnection } from "node:net";
 import { Controller, Get, HttpStatus, Res } from "@nestjs/common";
+import { Public } from "../auth/decorators/public.decorator.js";
 
 const DEFAULT_GRPC_PORT = 50051;
 
@@ -14,6 +15,7 @@ function isGrpcPortListening(port: number): Promise<boolean> {
   });
 }
 
+@Public()
 @Controller("health")
 export class HealthController {
   @Get()
