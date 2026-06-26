@@ -216,7 +216,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
-      WORKER_QUEUES: notifications,tournaments
+      WORKER_QUEUES: notifications,seasons,tournaments
       WORKER_CONCURRENCY: ${MISC_WORKER_CONCURRENCY:-4}
       WORKER_ROLE: notifier
       JOB_RUNNER_METRICS_PORT: 3002

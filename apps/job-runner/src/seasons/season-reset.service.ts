@@ -95,18 +95,22 @@ export class SeasonResetService {
   private async archiveStandingsAndSoftReset(season: Season): Promise<void> {
     const leagues = await this.prisma.league.findMany({ orderBy: { tier: "asc" } });
     type LeagueRow = (typeof leagues)[number];
-    const ratings = await this.prisma.eloRating.findMany({
-      orderBy: [{ rating: "desc" }, { gamesPlayed: "desc" }],
-      include: {
-        user: {
-          select: {
-            id: true,
-          },
-        },
-      },
-    });
 
     await this.prisma.$transaction(async (tx) => {
+      // Read ratings inside the transaction so a concurrent match-ended that
+      // updates an eloRating row cannot slip between the read and the write
+      // (TOCTOU). The transaction snapshot guarantees a consistent view.
+      const ratings = await tx.eloRating.findMany({
+        orderBy: [{ rating: "desc" }, { gamesPlayed: "desc" }],
+        include: {
+          user: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      });
+
       if (ratings.length > 0) {
         await tx.seasonStanding.createMany({
           data: ratings.map((entry, index) => {
@@ -187,6 +191,10 @@ export class SeasonResetService {
           season.startedAt,
         );
 
+        // Enqueue then mark: at-least-once delivery. A crash between the two
+        // steps re-sends the mail on retry, which is acceptable for reward
+        // notifications. rewardsDistributed acts as an idempotency guard on
+        // the next run so the mail is not sent a third time.
         await this.notificationsQueue.enqueueSeasonRewardMail({
           to: standing.user.email,
           displayName: SeasonResetService.sanitizeForTemplate(standing.user.displayName),
