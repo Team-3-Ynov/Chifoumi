@@ -4,12 +4,7 @@ export const ROUND_DEADLINE_MS = 5_000;
 export const MAX_ROUNDS = 5;
 export const WINS_TO_END = 2;
 
-export type MatchStatus =
-  | "WAITING_PLAYS"
-  | "WAITING_COMMITS"
-  | "WAITING_REVEALS"
-  | "RESOLVING"
-  | "ENDED";
+export type MatchStatus = "WAITING_PLAYS" | "RESOLVING" | "ENDED";
 
 export type Move = "rock" | "paper" | "scissors";
 
@@ -25,19 +20,9 @@ export type MatchEndReason =
   | "DISCONNECT_FORFEIT"
   | "MAX_ROUNDS_DRAW";
 
-export type MatchResumedCurrentState = "WAITING_PLAYS" | "WAITING_COMMITS" | "WAITING_REVEALS";
+export type MatchResumedCurrentState = "WAITING_PLAYS";
 
 export type RoundPlays = {
-  a: Move | null;
-  b: Move | null;
-};
-
-export type RoundCommits = {
-  a: string | null;
-  b: string | null;
-};
-
-export type RoundReveals = {
   a: Move | null;
   b: Move | null;
 };
@@ -60,9 +45,6 @@ export type MatchState = {
   startedAt: string;
   roundDeadline: string;
   roundPlays: RoundPlays;
-  roundCommits?: RoundCommits;
-  roundReveals?: RoundReveals;
-  revealDeadline?: string;
   rounds?: ResolvedRound[];
   winnerId?: string;
   endReason?: MatchEndReason;
@@ -148,13 +130,5 @@ export function playerIndex(state: MatchState, userId: string): 0 | 1 | null {
 }
 
 export function emptyRoundPlays(): RoundPlays {
-  return { a: null, b: null };
-}
-
-export function emptyRoundCommits(): RoundCommits {
-  return { a: null, b: null };
-}
-
-export function emptyRoundReveals(): RoundReveals {
   return { a: null, b: null };
 }
