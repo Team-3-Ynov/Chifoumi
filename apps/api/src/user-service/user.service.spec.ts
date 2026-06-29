@@ -14,6 +14,8 @@ describe("UserService gRPC client", () => {
     getCurrentProfile: jest.fn(),
     getPublicProfile: jest.fn(),
     listUsers: jest.fn(),
+    listLeaderboard: jest.fn(),
+    getCompetitionStats: jest.fn(),
   };
   const client = {
     getService: jest.fn(() => grpcUsers),
@@ -63,5 +65,15 @@ describe("UserService gRPC client", () => {
       service.createUser({ email: "a@b.com", passwordHash: "hash", displayName: "alice" }),
     ).rejects.toBe(error);
     expect(service.isUniqueConstraintError(error)).toBe(true);
+  });
+
+  it("maps missing public profiles to a REST 404", async () => {
+    const error = { code: GrpcStatus.NOT_FOUND };
+    grpcUsers.getPublicProfile.mockReturnValue(throwError(() => error));
+
+    await expect(service.getPublicProfile("missing")).rejects.toMatchObject({
+      status: 404,
+      response: { error: "USER_NOT_FOUND" },
+    });
   });
 });

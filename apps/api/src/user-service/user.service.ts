@@ -165,11 +165,18 @@ export class UserService implements OnModuleInit {
   }
 
   async getPublicProfile(userId: string): Promise<PublicUserProfile> {
-    const profile = await this.call(() => this.usersService.getPublicProfile({ userId }));
-    return {
-      ...profile,
-      createdAt: new Date(profile.createdAt),
-    };
+    try {
+      const profile = await this.call(() => this.usersService.getPublicProfile({ userId }));
+      return {
+        ...profile,
+        createdAt: new Date(profile.createdAt),
+      };
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new NotFoundException({ error: "USER_NOT_FOUND" });
+      }
+      throw error;
+    }
   }
 
   async listUsers(page: number, limit: number): Promise<AdminUsersPage> {

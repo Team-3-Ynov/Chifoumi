@@ -119,6 +119,14 @@ message UpdatePasswordRequest {
   string password_hash = 2;
 }
 
+message GetCurrentProfileRequest {
+  string user_id = 1;
+}
+
+message GetPublicProfileRequest {
+  string user_id = 1;
+}
+
 message UserRecordResponse {
   bool found = 1;
   string id = 2;
