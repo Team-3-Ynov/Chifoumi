@@ -12,6 +12,11 @@ docker compose up -d --wait postgres redis mailhog
 if ($LASTEXITCODE -ne 0) { Write-Error "Services failed to become healthy"; exit 1 }
 Write-Host "Postgres is ready."
 
+Write-Host "=== dev-reset: starting prometheus and grafana ==="
+docker compose up -d --no-deps prometheus grafana
+if ($LASTEXITCODE -ne 0) { Write-Error "Prometheus/Grafana failed to start"; exit 1 }
+Write-Host "Grafana available at http://localhost:3030 (admin / admin)"
+
 Write-Host "=== dev-reset: running migrations ==="
 pnpm --filter @chifoumi/db migrate:deploy
 if ($LASTEXITCODE -ne 0) { Write-Error "migrate:deploy failed"; exit 1 }

@@ -6,6 +6,8 @@ module.exports = {
       "always",
       [
         "api",
+        "auth-service",
+        "user-service",
         "game-service",
         "job-runner",
         "front",
