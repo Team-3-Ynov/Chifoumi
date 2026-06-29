@@ -14,6 +14,7 @@ export class CronSchedulerService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     @Inject(JOB_RUNNER_CONFIG) private readonly config: JobRunnerConfig,
+    @Inject(Logger)
     private readonly logger: Logger,
   ) {}
 

@@ -9,6 +9,7 @@ export class MailService {
 
   constructor(
     @Inject(JOB_RUNNER_CONFIG) private readonly config: JobRunnerConfig,
+    @Inject(TemplateService)
     private readonly templateService: TemplateService,
   ) {}
 
