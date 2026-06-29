@@ -16,6 +16,9 @@ describe("MatchPlayService", () => {
   let eventBus: MatchEventBus;
   let service: MatchPlayService;
   let publishedJobs: unknown[];
+  let matchEndedPublisher: {
+    publishMatchEnded: jest.MockedFunction<MatchEndedPublisher["publishMatchEnded"]>;
+  };
   let matchTimeoutScheduler: {
     scheduleTimeout: jest.Mock;
     cancelTimeout: jest.Mock;
@@ -26,6 +29,7 @@ describe("MatchPlayService", () => {
 
   beforeEach(async () => {
     client = new Redis(`redis://match-play-test/${Date.now()}-${Math.random()}`);
+    await client.flushall();
     redisService = new RedisService({ url: "redis://localhost:6379" });
     Object.assign(redisService, { client });
 
@@ -33,11 +37,11 @@ describe("MatchPlayService", () => {
     matchSessionService = new MatchSessionService(redisService, eventBus);
     publishedJobs = [];
 
-    const matchEndedPublisher = {
+    matchEndedPublisher = {
       publishMatchEnded: jest.fn(async (state) => {
         publishedJobs.push(state);
-      }),
-    } as unknown as MatchEndedPublisher;
+      }) as jest.MockedFunction<MatchEndedPublisher["publishMatchEnded"]>,
+    };
 
     matchTimeoutScheduler = {
       scheduleTimeout: jest.fn(async () => "job-1"),
@@ -56,7 +60,7 @@ describe("MatchPlayService", () => {
     service = new MatchPlayService(
       matchSessionService,
       eventBus,
-      matchEndedPublisher,
+      matchEndedPublisher as unknown as MatchEndedPublisher,
       matchTimeoutScheduler as unknown as MatchTimeoutSchedulerService,
       metrics as unknown as MatchmakingMetricsService,
       matchDisconnectScheduler as unknown as import("./match-disconnect-scheduler.service.js").MatchDisconnectSchedulerService,
@@ -238,6 +242,19 @@ describe("MatchPlayService", () => {
     expect(state?.status).toBe("ENDED");
     expect(state?.winnerId).toBeUndefined();
     expect(state?.endReason).toBe("FORFEIT_TIMEOUT");
+    expect(publishedJobs).toHaveLength(1);
+  });
+
+  it("releases the finalize guard when publishing the match-ended job fails", async () => {
+    matchEndedPublisher.publishMatchEnded.mockRejectedValueOnce(new Error("queue unavailable"));
+
+    await expect(service.handleMatchTimeout("match-1", 1, "WAITING_PLAYS")).rejects.toThrow(
+      "queue unavailable",
+    );
+    expect(publishedJobs).toHaveLength(0);
+
+    await service.handleMatchTimeout("match-1", 1, "WAITING_PLAYS");
+
     expect(publishedJobs).toHaveLength(1);
   });
 

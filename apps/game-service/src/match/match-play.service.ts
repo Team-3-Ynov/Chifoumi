@@ -23,6 +23,8 @@ import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
 import type { MatchTimeoutExpectedState } from "./match-timeout.types.js";
 import { MatchTimeoutSchedulerService } from "./match-timeout-scheduler.service.js";
 
+const MATCH_FINALIZE_LOCK_TTL_SECONDS = 86400;
+
 export type PlayInput = {
   userId: string;
   matchId: string;
@@ -417,36 +419,49 @@ export class MatchPlayService {
     // one-shot guard: BullMQ jobId dedup prevents double-processing at the worker,
     // but two concurrent paths (timeout + disconnect-forfeit) can both reach here
     // before either job is consumed. setnx ensures only the first caller proceeds.
-    const claimed = await this.redisService.setnx(`match:${state.matchId}:finalized`, 86400);
+    const finalizedKey = `match:${state.matchId}:finalized`;
+    const claimed = await this.redisService.setnx(finalizedKey, MATCH_FINALIZE_LOCK_TTL_SECONDS);
     if (!claimed) {
       return;
     }
 
-    await this.clearTimer(state.matchId);
-    this.metrics.recordMatchPlayed(this.resolveMatchOutcome(state));
-    await this.matchDisconnectScheduler.cancelForfeitForPlayers(
-      state.players.map((player) => player.userId),
-    );
+    try {
+      await this.clearTimer(state.matchId);
+      this.metrics.recordMatchPlayed(this.resolveMatchOutcome(state));
+      await this.matchDisconnectScheduler.cancelForfeitForPlayers(
+        state.players.map((player) => player.userId),
+      );
 
-    const payload = {
-      matchId: state.matchId,
-      winner: state.winnerId ?? null,
-      finalScore: { a: state.scoreA, b: state.scoreB },
-      eloDelta: { a: 0, b: 0 },
-      reason: state.endReason,
-    };
+      const payload = {
+        matchId: state.matchId,
+        winner: state.winnerId ?? null,
+        finalScore: { a: state.scoreA, b: state.scoreB },
+        eloDelta: { a: 0, b: 0 },
+        reason: state.endReason,
+      };
 
-    await Promise.all([
-      this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
-        recipientUserId: state.players[0].userId,
-      }),
-      this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
-        recipientUserId: state.players[1].userId,
-      }),
-    ]);
+      await Promise.all([
+        this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
+          recipientUserId: state.players[0].userId,
+        }),
+        this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
+          recipientUserId: state.players[1].userId,
+        }),
+      ]);
 
-    await this.matchSessionService.cleanupUserMappings(state);
-    await this.matchEndedPublisher.publishMatchEnded(state);
+      await this.matchSessionService.cleanupUserMappings(state);
+      await this.matchEndedPublisher.publishMatchEnded(state);
+    } catch (error) {
+      try {
+        await this.redisService.del(finalizedKey);
+      } catch (releaseError) {
+        this.logger.warn(
+          { matchId: state.matchId, error: releaseError },
+          "failed to release match finalized guard",
+        );
+      }
+      throw error;
+    }
   }
 
   private resolveMatchOutcome(state: MatchState): "win" | "draw" | "forfeit" {
