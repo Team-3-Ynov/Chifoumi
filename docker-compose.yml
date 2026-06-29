@@ -216,7 +216,7 @@ services:
     environment:
       DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
       REDIS_URL: redis://redis:6379
-      WORKER_QUEUES: notifications,tournaments
+      WORKER_QUEUES: notifications,seasons,tournaments
       WORKER_CONCURRENCY: 4
       WORKER_ROLE: notifier
       JOB_RUNNER_METRICS_PORT: 3002
