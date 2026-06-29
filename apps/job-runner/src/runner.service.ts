@@ -9,7 +9,9 @@ export class RunnerService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     @Inject(JOB_RUNNER_CONFIG) private readonly config: JobRunnerConfig,
+    @Inject(WorkerFactory)
     private readonly workerFactory: WorkerFactory,
+    @Inject(Logger)
     private readonly logger: Logger,
   ) {}
 
