@@ -22,7 +22,7 @@ import {
 import { Public } from "../auth/decorators/public.decorator.js";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
 import { SWAGGER_BEARER_AUTH } from "../swagger.js";
-import type { SafeUser } from "../users/users.service.js";
+import type { SafeUser } from "../user-service/user.service.js";
 import { ClosedSeasonsResponseDto } from "./dto/closed-seasons-response.dto.js";
 import { CurrentSeasonResponseDto } from "./dto/current-season-response.dto.js";
 import { SeasonStandingsQueryDto } from "./dto/season-standings-query.dto.js";

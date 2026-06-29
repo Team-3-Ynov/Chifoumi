@@ -10,7 +10,7 @@ import {
 } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
 import { SWAGGER_BEARER_AUTH } from "../swagger.js";
-import type { SafeUser } from "../users/users.service.js";
+import type { SafeUser } from "../user-service/user.service.js";
 import { MeHistoryQueryDto } from "./dto/me-history-query.dto.js";
 import { MeHistoryResponseDto } from "./dto/me-history-response.dto.js";
 import { MeProfileDto } from "./dto/me-profile.dto.js";

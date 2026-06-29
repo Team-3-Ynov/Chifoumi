@@ -4,7 +4,7 @@ import { Test } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { NotificationsQueueService } from "../queues/notifications-queue.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import { UsersService } from "../users/users.service.js";
+import { UserService } from "../user-service/user.service.js";
 import { AuthService } from "./auth.service.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
@@ -28,11 +28,11 @@ describe("AuthService", () => {
     },
   };
   const usersService = {
-    findByEmail: jest.fn<UsersService["findByEmail"]>(),
-    findById: jest.fn<UsersService["findById"]>(),
-    createUser: jest.fn<UsersService["createUser"]>(),
-    toSafeUser: jest.fn<UsersService["toSafeUser"]>(),
-    isUniqueConstraintError: jest.fn<UsersService["isUniqueConstraintError"]>(),
+    findByEmail: jest.fn<UserService["findByEmail"]>(),
+    findById: jest.fn<UserService["findById"]>(),
+    createUser: jest.fn<UserService["createUser"]>(),
+    toSafeUser: jest.fn<UserService["toSafeUser"]>(),
+    isUniqueConstraintError: jest.fn<UserService["isUniqueConstraintError"]>(),
   };
   const passwordService = {
     hash: jest.fn<PasswordService["hash"]>(),
@@ -87,7 +87,7 @@ describe("AuthService", () => {
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
-        { provide: UsersService, useValue: usersService },
+        { provide: UserService, useValue: usersService },
         { provide: PasswordService, useValue: passwordService },
         { provide: TokenService, useValue: tokenService },
         { provide: RedisService, useValue: redisService },
@@ -105,7 +105,7 @@ describe("AuthService", () => {
       email: "a@b.com",
       displayName: "alice",
       role: "player",
-    } as Awaited<ReturnType<UsersService["createUser"]>>);
+    } as Awaited<ReturnType<UserService["createUser"]>>);
     usersService.toSafeUser.mockReturnValue({
       id: "u1",
       email: "a@b.com",
@@ -157,7 +157,7 @@ describe("AuthService", () => {
       email: "a@b.com",
       displayName: "alice",
       role: "player",
-    } as Awaited<ReturnType<UsersService["createUser"]>>);
+    } as Awaited<ReturnType<UserService["createUser"]>>);
     usersService.toSafeUser.mockReturnValue({
       id: "u1",
       email: "a@b.com",
@@ -207,7 +207,7 @@ describe("AuthService", () => {
     usersService.findByEmail.mockResolvedValue({
       id: "u1",
       passwordHash: "hash",
-    } as Awaited<ReturnType<UsersService["findByEmail"]>>);
+    } as Awaited<ReturnType<UserService["findByEmail"]>>);
     passwordService.verify.mockResolvedValue(false);
 
     await expect(authService.login({ email: "a@b.com", password: "wrong" })).rejects.toBeInstanceOf(
@@ -230,7 +230,7 @@ describe("AuthService", () => {
       email: "a@b.com",
       displayName: "alice",
       role: "player",
-    } as Awaited<ReturnType<UsersService["findById"]>>);
+    } as Awaited<ReturnType<UserService["findById"]>>);
     usersService.toSafeUser.mockReturnValue({
       id: "u1",
       email: "a@b.com",
@@ -287,7 +287,7 @@ describe("AuthService", () => {
       email: "a@b.com",
       displayName: "alice",
       role: "player",
-    } as Awaited<ReturnType<UsersService["findById"]>>);
+    } as Awaited<ReturnType<UserService["findById"]>>);
 
     const result = await authService.refresh("old-refresh-token");
 
@@ -372,7 +372,7 @@ describe("AuthService", () => {
       email: "a@b.com",
       displayName: "alice",
       role: "player",
-    } as Awaited<ReturnType<UsersService["findById"]>>);
+    } as Awaited<ReturnType<UserService["findById"]>>);
     prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
 
     const result = await authService.refresh("concurrent-token");
@@ -409,7 +409,7 @@ describe("AuthService", () => {
     usersService.findByEmail.mockResolvedValue({
       id: "u1",
       email: "a@b.com",
-    } as Awaited<ReturnType<UsersService["findByEmail"]>>);
+    } as Awaited<ReturnType<UserService["findByEmail"]>>);
     tokenService.issuePasswordResetToken.mockReturnValue({
       token: "raw-token",
       tokenHash: "hashed-token",
@@ -458,7 +458,7 @@ describe("AuthService", () => {
     usersService.findByEmail.mockResolvedValue({
       id: "u1",
       email: "a@b.com",
-    } as Awaited<ReturnType<UsersService["findByEmail"]>>);
+    } as Awaited<ReturnType<UserService["findByEmail"]>>);
     tokenService.issuePasswordResetToken.mockReturnValue({
       token: "raw-token",
       tokenHash: "hashed-token",

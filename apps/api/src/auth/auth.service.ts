@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, UnauthorizedException } from "@n
 import { PrismaService } from "../prisma/prisma.service.js";
 import { NotificationsQueueService } from "../queues/notifications-queue.service.js";
 import { RedisService } from "../redis/redis.service.js";
-import { type SafeUser, UsersService } from "../users/users.service.js";
+import { type SafeUser, UserService } from "../user-service/user.service.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
 
@@ -20,7 +20,7 @@ const DEFAULT_FRONTEND_URL = "http://localhost:5173";
 @Injectable()
 export class AuthService {
   constructor(
-    @Inject(UsersService) private readonly usersService: UsersService,
+    @Inject(UserService) private readonly userService: UserService,
     @Inject(PasswordService) private readonly passwordService: PasswordService,
     @Inject(TokenService) private readonly tokenService: TokenService,
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -35,7 +35,7 @@ export class AuthService {
     displayName: string;
   }): Promise<AuthResult> {
     const email = input.email.toLowerCase();
-    const existing = await this.usersService.findByEmail(email);
+    const existing = await this.userService.findByEmail(email);
     if (existing) {
       throw new ConflictException("Unable to complete registration");
     }
@@ -43,7 +43,7 @@ export class AuthService {
     const passwordHash = await this.passwordService.hash(input.password);
 
     try {
-      const user = await this.usersService.createUser({
+      const user = await this.userService.createUser({
         email,
         passwordHash,
         displayName: input.displayName,
@@ -56,7 +56,7 @@ export class AuthService {
         .catch(() => undefined);
       return this.issueTokensForUser(user.id, user);
     } catch (error) {
-      if (this.usersService.isUniqueConstraintError(error)) {
+      if (this.userService.isUniqueConstraintError(error)) {
         throw new ConflictException("Unable to complete registration");
       }
       throw error;
@@ -64,7 +64,7 @@ export class AuthService {
   }
 
   async login(input: { email: string; password: string }): Promise<AuthResult> {
-    const user = await this.usersService.findByEmail(input.email.toLowerCase());
+    const user = await this.userService.findByEmail(input.email.toLowerCase());
     if (!user) {
       throw new UnauthorizedException("Invalid credentials");
     }
@@ -97,7 +97,7 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    const user = await this.usersService.findById(stored.userId);
+    const user = await this.userService.findById(stored.userId);
     if (!user) {
       throw new UnauthorizedException();
     }
@@ -111,7 +111,7 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    const safeUser = this.usersService.toSafeUser(user);
+    const safeUser = this.userService.toSafeUser(user);
 
     try {
       const newRefreshToken = await this.prisma.$transaction(async (tx) => {
@@ -162,7 +162,7 @@ export class AuthService {
 
   async requestPasswordReset(email: string): Promise<void> {
     const normalizedEmail = email.toLowerCase();
-    const user = await this.usersService.findByEmail(normalizedEmail);
+    const user = await this.userService.findByEmail(normalizedEmail);
     if (!user) {
       return;
     }
@@ -308,9 +308,9 @@ export class AuthService {
 
   private async issueTokensForUser(
     userId: string,
-    user: Parameters<UsersService["toSafeUser"]>[0],
+    user: Parameters<UserService["toSafeUser"]>[0],
   ): Promise<AuthResult> {
-    const safeUser = this.usersService.toSafeUser(user);
+    const safeUser = this.userService.toSafeUser(user);
     const { accessToken } = await this.tokenService.issueAccessToken({
       userId,
       role: safeUser.role,
