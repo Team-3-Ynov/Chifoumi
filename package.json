@@ -18,6 +18,7 @@
     "biome:fix": "biome check --write apps packages tests .github .devcontainer biome.json package.json pnpm-workspace.yaml lefthook.yml",
     "typecheck": "pnpm --filter @chifoumi/db typecheck && pnpm -r --if-present typecheck",
     "db:seed": "pnpm --filter @chifoumi/db seed",
+    "db:reset:docker": "docker compose -f docker-compose.yml -f docker-compose.scale.yml down -v && docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d postgres redis && sleep 10 && DATABASE_URL=\"postgresql://app:chifoumi_dev@localhost:5432/chifoumi\" pnpm --filter @chifoumi/db migrate:deploy && DATABASE_URL=\"postgresql://app:chifoumi_dev@localhost:5432/chifoumi\" pnpm db:seed",
     "docs:openapi": "pnpm --filter @chifoumi/api docs:openapi",
     "test:e2e:smoke": "pnpm --filter @chifoumi/e2e test:smoke",
     "lefthook:install": "lefthook install"
