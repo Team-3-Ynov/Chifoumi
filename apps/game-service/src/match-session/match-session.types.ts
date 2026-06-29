@@ -1,6 +1,6 @@
 export const MATCH_SESSION_TTL_SECONDS = 3600;
 export const MATCH_LOCK_TTL_SECONDS = 2;
-export const ROUND_DEADLINE_MS = 5_000;
+export const ROUND_DEADLINE_MS = 12_000;
 export const MAX_ROUNDS = 5;
 export const WINS_TO_END = 2;
 

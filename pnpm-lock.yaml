@@ -229,6 +229,9 @@ importers:
 
   apps/game-service:
     dependencies:
+      '@chifoumi/elo':
+        specifier: workspace:*
+        version: link:../../packages/elo
       '@chifoumi/proto':
         specifier: workspace:*
         version: link:../../packages/proto

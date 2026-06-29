@@ -29,11 +29,11 @@ layout: two-cols
 
 <v-clicks>
 
-- **[Membre 1]** — Product Owner · Auth & JWT
-- **[Membre 2]** — ELO Engine & Matchmaking
-- **[Membre 3]** — BO3 State Machine & Anti-triche
-- **[Membre 4]** — Job Runner & Notifications
-- **[Membre 5]** — DevOps · CI/CD · Observabilité
+- **[Adrien]** - Product Owner · Auth & JWT
+- **[Eliot]** - ELO Engine & Matchmaking
+- **[Florentin]** - BO3 State Machine & Anti-triche
+- **[Rayan]** - Job Runner & Notifications
+- **[Charles]** - DevOps · CI/CD · Observabilité
 
 </v-clicks>
 
@@ -53,7 +53,7 @@ layout: two-cols
 layout: default
 ---
 
-# Le pitch — 1 min 30
+# Le pitch - 1 min 30
 
 <v-clicks>
 
@@ -69,94 +69,6 @@ layout: default
 - Stack multi-réplicas tolérante aux pannes
 
 **Pour qui :** tout joueur souhaitant prouver qu'il maîtrise vraiment le RPS — pas juste la chance.
-
-</v-clicks>
-
----
-layout: section
----
-
-# Démo
-
-*La magie d'abord, les explications ensuite.*
-
----
-layout: default
----
-
-# Démo — Authentification
-
-> 🎬 **Montrer en live :** ouvrir `http://localhost:5173`
-
-<v-clicks>
-
-1. **Inscription** → formulaire → email de bienvenue reçu dans MailHog
-2. **Connexion** → JWT RS256 (15 min) + refresh token (7 jours) stocké
-3. **Profil** `/me` → ELO initial 1000, 0 parties jouées
-4. **Déconnexion** → JWT blacklisté dans Redis, refresh révoqué en DB
-
-</v-clicks>
-
-<div class="mt-6 text-sm opacity-60">
-Points clés à montrer : la réponse JSON des tokens, le header Authorization dans les requêtes suivantes.
-</div>
-
----
-layout: default
----
-
-# Démo — Matchmaking
-
-> 🎬 **Montrer en live :** deux onglets / deux comptes
-
-<v-clicks>
-
-1. **Joueur A** se connecte, clique sur "Rejoindre la file"
-2. **Joueur B** (ELO proche) rejoins la file → **match trouvé** instantanément
-3. Les deux joueurs reçoivent l'événement `matchFound` via WebSocket
-4. Redirection automatique vers la page de match `/match/:id`
-
-</v-clicks>
-
-<div class="mt-6 text-sm opacity-60">
-La file utilise un Redis Sorted Set trié par ELO — le worker de matchmaking appaire les joueurs par fenêtre de ±200 points.
-</div>
-
----
-layout: default
----
-
-# Démo — Partie BO3 avec anti-triche
-
-> 🎬 **Montrer en live :** la partie en cours, les deux fenêtres côte à côte
-
-<v-clicks>
-
-1. **Round 1 — Phase commit** : chaque joueur choisit son coup → le client envoie `SHA256(coup:nonce)` au serveur
-2. **Phase reveal** : une fois les deux commits reçus, chaque joueur envoie son coup + nonce en clair
-3. **Résolution** : le serveur vérifie `SHA256(coup:nonce) == commit` pour les deux joueurs, annonce le gagnant
-4. **Après 3 rounds** : résultat final + delta ELO calculé et appliqué de façon asynchrone
-
-</v-clicks>
-
-<div class="mt-4 p-3 bg-orange-50 rounded text-sm">
-⚠️ Si un joueur envoie un nonce invalide (tricherie) → le round est annulé et la vérification échoue dans l'audit trail.
-</div>
-
----
-layout: default
----
-
-# Démo — Stats & Audit
-
-> 🎬 **Montrer en live :** leaderboard, historique, audit trail
-
-<v-clicks>
-
-1. **Leaderboard** `/leaderboard` → top joueurs par ELO, mis à jour après chaque match
-2. **Historique** `/me/history` → pagination curseur, résultats et deltas ELO par match
-3. **Audit trail** `/matches/:id/audit` → vérification publique du commit-reveal pour chaque round
-4. **Grafana** `http://localhost:3002` → métriques HTTP, latences, jobs BullMQ
 
 </v-clicks>
 
@@ -231,22 +143,34 @@ layout: default
 
 # API — Contrôleurs & routes
 
-| Contrôleur | Route | Auth | Description |
-|---|---|---|---|
-| **AuthController** | `POST /auth/register` | Public | Inscription + tokens |
-| | `POST /auth/login` | Public | Connexion |
-| | `POST /auth/refresh` | Public | Rotation refresh token |
-| | `POST /auth/logout` | JWT | Blacklist + révocation |
-| | `POST /auth/forgot-password` | Public | Email reset (anti-enum) |
-| | `POST /auth/reset-password` | Public | Reset avec token opaque |
-| **MeController** | `GET /me` | JWT | Profil + ELO |
-| | `GET /me/history` | JWT | Historique (cursor-paginé) |
-| **UsersController** | `GET /users/:id/profile` | JWT | Profil public |
-| **LeaderboardController** | `GET /leaderboard` | Public | Top ELO (Redis cache 30s) |
-| **MatchesController** | `GET /matches/:id/audit` | Public | Audit commit-reveal |
-| **HealthController** | `GET /health` | Public | Santé + gRPC readiness |
-| **MetricsController** | `GET /metrics` | Public | Scrape Prometheus |
-| **JwksController** | `GET /.well-known/jwks.json` | Public | Clé publique RS256 |
+| Contrôleur                     | Route                                | Auth   | Description                                   |
+|--------------------------------|--------------------------------------|--------|-----------------------------------------------|
+| **AuthController**             | `POST /auth/register`                | Public | Inscription + tokens                          |
+|                                | `POST /auth/login`                   | Public | Connexion                                     |
+|                                | `POST /auth/refresh`                 | Public | Rotation refresh token                        |
+|                                | `POST /auth/logout`                  | JWT    | Blacklist + révocation                        |
+|                                | `POST /auth/forgot-password`         | Public | Email reset (anti-enum)                       |
+|                                | `POST /auth/reset-password`          | Public | Reset avec token opaque                       |
+| **MeController**               | `GET /me`                            | JWT    | Profil + ELO                                  |
+|                                | `GET /me/history`                    | JWT    | Historique (cursor-paginé)                    |
+| **UsersController**            | `GET /users/:id/profile`             | JWT    | Profil public                                 |
+| **LeaderboardController**      | `GET /leaderboard`                   | Public | Top ELO (Redis cache 30s)                     |
+| **MatchesController**          | `GET /matches/:id/audit`             | Public | Audit commit-reveal                           |
+| **SeasonsController**          | `GET /seasons/current`               | JWT    | Saison active + classement joueur             |
+|                                | `GET /seasons/closed`                | Public | Saisons terminées                             |
+|                                | `GET /seasons/:id/standings`         | Public | Classement saisonnier (paginé, filtre league) |
+| **AdminSeasonsController**     | `POST /admin/seasons`                | Admin  | Créer une saison                              |
+|                                | `PATCH /admin/seasons/:id/close`     | Admin  | Clôturer une saison                           |
+| **TournamentsController**      | `GET /tournaments`                   | JWT    | Liste des tournois                            |
+|                                | `GET /tournaments/:id`               | JWT    | Détail d'un tournoi                           |
+|                                | `POST /tournaments/:id/register`     | JWT    | Inscription                                   |
+|                                | `DELETE /tournaments/:id/register`   | JWT    | Désinscription                                |
+| **AdminTournamentsController** | `POST /admin/tournaments`            | Admin  | Créer un tournoi                              |
+|                                | `PATCH /admin/tournaments/:id/open`  | Admin  | Ouvrir les inscriptions                       |
+|                                | `PATCH /admin/tournaments/:id/start` | Admin  | Démarrer le tournoi                           |
+| **HealthController**           | `GET /health`                        | Public | Santé + gRPC readiness                        |
+| **MetricsController**          | `GET /metrics`                       | Public | Scrape Prometheus                             |
+| **JwksController**             | `GET /.well-known/jwks.json`         | Public | Clé publique RS256                            |
 
 ---
 layout: default
@@ -299,13 +223,13 @@ erDiagram
     uuid id PK
     string tokenHash UK
     datetime expiresAt
-    bool revoked
+    datetime revokedAt "nullable"
   }
   PasswordResetToken {
     uuid id PK
     string tokenHash UK
     datetime expiresAt
-    bool used
+    datetime usedAt "nullable"
   }
   EloRating {
     uuid id PK
@@ -352,16 +276,16 @@ layout: default
 
 # Redis — Table des clés
 
-| Clé | Type Redis | TTL | Justification |
-|---|---|---|---|
-| `blacklist:{jti}` | String | Durée restante du JWT | Invalidation immédiate au logout |
-| `matchmaking:queue` | Sorted Set (score = ELO) | — | File triée par rating pour le matchmaking |
-| `matchmaking:inQueue:{userId}` | String | — | Déduplication : empêche double inscription |
-| `match:session:{matchId}` | Hash | Durée du match | État in-memory partagé entre les réplicas |
-| `socket:user:{userId}` | String (instanceId) | — | Routage cross-réplica des événements WS |
-| `leaderboard:top` | String (JSON sérialisé) | 30 s | Cache du classement (évite les lectures DB répétées) |
-| `refresh:lock:{userId}` | String (NX) | 5 s | Prévention des races conditions sur le refresh concurrent |
-| `bull:{prefix}:*` | Structures BullMQ | Selon job | Queues, états et résultats des jobs asynchrones |
+| Clé                            | Type Redis               | TTL                   | Justification                                             |
+|--------------------------------|--------------------------|-----------------------|-----------------------------------------------------------|
+| `blacklist:{jti}`              | String                   | Durée restante du JWT | Invalidation immédiate au logout                          |
+| `matchmaking:queue`            | Sorted Set (score = ELO) | —                     | File triée par rating pour le matchmaking                 |
+| `matchmaking:inQueue:{userId}` | String                   | —                     | Déduplication : empêche double inscription                |
+| `match:session:{matchId}`      | Hash                     | Durée du match        | État in-memory partagé entre les réplicas                 |
+| `socket:user:{userId}`         | String (instanceId)      | —                     | Routage cross-réplica des événements WS                   |
+| `leaderboard:top`              | String (JSON sérialisé)  | 30 s                  | Cache du classement (évite les lectures DB répétées)      |
+| `refresh:lock:{userId}`        | String (NX)              | 5 s                   | Prévention des races conditions sur le refresh concurrent |
+| `bull:{prefix}:*`              | Structures BullMQ        | Selon job             | Queues, états et résultats des jobs asynchrones           |
 
 ---
 layout: default
@@ -369,17 +293,17 @@ layout: default
 
 # BullMQ — Queues asynchrones
 
-| Queue | Job | Statut | Rôle |
-|---|---|---|---|
-| `match-events` | `match-ended` | ✅ Implémenté | Persiste les rounds en DB, calcule et applique les deltas ELO, invalide le cache leaderboard Redis |
-| `notifications` | `welcome-email` | ✅ Implémenté | Envoie l'email de bienvenue après inscription |
-| `notifications` | `password-reset-email` | ✅ Implémenté | Envoie le lien de reset de mot de passe |
-| `seasons` | `season-reset` | 🔜 Stub | Réinitialisation saisonnière (sprint 2) |
-| `tournaments` | `generate-bracket` | 🔜 Stub | Génération de brackets (sprint 2) |
+| Queue           | Job                    | Statut       | Rôle                                                                                               |
+|-----------------|------------------------|--------------|----------------------------------------------------------------------------------------------------|
+| `match-events`  | `match-ended`          | ✅ Implémenté | Persiste les rounds en DB, calcule et applique les deltas ELO, invalide le cache leaderboard Redis |
+| `notifications` | `welcome-email`        | ✅ Implémenté | Envoie l'email de bienvenue après inscription                                                      |
+| `notifications` | `password-reset-email` | ✅ Implémenté | Envoie le lien de reset de mot de passe                                                            |
+| `seasons`       | `season-reset`         | 🔜 Stub      | Réinitialisation saisonnière (sprint 2)                                                            |
+| `tournaments`   | `generate-bracket`     | 🔜 Stub      | Génération de brackets (sprint 2)                                                                  |
 
 **Deux workers Docker distincts :**
 - `job-runner-match` → écoute `match-events`
-- `job-runner-misc` → écoute `notifications` + cron
+- `job-runner-misc` → écoute `notifications`, `seasons`, `tournaments` + cron
 
 **Isolation par `BULLMQ_PREFIX`** : les environnements dev/staging/prod n'interfèrent pas.
 
@@ -474,13 +398,13 @@ layout: default
 
 # Couverture de tests
 
-| Package | Runner | Seuil lignes | Seuil branches | Seuil fonctions | Résultat actuel |
-|---|---|---|---|---|---|
-| `apps/api` | Jest | 70 % | 60 % | 70 % | ~91 % / ~80 % / ~89 % ✅ |
-| `apps/game-service` | Jest | 70 % | 60 % | 70 % | ✅ CI verte |
-| `apps/job-runner` | Jest | 70 % | 60 % | 70 % | ✅ CI verte |
-| `packages/elo` | Jest | **95 %** | **95 %** | **100 %** | ✅ 100 % |
-| `apps/front` | Vitest | 60 % | 50 % | — | ~79 % / ~83 % ✅ |
+| Package             | Runner | Seuil lignes | Seuil branches | Seuil fonctions | Résultat actuel         |
+|---------------------|--------|--------------|----------------|-----------------|-------------------------|
+| `apps/api`          | Jest   | 70 %         | 60 %           | 70 %            | ~91 % / ~80 % / ~89 % ✅ |
+| `apps/game-service` | Jest   | 70 %         | 60 %           | 70 %            | ✅ CI verte              |
+| `apps/job-runner`   | Jest   | 70 %         | 60 %           | 70 %            | ✅ CI verte              |
+| `packages/elo`      | Jest   | **95 %**     | **95 %**       | **100 %**       | ✅ 100 %                 |
+| `apps/front`        | Vitest | 60 %         | 50 %           | —               | ~79 % / ~83 % ✅         |
 
 **Exclusions justifiées :** DTOs, fichiers bootstrap `main.ts`, code généré Prisma/gRPC, pages CRUD triviales du front.
 
@@ -491,8 +415,6 @@ layout: default
 ---
 
 # Observabilité — Prometheus + Grafana
-
-> 🎬 **Montrer en live :** `http://localhost:3002` (Grafana)
 
 <v-clicks>
 
@@ -519,7 +441,7 @@ layout: section
 layout: default
 ---
 
-# [Membre 1] — Auth JWT RS256 & Refresh Token Rotation
+# [Adrien] — Auth JWT RS256 & Refresh Token Rotation
 
 **Problématique :** comment invalider un JWT (stateless par nature) et prévenir les races conditions sur le refresh ?
 
@@ -539,7 +461,7 @@ layout: default
 layout: default
 ---
 
-# [Membre 1] — Implémentation clé
+# [Adrien] — Implémentation clé
 
 ```ts {all|8-13|16-21|23-27}
 // token.service.ts
@@ -569,7 +491,7 @@ issueRefreshToken(): { refreshToken: string; refreshTokenHash: string } {
 layout: default
 ---
 
-# [Membre 2] — Moteur ELO (`packages/elo`)
+# [Eliot] — Moteur ELO (`packages/elo`)
 
 **Problématique :** calculer l'évolution du rating ELO de façon juste, testable et indépendante de tout framework.
 
@@ -590,7 +512,7 @@ layout: default
 layout: default
 ---
 
-# [Membre 2] — Implémentation clé
+# [Eliot] — Implémentation clé
 
 ```ts {all|1-8|10-16|18-22}
 // computeElo.ts
@@ -621,7 +543,7 @@ export function getKFactor(rating: number, gamesPlayed: number): number {
 layout: default
 ---
 
-# [Membre 3] — BO3 State Machine & Anti-triche Commit-Reveal
+# [Florentin] — BO3 State Machine & Anti-triche Commit-Reveal
 
 **Problématique :** garantir qu'un joueur ne peut pas choisir son coup *après* avoir vu celui de l'adversaire.
 
@@ -634,7 +556,7 @@ layout: default
 3. **Vérification** : le serveur recalcule `SHA256(coup:nonce)` et compare au commit initial
 4. Si mismatch → tricherie détectée, round invalidé, trace dans l'audit trail public
 
-**State machine BO3 :** `WAITING_PLAYS` → `WAITING_COMMITS` → `WAITING_REVEALS` → `RESOLVING` → `ENDED`
+**State machine BO3 :** `WAITING_PLAYS` → `RESOLVING` → `WAITING_PLAYS` (round suivant) ou `ENDED`
 
 </v-clicks>
 
@@ -642,7 +564,7 @@ layout: default
 layout: default
 ---
 
-# [Membre 3] — Implémentation clé
+# [Florentin] — Implémentation clé
 
 ```ts {all|1-5|7-15}
 // packages/schemas/src/commit-hash.ts
@@ -666,7 +588,7 @@ export function verifyCommit(
 layout: default
 ---
 
-# [Membre 4] — Job Runner & BullMQ
+# [Rayan] - Job Runner & BullMQ
 
 **Problématique :** le Game Service est temps réel — persister les matchs et envoyer des emails de façon synchrone bloquerait le WebSocket.
 
@@ -685,7 +607,7 @@ layout: default
 layout: default
 ---
 
-# [Membre 4] — Implémentation clé
+# [Rayan] - Implémentation clé
 
 ```ts {all|1-10|12-20}
 // match-ended.processor.ts
@@ -716,7 +638,7 @@ export function createMatchEndedProcessor(deps: MatchEventsProcessorDependencies
 layout: default
 ---
 
-# [Membre 5] — CI/CD, Docker multi-réplicas & Observabilité
+# [Charles] - CI/CD, Docker multi-réplicas & Observabilité
 
 **Problématique :** comment garantir que chaque PR est déployable, et que la production est tolérante aux pannes d'un réplica ?
 
@@ -740,7 +662,7 @@ layout: default
 layout: default
 ---
 
-# [Membre 5] — Stack multi-réplicas
+# [Charles] - Stack multi-réplicas
 
 ```yaml
 # docker-compose.scale.yml (extrait)
@@ -787,7 +709,7 @@ layout: end
 **Liens utiles (dev)**
 - Front : `http://localhost:5173`
 - API : `http://localhost:3000/api/docs`
-- Grafana : `http://localhost:3002`
+- Grafana : `http://localhost:3030`
 - MailHog : `http://localhost:8025`
 
 </div>

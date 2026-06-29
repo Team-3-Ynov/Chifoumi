@@ -20,6 +20,7 @@ module.exports = {
         "infra",
         "ci",
         "deps",
+        "docs",
       ],
     ],
     "scope-empty": [1, "never"],

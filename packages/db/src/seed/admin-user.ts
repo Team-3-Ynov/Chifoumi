@@ -49,11 +49,18 @@ async function seedDemoTournament(prisma: PrismaClient): Promise<void> {
     where: { name: "Tournoi de démonstration" },
     select: { id: true },
   });
-  if (existing) return;
 
   const now = new Date();
   const registrationOpensAt = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const startsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  if (existing) {
+    await prisma.tournament.update({
+      where: { id: existing.id },
+      data: { registrationOpensAt, startsAt, status: TournamentStatus.registration_open },
+    });
+    return;
+  }
 
   await prisma.tournament.create({
     data: {
@@ -62,7 +69,7 @@ async function seedDemoTournament(prisma: PrismaClient): Promise<void> {
       bracketSize: 8,
       registrationOpensAt,
       startsAt,
-      status: TournamentStatus.upcoming,
+      status: TournamentStatus.registration_open,
     },
   });
   console.log("Seeded demo tournament.");

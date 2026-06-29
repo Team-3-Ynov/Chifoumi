@@ -74,6 +74,8 @@ export class MatchAuditResponseDto {
 
   @ApiProperty({
     description: "Final match score: [playerA score, playerB score]",
+    type: Number,
+    isArray: true,
     example: [2, 1],
   })
   finalScore!: [number, number];

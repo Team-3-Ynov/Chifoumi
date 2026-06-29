@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm run prepare:workspace",
     "dev": "tsx watch src/main.ts",
     "prebuild": "pnpm run prepare:workspace",
     "build": "tsc -p tsconfig.json && node scripts/copy-notification-templates.mjs",

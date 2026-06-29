@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm --filter @chifoumi/proto build && pnpm --filter @chifoumi/elo build",
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
-    "prebuild": "pnpm --filter @chifoumi/proto build",
+    "prebuild": "pnpm --filter @chifoumi/proto build && pnpm --filter @chifoumi/elo build",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretypecheck": "pnpm --filter @chifoumi/proto build",
-    "pretest": "pnpm --filter @chifoumi/proto build",
+    "pretypecheck": "pnpm --filter @chifoumi/proto build && pnpm --filter @chifoumi/elo build",
+    "pretest": "pnpm --filter @chifoumi/proto build && pnpm --filter @chifoumi/elo build",
     "pretest:e2e": "pnpm --filter @chifoumi/proto build",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./jest-e2e.config.cjs"
@@ -30,6 +31,7 @@
     "typescript": "~5.7.3"
   },
   "dependencies": {
+    "@chifoumi/elo": "workspace:*",
     "@chifoumi/proto": "workspace:*",
     "@grpc/grpc-js": "^1.13.4",
     "@nestjs/common": "^11.1.21",
