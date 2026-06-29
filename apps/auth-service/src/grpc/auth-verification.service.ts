@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { JwtService, TokenExpiredError } from "@nestjs/jwt";
 import type { AccessTokenPayload } from "../auth/token.service.js";
 import { RedisService } from "../redis/redis.service.js";
+import { UserService } from "../user-service/user.service.js";
 
 @Injectable()
 export class AuthVerificationService {
@@ -11,6 +12,7 @@ export class AuthVerificationService {
   constructor(
     @Inject(JwtService) private readonly jwtService: JwtService,
     @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(UserService) private readonly userService: UserService,
   ) {}
 
   async verifyToken(token: string): Promise<VerifyTokenResponse> {
@@ -44,11 +46,16 @@ export class AuthVerificationService {
       return { valid: false, reason: "REVOKED" };
     }
 
+    const user = await this.userService.findById(payload.sub);
+    if (!user) {
+      return { valid: false, reason: "INVALID" };
+    }
+
     return {
       valid: true,
       userId: payload.sub,
-      role: payload.role,
-      displayName: payload.displayName,
+      role: user.role,
+      displayName: user.displayName,
       jti: payload.jti,
     };
   }
