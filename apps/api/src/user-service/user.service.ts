@@ -1,5 +1,7 @@
 import type {
+  CompetitionStatsResponse,
   CurrentUserProfileResponse,
+  ListLeaderboardResponse,
   ListUsersResponse,
   PublicUserProfileResponse,
   UserRecordResponse,
@@ -93,6 +95,13 @@ type UsersGrpcService = {
     userId: string;
   }): import("rxjs").Observable<PublicUserProfileResponse>;
   listUsers(request: { page: number; limit: number }): import("rxjs").Observable<ListUsersResponse>;
+  listLeaderboard(request: {
+    limit: number;
+    leagueName?: string;
+  }): import("rxjs").Observable<ListLeaderboardResponse>;
+  getCompetitionStats(request: {
+    userId: string;
+  }): import("rxjs").Observable<CompetitionStatsResponse>;
 };
 
 export const USER_SERVICE_GRPC_CLIENT = "USER_SERVICE_GRPC_CLIENT";
@@ -172,6 +181,14 @@ export class UserService implements OnModuleInit {
         createdAt: new Date(user.createdAt),
       })),
     };
+  }
+
+  async listLeaderboard(limit: number, leagueName?: string): Promise<ListLeaderboardResponse> {
+    return this.call(() => this.usersService.listLeaderboard({ limit, leagueName }));
+  }
+
+  async getCompetitionStats(userId: string): Promise<CompetitionStatsResponse> {
+    return this.call(() => this.usersService.getCompetitionStats({ userId }));
   }
 
   toSafeUser(user: UserRecord): SafeUser {

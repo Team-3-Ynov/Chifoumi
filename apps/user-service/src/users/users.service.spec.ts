@@ -14,6 +14,10 @@ describe("UserService", () => {
       count: ReturnType<typeof jest.fn>;
       update: ReturnType<typeof jest.fn>;
     };
+    eloRating: {
+      findMany: ReturnType<typeof jest.fn>;
+      count: ReturnType<typeof jest.fn>;
+    };
   };
 
   beforeEach(() => {
@@ -21,6 +25,7 @@ describe("UserService", () => {
       $transaction: jest.fn(),
       $queryRaw: jest.fn(),
       user: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn(), update: jest.fn() },
+      eloRating: { findMany: jest.fn(), count: jest.fn() },
     };
     service = new UserService(prisma as unknown as PrismaService);
   });
@@ -220,6 +225,55 @@ describe("UserService", () => {
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { passwordHash: "new-hash" },
+    });
+  });
+
+  it("lists leaderboard rows ordered by ranking fields", async () => {
+    prisma.eloRating.findMany.mockResolvedValue([
+      {
+        rating: 1500,
+        gamesPlayed: 42,
+        user: { id: "user-1", displayName: "Alice" },
+      },
+    ]);
+
+    await expect(service.listLeaderboard(20, "gold")).resolves.toEqual({
+      items: [
+        {
+          rank: 1,
+          userId: "user-1",
+          displayName: "Alice",
+          rating: 1500,
+          gamesPlayed: 42,
+          league: { name: "Gold", tier: 3 },
+        },
+      ],
+    });
+    expect(prisma.eloRating.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { rating: { gte: 1200, lte: 1349 } },
+        orderBy: [{ rating: "desc" }, { gamesPlayed: "desc" }],
+        take: 20,
+      }),
+    );
+  });
+
+  it("computes competition stats with 1-indexed rank", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      eloRating: { rating: 1150, gamesPlayed: 12 },
+    });
+    prisma.eloRating.count.mockResolvedValue(6);
+
+    await expect(service.getCompetitionStats("user-1")).resolves.toEqual({
+      rating: 1150,
+      gamesPlayed: 12,
+      rank: 7,
+    });
+    expect(prisma.eloRating.count).toHaveBeenCalledWith({
+      where: {
+        OR: [{ rating: { gt: 1150 } }, { rating: 1150, gamesPlayed: { gt: 12 } }],
+      },
     });
   });
 

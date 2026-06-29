@@ -1,5 +1,6 @@
 import type {
   CurrentUserProfileResponse,
+  ListLeaderboardResponse,
   ListUsersResponse,
   PublicUserProfileResponse,
   UserRecordResponse,
@@ -113,6 +114,26 @@ export class UsersGrpcController {
   @GrpcMethod("Users", "ListUsers")
   async listUsers(data: { page: number; limit: number }): Promise<ListUsersResponse> {
     return this.toListUsersResponse(await this.userService.listUsers(data.page, data.limit));
+  }
+
+  @GrpcMethod("Users", "ListLeaderboard")
+  async listLeaderboard(data: {
+    limit: number;
+    leagueName?: string;
+  }): Promise<ListLeaderboardResponse> {
+    return this.userService.listLeaderboard(data.limit, data.leagueName || undefined);
+  }
+
+  @GrpcMethod("Users", "GetCompetitionStats")
+  async getCompetitionStats(data: { userId: string }) {
+    try {
+      return await this.userService.getCompetitionStats(data.userId);
+    } catch (error) {
+      if (this.userService.isNotFoundError(error)) {
+        throw new RpcException({ code: GrpcStatus.NOT_FOUND, message: "USER_NOT_FOUND" });
+      }
+      throw error;
+    }
   }
 
   private toUserRecordResponse(user: UserRecord): UserRecordResponse {

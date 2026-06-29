@@ -21,6 +21,8 @@ service Users {
   rpc GetCurrentProfile(GetCurrentProfileRequest) returns (CurrentUserProfileResponse);
   rpc GetPublicProfile(GetPublicProfileRequest) returns (PublicUserProfileResponse);
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc ListLeaderboard(ListLeaderboardRequest) returns (ListLeaderboardResponse);
+  rpc GetCompetitionStats(GetCompetitionStatsRequest) returns (CompetitionStatsResponse);
 }
 
 message VerifyTokenRequest {
@@ -173,4 +175,32 @@ message ListUsersResponse {
   int32 total = 2;
   int32 page = 3;
   int32 limit = 4;
+}
+
+message ListLeaderboardRequest {
+  int32 limit = 1;
+  string league_name = 2;
+}
+
+message LeaderboardItemMessage {
+  int32 rank = 1;
+  string user_id = 2;
+  string display_name = 3;
+  int32 rating = 4;
+  int32 games_played = 5;
+  LeagueSummaryMessage league = 6;
+}
+
+message ListLeaderboardResponse {
+  repeated LeaderboardItemMessage items = 1;
+}
+
+message GetCompetitionStatsRequest {
+  string user_id = 1;
+}
+
+message CompetitionStatsResponse {
+  int32 rating = 1;
+  int32 games_played = 2;
+  int32 rank = 3;
 }

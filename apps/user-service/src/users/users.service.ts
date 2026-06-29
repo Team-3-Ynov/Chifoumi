@@ -1,5 +1,10 @@
 import { Prisma, type User, UserRole } from "@chifoumi/db";
-import { getLeagueSummaryForRating } from "@chifoumi/leagues";
+import {
+  getLeagueSummaryForRating,
+  getReferenceLeagueByName,
+  type ReferenceLeague,
+  toLeagueSummary,
+} from "@chifoumi/leagues";
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import type {
@@ -117,6 +122,68 @@ export class UserService {
     };
   }
 
+  async listLeaderboard(
+    limit: number,
+    leagueName?: string,
+  ): Promise<{
+    items: Array<{
+      rank: number;
+      userId: string;
+      displayName: string;
+      rating: number;
+      gamesPlayed: number;
+      league: { name: string; tier: number };
+    }>;
+  }> {
+    const league = leagueName ? getReferenceLeagueByName(leagueName) : null;
+    const rows = await this.prisma.eloRating.findMany({
+      where: league ? this.toRatingWhere(league) : undefined,
+      orderBy: [{ rating: "desc" }, { gamesPlayed: "desc" }],
+      take: Math.trunc(Number(limit)),
+      include: {
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
+
+    return {
+      items: rows.map((row, index) => ({
+        rank: index + 1,
+        userId: row.user.id,
+        displayName: row.user.displayName,
+        rating: row.rating,
+        gamesPlayed: row.gamesPlayed,
+        league: league ? toLeagueSummary(league) : getLeagueSummaryForRating(row.rating),
+      })),
+    };
+  }
+
+  async getCompetitionStats(userId: string): Promise<{
+    rating: number;
+    gamesPlayed: number;
+    rank: number;
+  }> {
+    const rating = await this.getRating(userId);
+    const ahead = await this.prisma.eloRating.count({
+      where: {
+        OR: [
+          { rating: { gt: rating.rating } },
+          { rating: rating.rating, gamesPlayed: { gt: rating.gamesPlayed } },
+        ],
+      },
+    });
+
+    return {
+      rating: rating.rating,
+      gamesPlayed: rating.gamesPlayed,
+      rank: ahead + 1,
+    };
+  }
+
   async createUser(input: {
     email: string;
     passwordHash: string;
@@ -179,6 +246,15 @@ export class UserService {
 
   private mapRole(role: UserRole): "player" | "admin" {
     return role === UserRole.admin ? "admin" : "player";
+  }
+
+  private toRatingWhere(league: ReferenceLeague): { rating: { gte: number; lte?: number } } {
+    return {
+      rating: {
+        gte: league.minRating,
+        ...(league.maxRating === null ? {} : { lte: league.maxRating }),
+      },
+    };
   }
 
   private calculateWinRate(wins: number, gamesPlayed: number): number {

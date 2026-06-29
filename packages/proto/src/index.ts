@@ -100,3 +100,22 @@ export type ListUsersResponse = {
   page: number;
   limit: number;
 };
+
+export type LeaderboardItemMessage = {
+  rank: number;
+  userId: string;
+  displayName: string;
+  rating: number;
+  gamesPlayed: number;
+  league: LeagueSummaryMessage;
+};
+
+export type ListLeaderboardResponse = {
+  items: LeaderboardItemMessage[];
+};
+
+export type CompetitionStatsResponse = {
+  rating: number;
+  gamesPlayed: number;
+  rank: number;
+};
