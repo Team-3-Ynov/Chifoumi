@@ -70,6 +70,26 @@ describe("TournamentsService", () => {
   });
 
   describe("listTournaments", () => {
+    it("uses default pagination when query parameters are omitted", async () => {
+      prisma.tournament.findMany.mockResolvedValue([
+        makeTournament({ _count: { registrations: 1 } }),
+      ]);
+      prisma.tournament.count.mockResolvedValue(1);
+
+      const result = await service.listTournaments({} as never);
+
+      expect(prisma.tournament.findMany).toHaveBeenCalledWith({
+        where: {},
+        orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+        skip: 0,
+        take: 20,
+        include: { _count: { select: { registrations: true } } },
+      });
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
+      expect(result.total).toBe(1);
+    });
+
     it("returns a paginated tournament list filtered by status and sorted by start date", async () => {
       prisma.tournament.findMany.mockResolvedValue([
         makeTournament({

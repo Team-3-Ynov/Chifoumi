@@ -86,13 +86,15 @@ export class TournamentsService {
 
   async listTournaments(query: TournamentListQueryDto): Promise<TournamentListResponseDto> {
     const where = query.status ? { status: query.status } : {};
-    const skip = (query.page - 1) * query.limit;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
       this.prisma.tournament.findMany({
         where,
         orderBy: [{ startsAt: "asc" }, { id: "asc" }],
         skip,
-        take: query.limit,
+        take: limit,
         include: { _count: { select: { registrations: true } } },
       }),
       this.prisma.tournament.count({ where }),
@@ -100,8 +102,8 @@ export class TournamentsService {
 
     return {
       items: items.map((tournament) => this.toListItem(tournament as TournamentListRecord)),
-      page: query.page,
-      limit: query.limit,
+      page,
+      limit,
       total,
     };
   }

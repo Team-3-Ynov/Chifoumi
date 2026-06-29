@@ -112,6 +112,8 @@ describe("MatchPlayService", () => {
   });
 
   it("ends a BO3 match at 2-0", async () => {
+    const broadcastSpy = jest.spyOn(eventBus, "broadcastToMatch");
+
     await service.submitPlay({ userId: "a", matchId: "match-1", roundNumber: 1, move: "rock" });
     await service.submitPlay({ userId: "b", matchId: "match-1", roundNumber: 1, move: "scissors" });
     await service.submitPlay({ userId: "a", matchId: "match-1", roundNumber: 2, move: "paper" });
@@ -126,7 +128,15 @@ describe("MatchPlayService", () => {
       expect.objectContaining({ roundNumber: 1, moveA: "rock", moveB: "scissors", winner: "a" }),
       expect.objectContaining({ roundNumber: 2, moveA: "paper", moveB: "rock", winner: "a" }),
     ]);
+    expect(
+      broadcastSpy.mock.calls.filter((call) => call[1] === "matchEnded").map((call) => call[2]),
+    ).toEqual([
+      expect.objectContaining({ eloDelta: { a: 21, b: -21 } }),
+      expect.objectContaining({ eloDelta: { a: 21, b: -21 } }),
+    ]);
     expect(await client.get("match:byUser:a")).toBeNull();
+
+    broadcastSpy.mockRestore();
   });
 
   it("rejects invalid moves", async () => {

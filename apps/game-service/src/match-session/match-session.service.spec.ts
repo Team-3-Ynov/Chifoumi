@@ -94,7 +94,7 @@ describe("MatchSessionService", () => {
       currentRound: 1,
       status: "WAITING_PLAYS",
       startedAt: "2026-06-09T10:00:00.000Z",
-      roundDeadline: "2026-06-09T10:00:05.000Z",
+      roundDeadline: "2026-06-09T10:00:12.000Z",
       roundPlays: { a: null, b: null },
     });
     expect(JSON.parse(redis.values.get(matchStateKey("match-1")) ?? "{}")).toEqual(state);

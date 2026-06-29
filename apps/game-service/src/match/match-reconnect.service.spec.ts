@@ -96,7 +96,7 @@ describe("MatchReconnectService", () => {
       scoreA: 0,
       scoreB: 0,
       currentState: "WAITING_PLAYS",
-      deadline: "2026-06-09T10:00:05.000Z",
+      deadline: "2026-06-09T10:00:12.000Z",
     });
     expect(disconnectScheduler.cancelForfeit).toHaveBeenCalledWith("player-a");
   });
