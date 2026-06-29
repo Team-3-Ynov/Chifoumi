@@ -233,11 +233,6 @@ export class AuthService {
         throw new UnauthorizedException();
       }
 
-      await tx.user.update({
-        where: { id: stored.userId },
-        data: { passwordHash: newPasswordHash },
-      });
-
       // AC4: only refresh tokens are revoked here. Existing access JWTs are NOT
       // blacklisted on reset — they remain valid until their short (15 min)
       // expiry. This is an accepted trade-off documented for the reset flow.
@@ -246,6 +241,8 @@ export class AuthService {
         data: { revokedAt: new Date() },
       });
     });
+
+    await this.userService.updatePassword(stored.userId, newPasswordHash);
   }
 
   async logout(input: { userId: string; jti: string; expiresAt: Date }): Promise<void> {

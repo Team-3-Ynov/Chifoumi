@@ -12,7 +12,7 @@
     "tests/*"
   ],
   "scripts": {
-    "dev": "pnpm --parallel --filter @chifoumi/api --filter @chifoumi/game-service --filter @chifoumi/job-runner --filter @chifoumi/front dev",
+    "dev": "pnpm --parallel --filter @chifoumi/api --filter @chifoumi/game-service --filter @chifoumi/user-service --filter @chifoumi/job-runner --filter @chifoumi/front dev",
     "prepare": "test ! -d .git || lefthook install",
     "biome:check": "biome check apps packages tests .github .devcontainer biome.json package.json pnpm-workspace.yaml lefthook.yml",
     "biome:fix": "biome check --write apps packages tests .github .devcontainer biome.json package.json pnpm-workspace.yaml lefthook.yml",

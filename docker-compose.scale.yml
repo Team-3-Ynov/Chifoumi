@@ -75,6 +75,33 @@ x-game-common: &game-common
   networks:
     - chifoumi
 
+x-user-common: &user-common
+  build:
+    context: .
+    dockerfile: apps/user-service/Dockerfile
+  depends_on:
+    db-migrate:
+      condition: service_completed_successfully
+  environment: &user-env
+    DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+    USER_SERVICE_PORT: "3004"
+    USER_SERVICE_GRPC_PORT: "50053"
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3004/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+      ]
+    interval: 10s
+    timeout: 5s
+    retries: 6
+    start_period: 30s
+  restart: unless-stopped
+  networks:
+    - chifoumi
+
 x-traefik-api-labels: &traefik-api-labels
   traefik.enable: "true"
   traefik.http.routers.api.rule: Host(`api.localhost`)
@@ -88,6 +115,12 @@ x-traefik-game-labels: &traefik-game-labels
   traefik.http.services.game.loadbalancer.server.port: "3001"
   traefik.http.services.game.loadbalancer.sticky.cookie: "true"
   traefik.http.services.game.loadbalancer.sticky.cookie.name: chifoumi_game
+
+x-traefik-user-labels: &traefik-user-labels
+  traefik.enable: "true"
+  traefik.http.routers.user.rule: Host(`user.localhost`)
+  traefik.http.routers.user.entrypoints: web
+  traefik.http.services.user.loadbalancer.server.port: "3004"
 
 services:
   postgres:
@@ -156,20 +189,54 @@ services:
   api-1:
     <<: *api-common
     container_name: chifoumi-api-1
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      user-service-1:
+        condition: service_healthy
     environment:
       <<: *api-env
       INSTANCE_ID: api-1
+      USER_SERVICE_GRPC_URL: user-service-1:50053
     labels:
       <<: *traefik-api-labels
 
   api-2:
     <<: *api-common
     container_name: chifoumi-api-2
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      user-service-2:
+        condition: service_healthy
     environment:
       <<: *api-env
       INSTANCE_ID: api-2
+      USER_SERVICE_GRPC_URL: user-service-2:50053
     labels:
       <<: *traefik-api-labels
+
+  user-service-1:
+    <<: *user-common
+    container_name: chifoumi-user-service-1
+    environment:
+      <<: *user-env
+      INSTANCE_ID: user-service-1
+    labels:
+      <<: *traefik-user-labels
+
+  user-service-2:
+    <<: *user-common
+    container_name: chifoumi-user-service-2
+    environment:
+      <<: *user-env
+      INSTANCE_ID: user-service-2
+    labels:
+      <<: *traefik-user-labels
 
   game-1:
     <<: *game-common

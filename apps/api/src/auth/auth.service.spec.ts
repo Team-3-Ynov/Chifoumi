@@ -31,6 +31,7 @@ describe("AuthService", () => {
     findByEmail: jest.fn<UserService["findByEmail"]>(),
     findById: jest.fn<UserService["findById"]>(),
     createUser: jest.fn<UserService["createUser"]>(),
+    updatePassword: jest.fn<UserService["updatePassword"]>(),
     toSafeUser: jest.fn<UserService["toSafeUser"]>(),
     isUniqueConstraintError: jest.fn<UserService["isUniqueConstraintError"]>(),
   };
@@ -499,10 +500,7 @@ describe("AuthService", () => {
       },
       data: { usedAt: expect.any(Date) },
     });
-    expect(prisma.user.update).toHaveBeenCalledWith({
-      where: { id: "u1" },
-      data: { passwordHash: "new-hash" },
-    });
+    expect(usersService.updatePassword).toHaveBeenCalledWith("u1", "new-hash");
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
       where: { userId: "u1", revokedAt: null },
       data: { revokedAt: expect.any(Date) },

@@ -24,16 +24,14 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS builder
 ENV DATABASE_URL=postgresql://app:chifoumi_dev@localhost:5432/chifoumi
 COPY apps ./apps
-COPY infra ./infra
 COPY packages ./packages
-RUN pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/schemas build && pnpm --filter @chifoumi/proto build && pnpm --filter @chifoumi/api build
+RUN pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/proto build && pnpm --filter @chifoumi/user-service build
 
 FROM base AS runner
 ENV NODE_ENV=production
-ENV API_PORT=3000
+ENV USER_SERVICE_PORT=3004
+ENV USER_SERVICE_GRPC_PORT=50053
 COPY --from=builder --chown=node:node /app /app
-COPY --chown=node:node apps/api/docker-migrate.sh /app/apps/api/docker-migrate.sh
-RUN chmod +x /app/apps/api/docker-migrate.sh
 USER node
-EXPOSE 3000
-CMD ["node", "apps/api/dist/main.js"]
+EXPOSE 3004 50053
+CMD ["node", "apps/user-service/dist/main.js"]

@@ -24,3 +24,58 @@ export type GetRatingResponse = {
   rating: number;
   gamesPlayed: number;
 };
+
+export type UserRole = "player" | "admin";
+
+export type UserRecordResponse = {
+  found: boolean;
+  id?: string;
+  email?: string;
+  passwordHash?: string;
+  displayName?: string;
+  role?: UserRole;
+  createdAt?: string;
+};
+
+export type LeagueSummaryMessage = {
+  name: string;
+  tier: number;
+};
+
+export type CurrentUserProfileResponse = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  rating: number;
+  gamesPlayed: number;
+  league: LeagueSummaryMessage;
+  createdAt: string;
+};
+
+export type PublicUserProfileResponse = {
+  id: string;
+  displayName: string;
+  rating: number;
+  gamesPlayed: number;
+  league: LeagueSummaryMessage;
+  winRate: number;
+  createdAt: string;
+};
+
+export type AdminUserSummaryMessage = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  rating: number;
+  gamesPlayed: number;
+  createdAt: string;
+};
+
+export type ListUsersResponse = {
+  items: AdminUserSummaryMessage[];
+  total: number;
+  page: number;
+  limit: number;
+};

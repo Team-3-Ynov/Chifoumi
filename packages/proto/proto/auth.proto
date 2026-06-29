@@ -7,7 +7,14 @@ service Auth {
 }
 
 service Users {
+  rpc FindByEmail(FindByEmailRequest) returns (UserRecordResponse);
+  rpc FindById(FindByIdRequest) returns (UserRecordResponse);
+  rpc CreateUser(CreateUserRequest) returns (UserRecordResponse);
+  rpc UpdatePassword(UpdatePasswordRequest) returns (EmptyResponse);
   rpc GetRating(GetRatingRequest) returns (GetRatingResponse);
+  rpc GetCurrentProfile(GetCurrentProfileRequest) returns (CurrentUserProfileResponse);
+  rpc GetPublicProfile(GetPublicProfileRequest) returns (PublicUserProfileResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
 }
 
 message VerifyTokenRequest {
@@ -30,4 +37,83 @@ message GetRatingRequest {
 message GetRatingResponse {
   int32 rating = 1;
   int32 games_played = 2;
+}
+
+message EmptyResponse {}
+
+message FindByEmailRequest {
+  string email = 1;
+}
+
+message FindByIdRequest {
+  string user_id = 1;
+}
+
+message CreateUserRequest {
+  string email = 1;
+  string password_hash = 2;
+  string display_name = 3;
+}
+
+message UpdatePasswordRequest {
+  string user_id = 1;
+  string password_hash = 2;
+}
+
+message UserRecordResponse {
+  bool found = 1;
+  string id = 2;
+  string email = 3;
+  string password_hash = 4;
+  string display_name = 5;
+  string role = 6;
+  string created_at = 7;
+}
+
+message LeagueSummaryMessage {
+  string name = 1;
+  int32 tier = 2;
+}
+
+message CurrentUserProfileResponse {
+  string id = 1;
+  string email = 2;
+  string display_name = 3;
+  string role = 4;
+  int32 rating = 5;
+  int32 games_played = 6;
+  LeagueSummaryMessage league = 7;
+  string created_at = 8;
+}
+
+message PublicUserProfileResponse {
+  string id = 1;
+  string display_name = 2;
+  int32 rating = 3;
+  int32 games_played = 4;
+  LeagueSummaryMessage league = 5;
+  double win_rate = 6;
+  string created_at = 7;
+}
+
+message ListUsersRequest {
+  int32 page = 1;
+  int32 limit = 2;
+}
+
+message AdminUserSummaryMessage {
+  string id = 1;
+  string email = 2;
+  string display_name = 3;
+  string role = 4;
+  int32 rating = 5;
+  int32 games_played = 6;
+  string created_at = 7;
+}
+
+message ListUsersResponse {
+  repeated AdminUserSummaryMessage items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 limit = 4;
 }
