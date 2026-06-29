@@ -207,7 +207,7 @@ L'état du match est stocké dans Redis (clé `match:{matchId}:state`, TTL 1h) e
 
 **Saisons (sprint 2), Tournois (sprint 3), Boutique (sprint 4)** — détaillés dans plans de sprint.
 
-Tout documenté via **`@nestjs/swagger`** sur `/api/docs`. DTOs validés par **`class-validator`** + dérivés des schémas Zod de `packages/schemas`.
+Tout documenté via **`@nestjs/swagger`** sur `/api/docs`. DTOs REST validés par **`class-validator`** (source unique côté API). Les schémas Zod de `packages/schemas` couvrent les **payloads WebSocket** (§6.2) ; les DTO REST sont en class-validator pur pour des raisons de compatibilité Swagger/NestJS.
 
 ### 6.2 WebSocket (Client ↔ Game Service)
 
