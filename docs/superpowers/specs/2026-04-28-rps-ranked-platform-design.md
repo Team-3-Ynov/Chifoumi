@@ -60,7 +60,7 @@ ynov-rps/
 ├── packages/
 │   ├── biome/         ← config Biome partagée (étendue par chaque app)
 │   ├── tsconfig/      ← tsconfig.base.json strict
-│   ├── schemas/       ← schémas Zod partagés (DTOs API, payloads WebSocket)
+│   ├── schemas/       ← schémas Zod partagés (payloads WebSocket)
 │   ├── elo/           ← moteur ELO pur (logique testable à 100%, sans I/O)
 │   ├── proto/         ← définitions gRPC `.proto` + stubs générés
 │   └── db/            ← schéma Prisma + client généré, partagé entre API et job-runner
