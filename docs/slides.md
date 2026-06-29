@@ -62,7 +62,7 @@ layout: default
 **La solution** : Chifoumi Ranked implémente un protocole **commit-reveal** anti-triche inspiré de la cryptographie, couplé à un moteur ELO complet pour un classement compétitif juste.
 
 **Ce qu'on a construit :**
-- 4 services découplés (API, Game Service, Job Runner, Front)
+- 6 services découplés (API, auth-service, user-service, Game Service, Job Runner, Front)
 - Matchmaking par fenêtre ELO sur Redis
 - Parties Best-of-3 en temps réel via WebSocket
 - Persistance async des résultats via BullMQ
@@ -86,26 +86,31 @@ layout: default
 
 # Vue d'ensemble
 
-```mermaid {scale: 0.72}
+```mermaid {scale: 0.62}
 graph TD
   Browser["Navigateur React/Vite :5173"]
-  API["API NestJS :3000<br/>REST + Swagger + gRPC"]
+  API["API NestJS :3000<br/>REST + Swagger — BFF public"]
+  AS["auth-service :50054<br/>gRPC — JWT RS256 + refresh/reset"]
+  US["user-service :50053<br/>gRPC — profils + ratings"]
   GS["Game Service :3001<br/>Socket.io /game"]
   JR["Job Runner<br/>BullMQ Workers"]
   PG[("PostgreSQL 16")]
   RD[("Redis 7")]
   MH["MailHog SMTP"]
 
-  Browser -->|"HTTP / REST"| API
+  Browser -->|"HTTP REST"| API
   Browser -->|"WebSocket wss://"| GS
-  GS -->|"gRPC VerifyToken / GetRating"| API
+  API -->|"gRPC Auth.*"| AS
+  API -->|"gRPC Users.*"| US
+  AS -->|"gRPC Users.FindBy* / CreateUser"| US
+  GS -->|"gRPC Auth.VerifyToken"| AS
   GS -->|"Pub/Sub + Sessions"| RD
-  API -->|"Prisma ORM"| PG
-  API -->|"Blacklist + Cache"| RD
-  JR -->|"Prisma ORM"| PG
+  GS -->|"BullMQ match-ended"| RD
+  AS -->|"Prisma — auth tokens"| PG
+  US -->|"Prisma — users + ratings"| PG
+  JR -->|"Prisma — matchs + ELO"| PG
   JR -->|"Invalidation cache"| RD
   JR -->|"SMTP"| MH
-  GS -->|"BullMQ match-ended"| RD
   JR -->|"BullMQ workers"| RD
 ```
 
@@ -118,24 +123,28 @@ layout: default
 ```
 ynov-rps/
 ├── apps/
-│   ├── api/          ← NestJS REST + Swagger + gRPC server
-│   ├── game-service/ ← NestJS + Socket.io namespace /game
-│   ├── job-runner/   ← NestJS standalone + BullMQ workers
-│   └── front/        ← React + Vite
+│   ├── api/           ← NestJS REST + Swagger (BFF public)
+│   ├── auth-service/  ← NestJS gRPC — JWT RS256, refresh, reset
+│   ├── user-service/  ← NestJS gRPC — profils, ratings, leaderboard
+│   ├── game-service/  ← NestJS + Socket.io namespace /game
+│   ├── job-runner/    ← NestJS standalone + BullMQ workers
+│   └── front/         ← React + Vite
 ├── packages/
-│   ├── db/           ← Prisma schema, migrations, seed
-│   ├── elo/          ← Moteur ELO pur (0 dépendance framework)
-│   ├── schemas/      ← Schémas Zod partagés (WS events, commit-hash)
-│   ├── proto/        ← Définitions gRPC + stubs générés
-│   ├── biome/        ← Config Biome partagée
-│   └── tsconfig/     ← tsconfig.base.json strict
-├── tests/e2e/        ← Smoke tests cross-instance BO3
+│   ├── db/            ← Prisma schema, migrations, seed
+│   ├── elo/           ← Moteur ELO pur (0 dépendance framework)
+│   ├── bracket/       ← Logique bracket tournois (single/double elim)
+│   ├── leagues/       ← Logique ligues / tiers ELO
+│   ├── schemas/       ← Schémas Zod partagés (WS events, commit-hash)
+│   ├── proto/         ← Définitions gRPC + stubs générés
+│   ├── biome/         ← Config Biome partagée
+│   └── tsconfig/      ← tsconfig.base.json strict
+├── tests/e2e/         ← Smoke tests cross-instance BO3
 └── .github/workflows/
-    ├── pr.yml        ← lint + typecheck + test + build + e2e
-    └── deploy.yml    ← build images GHCR + SSH rolling deploy VPS
+    ├── pr.yml         ← lint + typecheck + test + build + e2e
+    └── deploy.yml     ← build images GHCR + SSH rolling deploy VPS
 ```
 
-**Règle clé :** le Game Service n'accède jamais à Postgres directement. Il passe par BullMQ → Job Runner pour la persistance.
+**Règles clés :** le Game Service n'accède jamais à Postgres — persistance via BullMQ → Job Runner. `auth-service` et `user-service` sont internes (non exposés par Traefik).
 
 ---
 layout: default
@@ -181,25 +190,32 @@ layout: default
 ```mermaid {scale: 0.52}
 sequenceDiagram
   participant C as Client
-  participant A as API
+  participant A as API :3000
+  participant AS as auth-service :50054
   participant DB as PostgreSQL
   participant R as Redis
 
   C->>A: POST /auth/login
-  A->>DB: Vérifier passwordHash (Argon2id)
-  A->>A: Générer JWT RS256 (jti, 15min)
-  A->>DB: Stocker SHA256(refreshToken)
+  A->>AS: gRPC Auth.Login(email, password)
+  AS->>DB: Vérifier passwordHash (Argon2id)
+  AS->>AS: Générer JWT RS256 (jti, 15min)
+  AS->>DB: Stocker SHA256(refreshToken)
+  AS-->>A: AuthResultResponse
   A-->>C: accessToken + refreshToken
 
   C->>A: POST /auth/refresh (refreshToken)
-  A->>R: Acquérir lock userId (5s TTL)
-  A->>DB: Valider + révoquer ancien token
-  A->>DB: Stocker nouveau SHA256(refreshToken)
+  A->>AS: gRPC Auth.Refresh(refreshToken)
+  AS->>R: Acquérir lock userId (5s TTL)
+  AS->>DB: Valider + révoquer ancien token
+  AS->>DB: Stocker nouveau SHA256(refreshToken)
+  AS-->>A: RefreshResponse
   A-->>C: nouveau accessToken + refreshToken
 
   C->>A: POST /auth/logout
-  A->>R: Blacklister jti jusqu'à expiry
-  A->>DB: Révoquer tous les refresh tokens
+  A->>AS: gRPC Auth.Logout(userId, jti, expiresAt)
+  AS->>R: Blacklister jti jusqu'à expiry
+  AS->>DB: Révoquer tous les refresh tokens
+  A-->>C: 204 No Content
 ```
 
 **Sécurité :** Argon2id `memoryCost:19456, timeCost:2` · RS256 · blacklist Redis · rotation atomique
@@ -208,16 +224,17 @@ sequenceDiagram
 layout: default
 ---
 
-# Base de données — Schéma Prisma
+# Base de données — Schéma Prisma (core)
 
-```mermaid {scale: 0.34}
+```mermaid {scale: 0.38}
 erDiagram
   User {
     uuid id PK
     string email UK
-    string displayName
+    string displayName UK
     string passwordHash
     enum role "player|admin"
+    datetime createdAt
   }
   RefreshToken {
     uuid id PK
@@ -232,30 +249,38 @@ erDiagram
     datetime usedAt "nullable"
   }
   EloRating {
-    uuid id PK
+    uuid userId PK
     int rating "default 1000"
     int gamesPlayed
   }
   Match {
     uuid id PK
+    uuid playerAId FK
+    uuid playerBId FK
+    uuid winnerId FK "nullable"
     enum status "in_progress|ended|aborted"
     int scoreA
     int scoreB
     datetime startedAt
+    datetime endedAt "nullable"
   }
   Round {
     uuid id PK
+    uuid matchId FK
     int roundNumber
+    enum moveA "rock|paper|scissors nullable"
+    enum moveB "rock|paper|scissors nullable"
     string commitA
     string commitB
-    string moveA
-    string moveB
     string nonceA
     string nonceB
     enum winner "a|b|draw"
+    datetime resolvedAt
   }
   EloHistory {
     uuid id PK
+    uuid userId FK
+    uuid matchId FK
     int ratingBefore
     int ratingAfter
     int delta
@@ -265,9 +290,82 @@ erDiagram
   User ||--|| EloRating : "possède"
   User ||--o{ Match : "joue (A)"
   User ||--o{ Match : "joue (B)"
+  User |o--o{ Match : "gagne"
   Match ||--o{ Round : "contient"
   Match ||--o{ EloHistory : "génère"
   User ||--o{ EloHistory : "concerne"
+```
+
+---
+layout: default
+---
+
+# Base de données — Features compétitives
+
+```mermaid {scale: 0.36}
+erDiagram
+  User {
+    uuid id PK
+  }
+  League {
+    uuid id PK
+    string name UK
+    int minRating
+    int maxRating "nullable"
+    int tier UK
+  }
+  Season {
+    uuid id PK
+    string name
+    datetime startedAt
+    datetime endsAt "nullable"
+    enum status "upcoming|active|closed"
+  }
+  SeasonStanding {
+    uuid id PK
+    uuid seasonId FK
+    uuid userId FK
+    int finalRating
+    uuid finalLeagueId FK
+    int rank
+    bool rewardsDistributed
+  }
+  Tournament {
+    uuid id PK
+    string name
+    enum format "single_elim|double_elim"
+    int bracketSize "power of 2"
+    datetime registrationOpensAt
+    datetime startsAt
+    datetime endedAt "nullable"
+    enum status "upcoming|registration_open|in_progress|completed"
+    uuid winnerId FK "nullable"
+  }
+  TournamentRegistration {
+    uuid tournamentId FK
+    uuid userId FK
+    int seed "nullable"
+    datetime registeredAt
+  }
+  TournamentMatch {
+    uuid id PK
+    uuid tournamentId FK
+    int round
+    int positionIndex
+    uuid matchId FK "nullable"
+    uuid slotAId FK "nullable"
+    uuid slotBId FK "nullable"
+    uuid nextMatchId FK "nullable"
+    enum winnerSlot "a|b nullable"
+  }
+  League ||--o{ SeasonStanding : "attribuée dans"
+  Season ||--o{ SeasonStanding : "contient"
+  User ||--o{ SeasonStanding : "a"
+  User |o--o{ Tournament : "gagne"
+  Tournament ||--o{ TournamentRegistration : "inscriptions"
+  User ||--o{ TournamentRegistration : "s inscrit"
+  Tournament ||--o{ TournamentMatch : "matches"
+  TournamentMatch |o--|| TournamentMatch : "suivant"
 ```
 
 ---
@@ -298,8 +396,8 @@ layout: default
 | `match-events`  | `match-ended`          | ✅ Implémenté | Persiste les rounds en DB, calcule et applique les deltas ELO, invalide le cache leaderboard Redis |
 | `notifications` | `welcome-email`        | ✅ Implémenté | Envoie l'email de bienvenue après inscription                                                      |
 | `notifications` | `password-reset-email` | ✅ Implémenté | Envoie le lien de reset de mot de passe                                                            |
-| `seasons`       | `season-reset`         | 🔜 Stub      | Réinitialisation saisonnière (sprint 2)                                                            |
-| `tournaments`   | `generate-bracket`     | 🔜 Stub      | Génération de brackets (sprint 2)                                                                  |
+| `seasons`       | `season-reset`         | ✅ Implémenté | Clôture la saison, calcule les standings finaux et distribue les récompenses                       |
+| `tournaments`   | `generate-bracket`     | ✅ Implémenté | Génère le bracket (single/double élimination) et lance les premiers matchs via gRPC Game Service   |
 
 **Deux workers Docker distincts :**
 - `job-runner-match` → écoute `match-events`
@@ -313,26 +411,36 @@ layout: default
 
 # gRPC — Communication inter-services
 
-```mermaid {scale: 0.78}
+```mermaid {scale: 0.62}
 sequenceDiagram
-  participant GS as Game Service
-  participant A as API (gRPC :50051)
-  participant R as Redis
+  participant C as Client
+  participant A as API :3000
+  participant GS as Game Service :3001
+  participant AS as auth-service :50054
+  participant US as user-service :50053
 
-  note over GS: Handshake WebSocket — ?token=JWT
-  GS->>A: Auth.VerifyToken(token)
-  A->>R: Vérifier blacklist jti
-  A-->>GS: { valid, userId, role }
+  note over C,A: Flux REST — register / login
+  C->>A: POST /auth/register
+  A->>AS: Auth.Register(email, password, displayName)
+  AS->>US: Users.CreateUser(email, passwordHash, displayName)
+  US-->>AS: UserRecordResponse
+  AS-->>A: AuthResultResponse (user + tokens)
+  A-->>C: accessToken + refreshToken
 
-  note over GS: Lors du matchmaking
-  GS->>A: Users.GetRating(userId)
-  A-->>GS: { rating, gamesPlayed }
+  note over GS,AS: Handshake WebSocket — ?token=JWT
+  GS->>AS: Auth.VerifyToken(token)
+  AS-->>GS: { valid, userId, role, displayName }
+
+  note over GS,US: Lors du matchmaking
+  GS->>US: Users.GetRating(userId)
+  US-->>GS: { rating, gamesPlayed }
 ```
 
-**Pourquoi gRPC plutôt que REST ?**
-- Contrat fort typé (Protobuf) entre les services
-- Latence faible pour des appels synchrones fréquents (auth WS à chaque connexion)
-- Le Game Service reste sans accès Prisma — il délègue à l'API
+**Frontières de responsabilité**
+- `auth-service` : JWT RS256, Argon2id, refresh rotation, blacklist Redis
+- `user-service` : enregistrements users, ratings ELO, leaderboard, profils
+- Le Game Service n'accède jamais à Prisma — il passe par gRPC
+- L'API est un BFF pur : elle orchestre, ne stocke pas
 
 ---
 layout: default
@@ -340,11 +448,15 @@ layout: default
 
 # Déploiement multi-réplicas
 
-```mermaid {scale: 0.6}
+```mermaid {scale: 0.52}
 graph LR
   T["Traefik<br/>Reverse Proxy"]
   A1["api-1"]
   A2["api-2"]
+  AS1["auth-service-1<br/>:50054"]
+  AS2["auth-service-2<br/>:50054"]
+  US1["user-service-1<br/>:50053"]
+  US2["user-service-2<br/>:50053"]
   G1["game-service-1"]
   G2["game-service-2"]
   JRM["job-runner-match"]
@@ -356,7 +468,16 @@ graph LR
   T -->|"Round Robin"| A2
   T -->|"Sticky Session"| G1
   T -->|"Sticky Session"| G2
-  A1 & A2 --> PG
+  A1 -->|"gRPC"| AS1
+  A2 -->|"gRPC"| AS2
+  A1 -->|"gRPC"| US1
+  A2 -->|"gRPC"| US2
+  AS1 -->|"gRPC"| US1
+  AS2 -->|"gRPC"| US2
+  G1 -->|"gRPC VerifyToken"| AS1
+  G2 -->|"gRPC VerifyToken"| AS2
+  AS1 & AS2 --> PG
+  US1 & US2 --> PG
   A1 & A2 --> RD
   G1 & G2 --> RD
   G1 & G2 -->|"BullMQ"| RD
@@ -364,7 +485,7 @@ graph LR
   JRM & JRN --> RD
 ```
 
-**Sessions sticky** sur le Game Service (nécessaire pour le WebSocket) · **Round-robin** sur l'API (stateless) · Redis comme seul état partagé entre réplicas.
+**Sessions sticky** sur le Game Service (WebSocket) · **Round-robin** sur l'API (stateless) · `auth-service` / `user-service` internes, non exposés par Traefik · Redis : seul état partagé entre réplicas.
 
 ---
 layout: default
@@ -381,7 +502,7 @@ flowchart LR
   B["build<br/>pnpm -r build"]
   E["e2e smoke<br/>BO3 cross-instance"]
   MERGE["Merge → main"]
-  D["deploy.yml<br/>Build 4 images GHCR"]
+  D["deploy.yml<br/>Build 6 images GHCR"]
   VPS["Rolling deploy VPS<br/>SSH + docker compose"]
 
   PR --> L & TC & T & B
@@ -652,7 +773,7 @@ layout: default
 - `e2e` : smoke test BO3 cross-instance (2 réplicas game-service distincts)
 
 **CD — `deploy.yml` :**
-- Build & push 4 images Docker vers GHCR
+- Build & push 6 images Docker vers GHCR (api, auth-service, user-service, game-service, job-runner, front)
 - SSH rolling deploy VPS via `docker-compose.prod.yml`
 - Smoke post-deploy : `/health`, Swagger, front
 
