@@ -86,7 +86,7 @@ layout: default
 
 # Vue d'ensemble
 
-```mermaid
+```mermaid {scale: 0.72}
 graph TD
   Browser["Navigateur React/Vite :5173"]
   API["API NestJS :3000<br/>REST + Swagger + gRPC"]
@@ -178,7 +178,7 @@ layout: default
 
 # Authentification — JWT RS256 + Refresh Rotation
 
-```mermaid
+```mermaid {scale: 0.52}
 sequenceDiagram
   participant C as Client
   participant A as API
@@ -210,7 +210,7 @@ layout: default
 
 # Base de données — Schéma Prisma
 
-```mermaid
+```mermaid {scale: 0.34}
 erDiagram
   User {
     uuid id PK
@@ -313,7 +313,7 @@ layout: default
 
 # gRPC — Communication inter-services
 
-```mermaid
+```mermaid {scale: 0.78}
 sequenceDiagram
   participant GS as Game Service
   participant A as API (gRPC :50051)
@@ -340,7 +340,7 @@ layout: default
 
 # Déploiement multi-réplicas
 
-```mermaid
+```mermaid {scale: 0.6}
 graph LR
   T["Traefik<br/>Reverse Proxy"]
   A1["api-1"]
@@ -372,7 +372,7 @@ layout: default
 
 # CI/CD — Pipeline GitHub Actions
 
-```mermaid
+```mermaid {scale: 0.6}
 flowchart LR
   PR[/"PR ouverte<br/>→ develop / main"/]
   L["lint<br/>Biome CI"]
