@@ -34,7 +34,6 @@ describe("UserService gRPC client", () => {
         found: true,
         id: "user-1",
         email: "a@b.com",
-        passwordHash: "hash",
         displayName: "alice",
         role: "player",
         createdAt: "2026-01-01T00:00:00.000Z",
@@ -44,7 +43,6 @@ describe("UserService gRPC client", () => {
     await expect(service.findByEmail("a@b.com")).resolves.toEqual({
       id: "user-1",
       email: "a@b.com",
-      passwordHash: "hash",
       displayName: "alice",
       role: "player",
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
