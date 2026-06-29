@@ -67,32 +67,18 @@ function buildMatchResumedPayload(state: MatchState): MatchResumedPayload | null
     return null;
   }
 
-  const deadline =
-    currentState === "WAITING_REVEALS" && state.revealDeadline
-      ? state.revealDeadline
-      : state.roundDeadline;
-
   return {
     matchId: state.matchId,
     currentRound: state.currentRound,
     scoreA: state.scoreA,
     scoreB: state.scoreB,
     currentState,
-    deadline,
+    deadline: state.roundDeadline,
   };
 }
 
 function toResumedCurrentState(state: MatchState): MatchResumedCurrentState | null {
-  if (state.status === "WAITING_PLAYS") {
-    return "WAITING_PLAYS";
-  }
-  if (state.status === "WAITING_COMMITS") {
-    return "WAITING_COMMITS";
-  }
-  if (state.status === "WAITING_REVEALS") {
-    return "WAITING_REVEALS";
-  }
-  if (state.status === "RESOLVING") {
+  if (state.status === "WAITING_PLAYS" || state.status === "RESOLVING") {
     return "WAITING_PLAYS";
   }
   return null;

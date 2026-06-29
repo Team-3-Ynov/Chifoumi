@@ -66,7 +66,7 @@ export const matchResumedPayloadSchema = z.object({
   currentRound: z.number().int().positive(),
   scoreA: z.number().int().nonnegative(),
   scoreB: z.number().int().nonnegative(),
-  currentState: z.enum(["WAITING_PLAYS", "WAITING_COMMITS", "WAITING_REVEALS"]),
+  currentState: z.literal("WAITING_PLAYS"),
   deadline: z.string().datetime(),
 });
 
