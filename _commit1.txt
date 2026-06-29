@@ -1,0 +1,10 @@
+fix(proto): remove password_hash, add VerifyPassword and VerifySession (#180)
+
+Remove password_hash field from UserRecordResponse (reserved field 4)
+to stop the Argon2id hash from travelling over the internal gRPC wire.
+Add rpc VerifyPassword to Users service so auth-service can delegate
+credential verification without ever receiving the hash.
+Add rpc VerifySession(jti, userId) to Auth service so the API JwtStrategy
+can check revocation and user existence without re-verifying the RS256
+signature already validated by Passport.
+Add email to VerifyTokenResponse to fix the email regression in JwtStrategy.

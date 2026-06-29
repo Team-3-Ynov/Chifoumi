@@ -24,22 +24,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      passReqToCallback: true,
       ignoreExpiration: false,
       algorithms: ["RS256"],
       secretOrKey: jwtConfig.publicKey,
     });
   }
 
-  async validate(req: { headers?: { authorization?: string } }, payload: JwtPayload) {
-    const token = this.extractBearerToken(req);
-    if (!token) {
-      throw new UnauthorizedException();
-    }
-
-    let result: Awaited<ReturnType<AuthService["verifyToken"]>>;
+  async validate(payload: JwtPayload) {
+    let result: Awaited<ReturnType<AuthService["verifySession"]>>;
     try {
-      result = await this.authService.verifyToken(token);
+      result = await this.authService.verifySession(payload.jti, payload.sub);
     } catch {
       throw new ServiceUnavailableException("Authentication revocation store unavailable");
     }
@@ -48,29 +42,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-    if (result.userId !== payload.sub || result.jti !== payload.jti) {
-      throw new UnauthorizedException();
-    }
-
     return {
       id: result.userId,
-      email: "",
+      email: result.email ?? "",
       displayName: result.displayName,
       role: result.role,
       tokenJti: payload.jti,
       tokenExpiresAt: new Date(payload.exp * 1000),
     };
-  }
-
-  private extractBearerToken(req: { headers?: { authorization?: string } }): string | null {
-    const authorization = req.headers?.authorization;
-    if (!authorization) {
-      return null;
-    }
-    const [scheme, token] = authorization.split(" ");
-    if (scheme !== "Bearer" || !token) {
-      return null;
-    }
-    return token;
   }
 }

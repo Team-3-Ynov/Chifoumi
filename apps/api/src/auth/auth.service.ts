@@ -55,6 +55,16 @@ type AuthGrpcService = {
     userId?: string;
     role?: string;
     displayName?: string;
+    email?: string;
+    reason?: string;
+    jti?: string;
+  }>;
+  verifySession(request: { jti: string; userId: string }): import("rxjs").Observable<{
+    valid: boolean;
+    userId?: string;
+    role?: string;
+    displayName?: string;
+    email?: string;
     reason?: string;
     jti?: string;
   }>;
@@ -62,7 +72,7 @@ type AuthGrpcService = {
 
 export const AUTH_SERVICE_GRPC_CLIENT = "AUTH_SERVICE_GRPC_CLIENT";
 
-const DEFAULT_TIMEOUT_MS = 1000;
+const DEFAULT_TIMEOUT_MS = 5000;
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -116,6 +126,23 @@ export class AuthService implements OnModuleInit {
 
   async verifyToken(token: string): Promise<VerifyTokenResponse> {
     const response = await this.call(() => this.authService.verifyToken({ token }));
+    return this.toVerifyTokenResponse(response);
+  }
+
+  async verifySession(jti: string, userId: string): Promise<VerifyTokenResponse> {
+    const response = await this.call(() => this.authService.verifySession({ jti, userId }));
+    return this.toVerifyTokenResponse(response);
+  }
+
+  private toVerifyTokenResponse(response: {
+    valid: boolean;
+    userId?: string;
+    role?: string;
+    displayName?: string;
+    email?: string;
+    reason?: string;
+    jti?: string;
+  }): VerifyTokenResponse {
     if (!response.valid) {
       const reason =
         response.reason === "REVOKED" ||
@@ -131,6 +158,7 @@ export class AuthService implements OnModuleInit {
       userId: response.userId,
       role: response.role,
       displayName: response.displayName,
+      email: response.email,
       jti: response.jti,
     };
   }

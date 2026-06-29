@@ -54,7 +54,7 @@ export class AuthService {
           displayName: input.displayName,
         })
         .catch(() => undefined);
-      return this.issueTokensForUser(user.id, user);
+      return this.issueTokensForUser(user.id, this.userService.toSafeUser(user));
     } catch (error) {
       if (this.userService.isUniqueConstraintError(error)) {
         throw new ConflictException("Unable to complete registration");
@@ -64,15 +64,20 @@ export class AuthService {
   }
 
   async login(input: { email: string; password: string }): Promise<AuthResult> {
-    const user = await this.userService.findByEmail(input.email.toLowerCase());
-    if (!user) {
+    const verified = await this.userService.verifyPassword(
+      input.email.toLowerCase(),
+      input.password,
+    );
+    if (!verified) {
       throw new UnauthorizedException("Invalid credentials");
     }
-    const valid = await this.passwordService.verify(user.passwordHash, input.password);
-    if (!valid) {
-      throw new UnauthorizedException("Invalid credentials");
-    }
-    return this.issueTokensForUser(user.id, user);
+    const safeUser: SafeUser = {
+      id: verified.userId,
+      email: input.email.toLowerCase(),
+      displayName: verified.displayName,
+      role: verified.role,
+    };
+    return this.issueTokensForUser(verified.userId, safeUser);
   }
 
   async refresh(refreshToken: string): Promise<{ tokens: AuthTokens }> {
@@ -303,15 +308,11 @@ export class AuthService {
     });
   }
 
-  private async issueTokensForUser(
-    userId: string,
-    user: Parameters<UserService["toSafeUser"]>[0],
-  ): Promise<AuthResult> {
-    const safeUser = this.userService.toSafeUser(user);
+  private async issueTokensForUser(userId: string, user: SafeUser): Promise<AuthResult> {
     const { accessToken } = await this.tokenService.issueAccessToken({
       userId,
-      role: safeUser.role,
-      displayName: safeUser.displayName,
+      role: user.role,
+      displayName: user.displayName,
     });
     const { refreshToken, refreshTokenHash } = this.tokenService.issueRefreshToken();
     await this.prisma.refreshToken.create({
@@ -322,7 +323,7 @@ export class AuthService {
       },
     });
     return {
-      user: safeUser,
+      user,
       tokens: { access: accessToken, refresh: refreshToken },
     };
   }

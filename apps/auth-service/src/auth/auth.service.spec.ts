@@ -32,6 +32,7 @@ describe("AuthService", () => {
     findById: jest.fn<UserService["findById"]>(),
     createUser: jest.fn<UserService["createUser"]>(),
     updatePassword: jest.fn<UserService["updatePassword"]>(),
+    verifyPassword: jest.fn<UserService["verifyPassword"]>(),
     toSafeUser: jest.fn<UserService["toSafeUser"]>(),
     isUniqueConstraintError: jest.fn<UserService["isUniqueConstraintError"]>(),
   };
@@ -205,15 +206,12 @@ describe("AuthService", () => {
   });
 
   it("login throws UnauthorizedException on bad password", async () => {
-    usersService.findByEmail.mockResolvedValue({
-      id: "u1",
-      passwordHash: "hash",
-    } as Awaited<ReturnType<UserService["findByEmail"]>>);
-    passwordService.verify.mockResolvedValue(false);
+    usersService.verifyPassword.mockResolvedValue(null);
 
     await expect(authService.login({ email: "a@b.com", password: "wrong" })).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+    expect(usersService.verifyPassword).toHaveBeenCalledWith("a@b.com", "wrong");
   });
 
   it("refresh rotates tokens for a valid refresh token", async () => {

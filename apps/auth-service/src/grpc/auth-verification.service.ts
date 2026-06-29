@@ -56,7 +56,36 @@ export class AuthVerificationService {
       userId: payload.sub,
       role: user.role,
       displayName: user.displayName,
+      email: user.email,
       jti: payload.jti,
+    };
+  }
+
+  async verifySession(jti: string, userId: string): Promise<VerifyTokenResponse> {
+    let revoked: boolean;
+    try {
+      revoked = await this.redisService.isAccessTokenRevoked(jti);
+    } catch (error) {
+      this.logger.error("Redis blacklist check failed during session verification", error);
+      return { valid: false, reason: "UNAVAILABLE" };
+    }
+
+    if (revoked) {
+      return { valid: false, reason: "REVOKED" };
+    }
+
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      return { valid: false, reason: "INVALID" };
+    }
+
+    return {
+      valid: true,
+      userId,
+      role: user.role,
+      displayName: user.displayName,
+      email: user.email,
+      jti,
     };
   }
 }

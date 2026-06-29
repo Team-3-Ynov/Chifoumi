@@ -48,7 +48,6 @@ describe("AuthVerificationService", () => {
     userService.findById.mockResolvedValue({
       id: "user-1",
       email: "user@example.com",
-      passwordHash: "hash",
       role: "admin",
       displayName: "current-name",
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -59,6 +58,7 @@ describe("AuthVerificationService", () => {
       userId: "user-1",
       role: "admin",
       displayName: "current-name",
+      email: "user@example.com",
       jti: "token-1",
     } satisfies VerifyTokenResponse);
   });

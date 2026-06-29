@@ -4,6 +4,7 @@ import type {
   PublicUserProfileResponse,
   UserRecordResponse,
   UserRole,
+  VerifyPasswordResponse,
 } from "@chifoumi/proto";
 import { status as GrpcStatus } from "@grpc/grpc-js";
 import {
@@ -19,7 +20,6 @@ import { firstValueFrom, timeout } from "rxjs";
 export type UserRecord = {
   id: string;
   email: string;
-  passwordHash: string;
   displayName: string;
   role: UserRole;
   createdAt: Date;
@@ -82,6 +82,10 @@ type UsersGrpcService = {
     userId: string;
     passwordHash: string;
   }): import("rxjs").Observable<Record<string, never>>;
+  verifyPassword(request: {
+    email: string;
+    plaintextPassword: string;
+  }): import("rxjs").Observable<VerifyPasswordResponse>;
   getRating(request: { userId: string }): import("rxjs").Observable<{
     rating: number;
     gamesPlayed: number;
@@ -97,7 +101,7 @@ type UsersGrpcService = {
 
 export const USER_SERVICE_GRPC_CLIENT = "USER_SERVICE_GRPC_CLIENT";
 
-const DEFAULT_TIMEOUT_MS = 1000;
+const DEFAULT_TIMEOUT_MS = 5000;
 
 @Injectable()
 export class UserService implements OnModuleInit {
@@ -134,6 +138,23 @@ export class UserService implements OnModuleInit {
 
   async updatePassword(userId: string, passwordHash: string): Promise<void> {
     await this.call(() => this.usersService.updatePassword({ userId, passwordHash }));
+  }
+
+  async verifyPassword(
+    email: string,
+    plaintextPassword: string,
+  ): Promise<{ userId: string; displayName: string; role: UserRole } | null> {
+    const response = await this.call(() =>
+      this.usersService.verifyPassword({ email, plaintextPassword }),
+    );
+    if (!response.valid || !response.userId || !response.displayName || !response.role) {
+      return null;
+    }
+    return {
+      userId: response.userId,
+      displayName: response.displayName,
+      role: response.role as UserRole,
+    };
   }
 
   async getRating(userId: string): Promise<{ rating: number; gamesPlayed: number }> {
@@ -213,7 +234,6 @@ export class UserService implements OnModuleInit {
     if (
       !response.id ||
       !response.email ||
-      !response.passwordHash ||
       !response.displayName ||
       !response.role ||
       !response.createdAt
@@ -223,7 +243,6 @@ export class UserService implements OnModuleInit {
     return {
       id: response.id,
       email: response.email,
-      passwordHash: response.passwordHash,
       displayName: response.displayName,
       role: response.role,
       createdAt: new Date(response.createdAt),

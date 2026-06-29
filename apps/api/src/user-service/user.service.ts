@@ -21,7 +21,6 @@ import { firstValueFrom, timeout } from "rxjs";
 export type UserRecord = {
   id: string;
   email: string;
-  passwordHash: string;
   displayName: string;
   role: UserRole;
   createdAt: Date;
@@ -106,7 +105,7 @@ type UsersGrpcService = {
 
 export const USER_SERVICE_GRPC_CLIENT = "USER_SERVICE_GRPC_CLIENT";
 
-const DEFAULT_TIMEOUT_MS = 1000;
+const DEFAULT_TIMEOUT_MS = 5000;
 
 @Injectable()
 export class UserService implements OnModuleInit {
@@ -237,7 +236,6 @@ export class UserService implements OnModuleInit {
     if (
       !response.id ||
       !response.email ||
-      !response.passwordHash ||
       !response.displayName ||
       !response.role ||
       !response.createdAt
@@ -247,7 +245,6 @@ export class UserService implements OnModuleInit {
     return {
       id: response.id,
       email: response.email,
-      passwordHash: response.passwordHash,
       displayName: response.displayName,
       role: response.role,
       createdAt: new Date(response.createdAt),

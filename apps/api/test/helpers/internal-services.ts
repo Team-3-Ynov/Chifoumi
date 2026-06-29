@@ -47,6 +47,8 @@ async function getFreePort(): Promise<number> {
   });
 }
 
+// Both Auth and Users gRPC services share the same proto file and package
+// (chifoumi.auth.v1), so AUTH_PROTO_PACKAGE / AUTH_PROTO_PATH apply to both.
 async function createGrpcApp(module: ModuleImport, grpcUrl: string): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({
     imports: [module],

@@ -4,6 +4,7 @@ import type {
   ListUsersResponse,
   PublicUserProfileResponse,
   UserRecordResponse,
+  VerifyPasswordResponse,
 } from "@chifoumi/proto";
 import { status as GrpcStatus } from "@grpc/grpc-js";
 import { Controller, Inject } from "@nestjs/common";
@@ -51,6 +52,18 @@ export class UsersGrpcController {
       }
       throw error;
     }
+  }
+
+  @GrpcMethod("Users", "VerifyPassword")
+  async verifyPassword(data: {
+    email: string;
+    plaintextPassword: string;
+  }): Promise<VerifyPasswordResponse> {
+    const result = await this.userService.verifyPassword(data.email, data.plaintextPassword);
+    if (!result) {
+      return { valid: false, userId: "", displayName: "", role: "" };
+    }
+    return result;
   }
 
   @GrpcMethod("Users", "UpdatePassword")
@@ -141,7 +154,6 @@ export class UsersGrpcController {
       found: true,
       id: user.id,
       email: user.email,
-      passwordHash: user.passwordHash,
       displayName: user.displayName,
       role: user.role,
       createdAt: user.createdAt.toISOString(),

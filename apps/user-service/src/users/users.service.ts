@@ -6,6 +6,7 @@ import {
   toLeagueSummary,
 } from "@chifoumi/leagues";
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import * as argon2 from "argon2";
 import { PrismaService } from "../prisma/prisma.service.js";
 import type {
   AdminUsersPage,
@@ -181,6 +182,38 @@ export class UserService {
       rating: rating.rating,
       gamesPlayed: rating.gamesPlayed,
       rank: ahead + 1,
+    };
+  }
+
+  async verifyPassword(
+    email: string,
+    plaintextPassword: string,
+  ): Promise<{
+    valid: boolean;
+    userId: string;
+    displayName: string;
+    role: "player" | "admin";
+  } | null> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Run a dummy verify to prevent user-enumeration via timing side-channel
+      await argon2
+        .verify(
+          "$argon2id$v=19$m=19456,t=2,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          plaintextPassword,
+        )
+        .catch(() => undefined);
+      return null;
+    }
+    const valid = await argon2.verify(user.passwordHash, plaintextPassword);
+    if (!valid) {
+      return null;
+    }
+    return {
+      valid: true,
+      userId: user.id,
+      displayName: user.displayName,
+      role: this.mapRole(user.role),
     };
   }
 

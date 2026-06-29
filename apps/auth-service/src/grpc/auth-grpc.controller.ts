@@ -94,6 +94,21 @@ export class AuthGrpcController {
       userId: result.userId ?? "",
       role: result.role ?? "",
       displayName: result.displayName ?? "",
+      email: result.email ?? "",
+      reason: result.reason ?? "",
+      jti: result.jti ?? "",
+    };
+  }
+
+  @GrpcMethod("Auth", "VerifySession")
+  async verifySession(data: { jti: string; userId: string }) {
+    const result = await this.authVerificationService.verifySession(data.jti, data.userId);
+    return {
+      valid: result.valid,
+      userId: result.userId ?? "",
+      role: result.role ?? "",
+      displayName: result.displayName ?? "",
+      email: result.email ?? "",
       reason: result.reason ?? "",
       jti: result.jti ?? "",
     };
