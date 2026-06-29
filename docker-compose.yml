@@ -133,8 +133,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "3004:3004"
     environment:
       USER_SERVICE_PORT: 3004
       USER_SERVICE_GRPC_PORT: 50053
@@ -156,8 +154,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "3005:3004"
     environment:
       USER_SERVICE_PORT: 3004
       USER_SERVICE_GRPC_PORT: 50053
@@ -183,8 +179,6 @@ services:
         condition: service_healthy
       user-service-1:
         condition: service_healthy
-    ports:
-      - "3006:3006"
     environment:
       AUTH_SERVICE_PORT: 3006
       AUTH_SERVICE_GRPC_PORT: 50054
@@ -218,8 +212,6 @@ services:
         condition: service_healthy
       user-service-2:
         condition: service_healthy
-    ports:
-      - "3007:3006"
     environment:
       AUTH_SERVICE_PORT: 3006
       AUTH_SERVICE_GRPC_PORT: 50054
