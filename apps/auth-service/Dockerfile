@@ -13,6 +13,7 @@ COPY apps/game-service/package.json apps/game-service/package.json
 COPY apps/job-runner/package.json apps/job-runner/package.json
 COPY apps/user-service/package.json apps/user-service/package.json
 COPY packages/biome/package.json packages/biome/package.json
+COPY packages/bracket/package.json packages/bracket/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/elo/package.json packages/elo/package.json
 COPY packages/leagues/package.json packages/leagues/package.json
@@ -22,17 +23,17 @@ COPY packages/tsconfig/package.json packages/tsconfig/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder
-ARG VITE_API_BASE_URL=http://localhost:3000
-ARG VITE_GAME_SERVICE_URL=http://localhost:3001
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-ENV VITE_GAME_SERVICE_URL=$VITE_GAME_SERVICE_URL
+ENV DATABASE_URL=postgresql://app:chifoumi_dev@localhost:5432/chifoumi
 COPY apps ./apps
+COPY infra ./infra
 COPY packages ./packages
-RUN pnpm --filter @chifoumi/front build
-RUN mkdir -p apps/front/dist/vendor \
-  && cp "$(find node_modules -path '*/socket.io-client/dist/socket.io.min.js' -print -quit)" apps/front/dist/vendor/socket.io.min.js
+RUN pnpm --filter @chifoumi/db build && pnpm --filter @chifoumi/proto build && pnpm --filter @chifoumi/auth-service build
 
-FROM nginx:1.27-alpine AS runner
-COPY apps/front/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/apps/front/dist /usr/share/nginx/html
-EXPOSE 80
+FROM base AS runner
+ENV NODE_ENV=production
+ENV AUTH_SERVICE_PORT=3006
+ENV AUTH_SERVICE_GRPC_PORT=50054
+COPY --from=builder --chown=node:node /app /app
+USER node
+EXPOSE 3006 50054
+CMD ["node", "apps/auth-service/dist/main.js"]

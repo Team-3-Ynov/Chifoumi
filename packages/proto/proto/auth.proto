@@ -3,6 +3,12 @@ syntax = "proto3";
 package chifoumi.auth.v1;
 
 service Auth {
+  rpc Register(RegisterRequest) returns (AuthResultResponse);
+  rpc Login(LoginRequest) returns (AuthResultResponse);
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+  rpc Logout(LogoutRequest) returns (EmptyResponse);
+  rpc RequestPasswordReset(RequestPasswordResetRequest) returns (EmptyResponse);
+  rpc ResetPassword(ResetPasswordRequest) returns (EmptyResponse);
   rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse);
 }
 
@@ -40,6 +46,57 @@ message GetRatingResponse {
 }
 
 message EmptyResponse {}
+
+message SafeUserMessage {
+  string id = 1;
+  string email = 2;
+  string display_name = 3;
+  string role = 4;
+}
+
+message AuthTokensMessage {
+  string access = 1;
+  string refresh = 2;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string display_name = 3;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthResultResponse {
+  SafeUserMessage user = 1;
+  AuthTokensMessage tokens = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message RefreshResponse {
+  AuthTokensMessage tokens = 1;
+}
+
+message LogoutRequest {
+  string user_id = 1;
+  string jti = 2;
+  string expires_at = 3;
+}
+
+message RequestPasswordResetRequest {
+  string email = 1;
+}
+
+message ResetPasswordRequest {
+  string token = 1;
+  string new_password = 2;
+}
 
 message FindByEmailRequest {
   string email = 1;

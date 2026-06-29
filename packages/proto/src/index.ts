@@ -20,6 +20,27 @@ export type VerifyTokenResponse = {
   jti?: string;
 };
 
+export type SafeUserMessage = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+};
+
+export type AuthTokensMessage = {
+  access: string;
+  refresh: string;
+};
+
+export type AuthResultResponse = {
+  user?: SafeUserMessage;
+  tokens?: AuthTokensMessage;
+};
+
+export type RefreshResponse = {
+  tokens?: AuthTokensMessage;
+};
+
 export type GetRatingResponse = {
   rating: number;
   gamesPlayed: number;

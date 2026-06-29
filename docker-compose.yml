@@ -57,6 +57,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      auth-service-1:
+        condition: service_healthy
       user-service-1:
         condition: service_healthy
     ports:
@@ -68,6 +70,7 @@ services:
       REDIS_URL: redis://redis:6379
       CORS_ORIGINS: http://localhost:5173
       FRONTEND_URL: http://localhost:5173
+      AUTH_SERVICE_GRPC_URL: auth-service-1:50054
       USER_SERVICE_GRPC_URL: user-service-1:50053
       BULLMQ_PREFIX: rps
       INSTANCE_ID: api-1
@@ -93,6 +96,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      auth-service-2:
+        condition: service_healthy
       user-service-2:
         condition: service_healthy
     ports:
@@ -104,6 +109,7 @@ services:
       REDIS_URL: redis://redis:6379
       CORS_ORIGINS: http://localhost:5173
       FRONTEND_URL: http://localhost:5173
+      AUTH_SERVICE_GRPC_URL: auth-service-2:50054
       USER_SERVICE_GRPC_URL: user-service-2:50053
       BULLMQ_PREFIX: rps
       INSTANCE_ID: api-2
@@ -165,6 +171,76 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  auth-service-1:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: chifoumi-auth-service-1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user-service-1:
+        condition: service_healthy
+    ports:
+      - "3006:3006"
+    environment:
+      AUTH_SERVICE_PORT: 3006
+      AUTH_SERVICE_GRPC_PORT: 50054
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:5173
+      USER_SERVICE_GRPC_URL: user-service-1:50053
+      BULLMQ_PREFIX: rps
+      INSTANCE_ID: auth-service-1
+      JWT_PRIVATE_KEY_PATH: /app/infra/keys/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+    volumes:
+      - ./infra/keys:/app/infra/keys:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3006/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  auth-service-2:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: chifoumi-auth-service-2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user-service-2:
+        condition: service_healthy
+    ports:
+      - "3007:3006"
+    environment:
+      AUTH_SERVICE_PORT: 3006
+      AUTH_SERVICE_GRPC_PORT: 50054
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:5173
+      USER_SERVICE_GRPC_URL: user-service-2:50053
+      BULLMQ_PREFIX: rps
+      INSTANCE_ID: auth-service-2
+      JWT_PRIVATE_KEY_PATH: /app/infra/keys/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+    volumes:
+      - ./infra/keys:/app/infra/keys:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3006/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
   game-service-1:
     build:
       context: .
@@ -175,12 +251,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      auth-service-1:
+        condition: service_healthy
     ports:
       - "3001:3001"
     environment:
       GAME_SERVICE_PORT: 3001
       REDIS_URL: redis://redis:6379
-      API_GRPC_URL: api-1:50051
+      API_GRPC_URL: auth-service-1:50054
       CORS_ORIGINS: http://localhost:5173
       BULLMQ_PREFIX: rps
       INSTANCE_ID: game-service-1
@@ -202,12 +280,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      auth-service-2:
+        condition: service_healthy
     ports:
       - "3003:3001"
     environment:
       GAME_SERVICE_PORT: 3001
       REDIS_URL: redis://redis:6379
-      API_GRPC_URL: api-2:50051
+      API_GRPC_URL: auth-service-2:50054
       CORS_ORIGINS: http://localhost:5173
       BULLMQ_PREFIX: rps
       INSTANCE_ID: game-service-2

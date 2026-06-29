@@ -1,8 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { jest } from "@jest/globals";
 import { ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
-import type { RedisService } from "../../redis/redis.service.js";
-import type { UserService } from "../../user-service/user.service.js";
+import type { AuthService } from "../auth.service.js";
 import { JwtStrategy } from "./jwt.strategy.js";
 
 describe("JwtStrategy", () => {
@@ -12,51 +11,51 @@ describe("JwtStrategy", () => {
     publicKeyEncoding: { type: "spki", format: "pem" },
   });
 
-  const usersService = {
-    findById: jest.fn<UserService["findById"]>(),
-    toSafeUser: jest.fn<UserService["toSafeUser"]>(),
-  };
-  const redisService = {
-    isAccessTokenRevoked: jest.fn<RedisService["isAccessTokenRevoked"]>(),
+  const authService = {
+    verifyToken: jest.fn<AuthService["verifyToken"]>(),
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("returns service unavailable when Redis revocation check fails", async () => {
-    redisService.isAccessTokenRevoked.mockRejectedValue(new Error("redis down"));
+  it("returns service unavailable when auth-service verification fails", async () => {
+    authService.verifyToken.mockRejectedValue(new Error("auth down"));
     const strategy = new JwtStrategy(
       { publicKey, privateKey: "unused", accessTtlSeconds: 900, refreshTtlSeconds: 604800 },
-      usersService as unknown as UserService,
-      redisService as unknown as RedisService,
+      authService as unknown as AuthService,
     );
 
     await expect(
-      strategy.validate({
-        sub: "user-1",
-        role: "player",
-        jti: "jti-1",
-        exp: Math.floor(Date.now() / 1000) + 60,
-      }),
+      strategy.validate(
+        { headers: { authorization: "Bearer token" } },
+        {
+          sub: "user-1",
+          role: "player",
+          jti: "jti-1",
+          exp: Math.floor(Date.now() / 1000) + 60,
+        },
+      ),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it("rejects revoked access tokens", async () => {
-    redisService.isAccessTokenRevoked.mockResolvedValue(true);
+  it("rejects invalid access tokens", async () => {
+    authService.verifyToken.mockResolvedValue({ valid: false, reason: "REVOKED" });
     const strategy = new JwtStrategy(
       { publicKey, privateKey: "unused", accessTtlSeconds: 900, refreshTtlSeconds: 604800 },
-      usersService as unknown as UserService,
-      redisService as unknown as RedisService,
+      authService as unknown as AuthService,
     );
 
     await expect(
-      strategy.validate({
-        sub: "user-1",
-        role: "player",
-        jti: "jti-1",
-        exp: Math.floor(Date.now() / 1000) + 60,
-      }),
+      strategy.validate(
+        { headers: { authorization: "Bearer token" } },
+        {
+          sub: "user-1",
+          role: "player",
+          jti: "jti-1",
+          exp: Math.floor(Date.now() / 1000) + 60,
+        },
+      ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
