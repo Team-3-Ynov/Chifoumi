@@ -24,6 +24,7 @@ import { Throttle } from "@nestjs/throttler";
 import { SWAGGER_BEARER_AUTH } from "../swagger.js";
 import type { SafeUser } from "../users/users.service.js";
 import { AuthService } from "./auth.service.js";
+import { Public } from "./decorators/public.decorator.js";
 import { AuthResponseDto } from "./dto/auth-response.dto.js";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto.js";
 import { LoginDto } from "./dto/login.dto.js";
@@ -51,6 +52,7 @@ export class AuthController {
   constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   @Post("register")
+  @Public()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: "Register a new player account",
@@ -94,6 +96,7 @@ export class AuthController {
   }
 
   @Post("login")
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Login with email and password",
@@ -134,6 +137,7 @@ export class AuthController {
   }
 
   @Post("refresh")
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Rotate refresh token and issue a new access token",
@@ -201,6 +205,7 @@ export class AuthController {
   }
 
   @Post("forgot-password")
+  @Public()
   @HttpCode(HttpStatus.OK)
   // Override the shared "auth" throttler with a stricter limit for this route
   // only (the throttler key is per-handler), instead of a global throttler that
@@ -236,6 +241,7 @@ export class AuthController {
   }
 
   @Post("reset-password")
+  @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: "Reset the account password using a reset token",
