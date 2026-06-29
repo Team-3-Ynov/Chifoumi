@@ -11,7 +11,9 @@ import { GenerateBracketLockService } from "./generate-bracket-lock.service.js";
 @Injectable()
 export class GenerateBracketService {
   constructor(
+    @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Inject(GenerateBracketLockService)
     private readonly generateBracketLock: GenerateBracketLockService,
     @Inject(NotificationsQueueService)
     private readonly notificationsQueue: NotificationsQueueService,

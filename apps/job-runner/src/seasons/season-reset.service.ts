@@ -13,7 +13,9 @@ const MAIL_BATCH_SIZE = 200;
 @Injectable()
 export class SeasonResetService {
   constructor(
+    @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Inject(SeasonResetLockService)
     private readonly seasonResetLock: SeasonResetLockService,
     @Inject(NotificationsQueueService)
     private readonly notificationsQueue: NotificationsQueueService,

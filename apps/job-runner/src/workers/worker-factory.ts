@@ -20,13 +20,21 @@ export type ManagedWorker = {
 export class WorkerFactory {
   constructor(
     @Inject(JOB_RUNNER_CONFIG) private readonly config: JobRunnerConfig,
+    @Inject(WorkerMetricsService)
     private readonly metrics: WorkerMetricsService,
+    @Inject(MatchPersistenceService)
     private readonly matchPersistence: MatchPersistenceService,
+    @Inject(RedisInvalidationService)
     private readonly redisInvalidation: RedisInvalidationService,
+    @Inject(SeasonResetService)
     private readonly seasonReset: SeasonResetService,
+    @Inject(TournamentProgressionService)
     private readonly tournamentProgression: TournamentProgressionService,
+    @Inject(GenerateBracketService)
     private readonly generateBracket: GenerateBracketService,
+    @Inject(MailService)
     private readonly mailService: MailService,
+    @Inject(Logger)
     private readonly logger: Logger,
   ) {}
 

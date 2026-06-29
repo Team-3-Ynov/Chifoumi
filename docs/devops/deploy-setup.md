@@ -27,6 +27,8 @@ Each successful deploy tags images with `:sha-<short>` and `:latest`.
    - `DEPLOY_DOMAIN` → API (Traefik routes `/health`, `/api/*`, `/auth/*`, …)
    - `GAME_DOMAIN` → WebSocket game service (sticky sessions)
    - `FRONT_DOMAIN` → React front (nginx)
+   - `PROMETHEUS_DOMAIN` → Prometheus (Traefik, internal only)
+   - `GRAFANA_DOMAIN` → Grafana dashboards
 4. Managed **PostgreSQL** and **Redis** reachable from the VPS (connection strings in `.env.prod`).
 5. Repository clone on the VPS at `DEPLOY_PATH` containing a **git working copy** with `origin` pointing to this repository (the CD job runs `git fetch origin main && git reset --hard <deployed-sha>` before each rolling update, preserving `.env.prod`).
 
@@ -98,6 +100,8 @@ IMAGE_TAG=latest
 DEPLOY_DOMAIN=api.example.com
 GAME_DOMAIN=game.example.com
 FRONT_DOMAIN=app.example.com
+PROMETHEUS_DOMAIN=prometheus.example.com
+GRAFANA_DOMAIN=grafana.example.com
 ACME_EMAIL=ops@example.com
 CORS_ORIGINS=https://app.example.com
 FRONTEND_URL=https://app.example.com
@@ -113,6 +117,8 @@ MAIL_PORT=587
 MAIL_USER=noreply@example.com
 MAIL_PASSWORD=secret
 MAIL_FROM=noreply@example.com
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=change-me
 ```
 
 ## Deploy flow
