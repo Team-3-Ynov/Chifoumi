@@ -1,7 +1,0 @@
-fix(api): add VerifyPassword RPC to user-service, strip passwordHash from wire (#180)
-
-Add argon2 dependency to user-service and implement verifyPassword so
-that the Argon2id hash never leaves the service boundary. Remove
-passwordHash from toUserRecordResponse since UserRecordResponse proto
-field 4 is now reserved. Update auth-service login to call verifyPassword
-via gRPC instead of fetching the hash and verifying locally.
