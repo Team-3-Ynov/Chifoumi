@@ -10,11 +10,11 @@ services:
       - pg_data:/bitnami/postgresql
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1 -p 5432"]
-      interval: 5s
+      test: ["CMD-SHELL", "PGPASSWORD=chifoumi_dev psql -U app -d chifoumi -h 127.0.0.1 -c 'SELECT 1' > /dev/null 2>&1"]
+      interval: 3s
       timeout: 5s
-      retries: 6
-      start_period: 10s
+      retries: 15
+      start_period: 5s
     restart: unless-stopped
 
   redis:
