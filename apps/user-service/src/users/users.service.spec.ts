@@ -1,7 +1,18 @@
 import { Prisma, UserRole } from "@chifoumi/db";
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import * as argon2 from "argon2";
 import type { PrismaService } from "../prisma/prisma.service.js";
 import { UserService } from "./users.service.js";
+
+let realHash: string;
+
+beforeAll(async () => {
+  realHash = await argon2.hash("correct-password", {
+    memoryCost: 19456,
+    timeCost: 2,
+    parallelism: 1,
+  });
+});
 
 describe("UserService", () => {
   let service: UserService;
@@ -275,6 +286,66 @@ describe("UserService", () => {
         OR: [{ rating: { gt: 1150 } }, { rating: 1150, gamesPlayed: { gt: 12 } }],
       },
     });
+  });
+
+  it("returns verified user data when password matches", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "player@example.com",
+      passwordHash: realHash,
+      displayName: "player",
+      role: UserRole.player,
+    });
+
+    const result = await service.verifyPassword("player@example.com", "correct-password");
+
+    expect(result).toEqual({
+      valid: true,
+      userId: "user-1",
+      displayName: "player",
+      role: "player",
+    });
+  });
+
+  it("returns null when password does not match", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "player@example.com",
+      passwordHash: realHash,
+      displayName: "player",
+      role: UserRole.player,
+    });
+
+    const result = await service.verifyPassword("player@example.com", "wrong-password");
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null for unknown email and runs dummy verify to prevent timing attack", async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    const result = await service.verifyPassword("nobody@example.com", "any-password");
+
+    expect(result).toBeNull();
+  });
+
+  it("converts a UserRecord to a SafeUser without sensitive fields", () => {
+    const record = {
+      id: "user-1",
+      email: "player@example.com",
+      passwordHash: "secret-hash",
+      displayName: "player",
+      role: "player" as const,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    };
+
+    expect(service.toSafeUser(record)).toEqual({
+      id: "user-1",
+      email: "player@example.com",
+      displayName: "player",
+      role: "player",
+    });
+    expect(service.toSafeUser(record)).not.toHaveProperty("passwordHash");
   });
 
   it("classifies expected Prisma errors for API translation", () => {

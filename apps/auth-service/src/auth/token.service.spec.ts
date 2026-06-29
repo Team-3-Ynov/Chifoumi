@@ -67,4 +67,20 @@ describe("TokenService", () => {
     expect(refreshTokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(tokenService.hashRefreshToken(refreshToken)).toBe(refreshTokenHash);
   });
+
+  it("getRefreshExpiresAt returns a date in the future by refreshTtlSeconds", () => {
+    const before = Date.now();
+    const expiresAt = tokenService.getRefreshExpiresAt();
+    const after = Date.now();
+
+    expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + jwtConfig.refreshTtlSeconds * 1000);
+    expect(expiresAt.getTime()).toBeLessThanOrEqual(after + jwtConfig.refreshTtlSeconds * 1000);
+  });
+
+  it("issues a password-reset token and its SHA-256 hash", () => {
+    const { token, tokenHash } = tokenService.issuePasswordResetToken();
+    expect(token).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(tokenHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(tokenService.hashPasswordResetToken(token)).toBe(tokenHash);
+  });
 });
