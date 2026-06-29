@@ -30,7 +30,7 @@ x-api-common: &api-common
         "CMD",
         "node",
         "-e",
-        "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        "fetch('http://127.0.0.1:3000/metrics').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
       ]
     interval: 10s
     timeout: 5s
@@ -182,6 +182,14 @@ services:
     networks:
       - chifoumi
 
+  game-service-1:
+    networks:
+      - chifoumi
+
+  game-service-2:
+    networks:
+      - chifoumi
+
   db-migrate:
     build:
       context: .
@@ -198,14 +206,17 @@ services:
       - chifoumi
 
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3.6.2
     container_name: chifoumi-traefik
     command:
       - --api.dashboard=true
       - --api.insecure=true
+      - --ping=true
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
+    environment:
+      DOCKER_API_VERSION: "1.51"
     ports:
       - "80:80"
     volumes:
@@ -224,7 +235,7 @@ services:
       traefik.http.middlewares.security-headers.headers.contentTypeNosniff: "true"
       traefik.http.middlewares.security-headers.headers.browserXssFilter: "true"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ping || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -382,6 +393,19 @@ services:
   prometheus:
     image: prom/prometheus:v3.2.1
     container_name: chifoumi-prometheus
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+      game-1:
+        condition: service_healthy
+      game-2:
+        condition: service_healthy
+      job-runner-match:
+        condition: service_healthy
+      job-runner-misc:
+        condition: service_healthy
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -420,7 +444,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "3002:3000"
+      - "3030:3000"
     labels:
       traefik.enable: "true"
       traefik.http.routers.grafana.rule: Host(`grafana.localhost`)
