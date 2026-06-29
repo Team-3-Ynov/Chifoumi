@@ -19,7 +19,7 @@ import type { CurrentSeasonResponseDto } from "./dto/current-season-response.dto
 import type { SeasonStandingsResponseDto } from "./dto/season-standings-response.dto.js";
 
 // Players always have an elo rating row created at registration, but fall back
-// to the platform starting rating defensively (mirrors UsersService).
+// to the platform starting rating defensively (mirrors UserService).
 const STARTING_RATING = 1000;
 
 @Injectable()

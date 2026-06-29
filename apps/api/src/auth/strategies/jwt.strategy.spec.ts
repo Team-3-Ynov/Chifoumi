@@ -2,7 +2,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { jest } from "@jest/globals";
 import { ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import type { RedisService } from "../../redis/redis.service.js";
-import type { UsersService } from "../../users/users.service.js";
+import type { UserService } from "../../user-service/user.service.js";
 import { JwtStrategy } from "./jwt.strategy.js";
 
 describe("JwtStrategy", () => {
@@ -13,8 +13,8 @@ describe("JwtStrategy", () => {
   });
 
   const usersService = {
-    findById: jest.fn<UsersService["findById"]>(),
-    toSafeUser: jest.fn<UsersService["toSafeUser"]>(),
+    findById: jest.fn<UserService["findById"]>(),
+    toSafeUser: jest.fn<UserService["toSafeUser"]>(),
   };
   const redisService = {
     isAccessTokenRevoked: jest.fn<RedisService["isAccessTokenRevoked"]>(),
@@ -28,7 +28,7 @@ describe("JwtStrategy", () => {
     redisService.isAccessTokenRevoked.mockRejectedValue(new Error("redis down"));
     const strategy = new JwtStrategy(
       { publicKey, privateKey: "unused", accessTtlSeconds: 900, refreshTtlSeconds: 604800 },
-      usersService as unknown as UsersService,
+      usersService as unknown as UserService,
       redisService as unknown as RedisService,
     );
 
@@ -46,7 +46,7 @@ describe("JwtStrategy", () => {
     redisService.isAccessTokenRevoked.mockResolvedValue(true);
     const strategy = new JwtStrategy(
       { publicKey, privateKey: "unused", accessTtlSeconds: 900, refreshTtlSeconds: 604800 },
-      usersService as unknown as UsersService,
+      usersService as unknown as UserService,
       redisService as unknown as RedisService,
     );
 

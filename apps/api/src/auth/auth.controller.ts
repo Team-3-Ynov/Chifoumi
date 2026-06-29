@@ -22,7 +22,7 @@ import {
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { SWAGGER_BEARER_AUTH } from "../swagger.js";
-import type { SafeUser } from "../users/users.service.js";
+import type { SafeUser } from "../user-service/user.service.js";
 import { AuthService } from "./auth.service.js";
 import { Public } from "./decorators/public.decorator.js";
 import { AuthResponseDto } from "./dto/auth-response.dto.js";

@@ -1,10 +1,10 @@
 import { UserRole } from "@chifoumi/db";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PrismaService } from "../prisma/prisma.service.js";
-import { UsersService } from "./users.service.js";
+import { UserService } from "./user.service.js";
 
-describe("UsersService.listUsers", () => {
-  let service: UsersService;
+describe("UserService", () => {
+  let service: UserService;
   let prisma: {
     $transaction: ReturnType<typeof jest.fn>;
     $queryRaw: ReturnType<typeof jest.fn>;
@@ -21,7 +21,7 @@ describe("UsersService.listUsers", () => {
       $queryRaw: jest.fn(),
       user: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
     };
-    service = new UsersService(prisma as unknown as PrismaService);
+    service = new UserService(prisma as unknown as PrismaService);
   });
 
   it("maps users with their elo rating and pagination metadata", async () => {
@@ -97,6 +97,28 @@ describe("UsersService.listUsers", () => {
       league: { name: "Gold", tier: 3 },
       winRate: 0.4,
       createdAt: new Date("2026-03-01T00:00:00.000Z"),
+    });
+  });
+
+  it("builds the current user profile with private fields", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "player@example.com",
+      displayName: "player",
+      role: UserRole.player,
+      createdAt: new Date("2026-04-01T00:00:00.000Z"),
+      eloRating: { rating: 980, gamesPlayed: 3 },
+    });
+
+    await expect(service.getCurrentProfile("user-1")).resolves.toEqual({
+      id: "user-1",
+      email: "player@example.com",
+      displayName: "player",
+      role: "player",
+      rating: 980,
+      gamesPlayed: 3,
+      league: { name: "Bronze", tier: 1 },
+      createdAt: new Date("2026-04-01T00:00:00.000Z"),
     });
   });
 });

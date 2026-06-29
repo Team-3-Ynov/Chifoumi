@@ -4,7 +4,7 @@ import { PassportModule } from "@nestjs/passport";
 import { JWT_CONFIG, type JwtConfig } from "../config/jwt.config.js";
 import { QueuesModule } from "../queues/queues.module.js";
 import { RedisModule } from "../redis/redis.module.js";
-import { UsersModule } from "../users/users.module.js";
+import { UserServiceModule } from "../user-service/user-service.module.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthService } from "./auth.service.js";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard.js";
@@ -14,7 +14,7 @@ import { TokenService } from "./token.service.js";
 
 @Module({
   imports: [
-    UsersModule,
+    UserServiceModule,
     RedisModule,
     QueuesModule,
     PassportModule.register({ defaultStrategy: "jwt" }),

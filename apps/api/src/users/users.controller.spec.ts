@@ -4,10 +4,9 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
 import { RolesGuard } from "../auth/guards/roles.guard.js";
+import { type AdminUsersPage, UserService } from "../user-service/user.service.js";
 import { ListUsersQueryDto } from "./dto/list-users-query.dto.js";
 import { UsersController } from "./users.controller.js";
-import type { AdminUsersPage } from "./users.service.js";
-import { UsersService } from "./users.service.js";
 
 describe("UsersController", () => {
   let controller: UsersController;
@@ -21,7 +20,7 @@ describe("UsersController", () => {
       listUsers: jest.fn(),
       getPublicProfile: jest.fn(),
     };
-    controller = new UsersController(usersService as unknown as UsersService);
+    controller = new UsersController(usersService as unknown as UserService);
   });
 
   describe("listUsers", () => {
@@ -49,7 +48,7 @@ describe("UsersController — guard wiring (AC6)", () => {
       controllers: [UsersController],
       providers: [
         {
-          provide: UsersService,
+          provide: UserService,
           useValue: { listUsers: jest.fn(), getPublicProfile: jest.fn() },
         },
         // Real RolesGuard — the 403 comes from actual guard logic, not a stub.
