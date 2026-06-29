@@ -52,6 +52,7 @@ export class MatchEndedPublisher implements OnModuleInit, OnModuleDestroy {
     };
 
     await this.queue.add("match-ended", payload, {
+      jobId: state.matchId,
       attempts: 3,
       backoff: {
         type: "exponential",

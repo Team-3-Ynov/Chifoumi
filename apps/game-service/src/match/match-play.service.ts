@@ -414,6 +414,14 @@ export class MatchPlayService {
   }
 
   private async finalizeMatch(state: MatchState): Promise<void> {
+    // one-shot guard: BullMQ jobId dedup prevents double-processing at the worker,
+    // but two concurrent paths (timeout + disconnect-forfeit) can both reach here
+    // before either job is consumed. setnx ensures only the first caller proceeds.
+    const claimed = await this.redisService.setnx(`match:${state.matchId}:finalized`, 86400);
+    if (!claimed) {
+      return;
+    }
+
     await this.clearTimer(state.matchId);
     this.metrics.recordMatchPlayed(this.resolveMatchOutcome(state));
     await this.matchDisconnectScheduler.cancelForfeitForPlayers(
