@@ -10,6 +10,7 @@ service Auth {
   rpc RequestPasswordReset(RequestPasswordResetRequest) returns (EmptyResponse);
   rpc ResetPassword(ResetPasswordRequest) returns (EmptyResponse);
   rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse);
+  rpc VerifySession(VerifySessionRequest) returns (VerifyTokenResponse);
 }
 
 service Users {
@@ -17,6 +18,7 @@ service Users {
   rpc FindById(FindByIdRequest) returns (UserRecordResponse);
   rpc CreateUser(CreateUserRequest) returns (UserRecordResponse);
   rpc UpdatePassword(UpdatePasswordRequest) returns (EmptyResponse);
+  rpc VerifyPassword(VerifyPasswordRequest) returns (VerifyPasswordResponse);
   rpc GetRating(GetRatingRequest) returns (GetRatingResponse);
   rpc GetCurrentProfile(GetCurrentProfileRequest) returns (CurrentUserProfileResponse);
   rpc GetPublicProfile(GetPublicProfileRequest) returns (PublicUserProfileResponse);
@@ -36,6 +38,12 @@ message VerifyTokenResponse {
   string display_name = 4;
   string reason = 5;
   string jti = 6;
+  string email = 7;
+}
+
+message VerifySessionRequest {
+  string jti = 1;
+  string user_id = 2;
 }
 
 message GetRatingRequest {
@@ -127,11 +135,24 @@ message GetPublicProfileRequest {
   string user_id = 1;
 }
 
+message VerifyPasswordRequest {
+  string email = 1;
+  string plaintext_password = 2;
+}
+
+message VerifyPasswordResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string display_name = 3;
+  string role = 4;
+}
+
 message UserRecordResponse {
   bool found = 1;
   string id = 2;
   string email = 3;
-  string password_hash = 4;
+  reserved 4;
+  reserved "password_hash";
   string display_name = 5;
   string role = 6;
   string created_at = 7;

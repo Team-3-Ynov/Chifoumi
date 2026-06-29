@@ -16,8 +16,21 @@ export type VerifyTokenResponse = {
   userId?: string;
   role?: string;
   displayName?: string;
+  email?: string;
   reason?: VerifyTokenReason;
   jti?: string;
+};
+
+export type VerifySessionRequest = {
+  jti: string;
+  userId: string;
+};
+
+export type VerifyPasswordResponse = {
+  valid: boolean;
+  userId?: string;
+  displayName?: string;
+  role?: string;
 };
 
 export type SafeUserMessage = {
@@ -52,7 +65,6 @@ export type UserRecordResponse = {
   found: boolean;
   id?: string;
   email?: string;
-  passwordHash?: string;
   displayName?: string;
   role?: UserRole;
   createdAt?: string;
