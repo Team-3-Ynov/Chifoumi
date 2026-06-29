@@ -1,0 +1,176 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Biome (CI mode)
+        run: pnpm exec biome ci .
+
+  typecheck:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql://app:chifoumi_dev@localhost:5432/chifoumi
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: chifoumi_dev
+          POSTGRES_DB: chifoumi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d chifoumi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://app:chifoumi_dev@localhost:5432/chifoumi
+      REDIS_URL: redis://localhost:6379
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build workspace packages for tests
+        run: |
+          pnpm --filter @chifoumi/db build
+          pnpm --filter @chifoumi/elo build
+          pnpm --filter @chifoumi/schemas build
+          pnpm --filter @chifoumi/proto build
+
+      - name: Apply database migrations
+        run: pnpm --filter @chifoumi/db migrate:deploy
+
+      - name: Test with coverage
+        run: pnpm -r run --if-present test --coverage
+
+      - name: Game service WebSocket e2e tests
+        run: pnpm --filter @chifoumi/game-service test:e2e
+
+      - name: Job-runner match-events integration tests
+        run: pnpm --filter @chifoumi/job-runner test:integration
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-reports
+          path: |
+            **/coverage/**
+            !**/coverage/**/node_modules/**
+          if-no-files-found: warn
+
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql://app:chifoumi_dev@localhost:5432/chifoumi
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build
+        run: pnpm -r run --if-present build
+
+  e2e:
+    runs-on: ubuntu-latest
+
+    env:
+      E2E_API_URL: http://127.0.0.1:3000
+      E2E_GAME_1_URL: http://127.0.0.1:3101
+      E2E_GAME_2_URL: http://127.0.0.1:3102
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Generate dev JWT keys for E2E
+        run: |
+          mkdir -p infra/keys
+          openssl genrsa -out infra/keys/jwt-private.pem 2048
+          openssl rsa -in infra/keys/jwt-private.pem -pubout -out infra/keys/jwt-public.pem
+          chmod a+r infra/keys/jwt-private.pem infra/keys/jwt-public.pem
+
+      - name: Start E2E stack
+        run: bash scripts/e2e/start-stack.sh
+
+      - name: Wait for E2E health endpoints
+        run: |
+          for url in http://127.0.0.1:3000/health http://127.0.0.1:3101/health http://127.0.0.1:3102/health; do
+            for attempt in $(seq 1 30); do
+              if curl -fsS "$url" >/dev/null; then
+                echo "$url is healthy"
+                break
+              fi
+              if [ "$attempt" -eq 30 ]; then
+                echo "$url failed health check"
+                exit 1
+              fi
+              sleep 2
+            done
+          done
+
+      - name: BO3 cross-instance smoke test (US-031)
+        run: pnpm --filter @chifoumi/e2e test:smoke
+
+      - name: Capture E2E stack logs
+        if: failure()
+        run: >-
+          docker compose --project-name chifoumi-e2e -f docker-compose.e2e.yml
+          logs --no-color > e2e-stack.log
+
+      - name: Upload E2E failure logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-stack-logs
+          path: e2e-stack.log
+          if-no-files-found: warn
+
+      - name: Stop E2E stack
+        if: always()
+        run: bash scripts/e2e/stop-stack.sh

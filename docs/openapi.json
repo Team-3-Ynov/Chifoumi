@@ -1,0 +1,1119 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Health"]
+      }
+    },
+    "/users/{id}/profile": {
+      "get": {
+        "description": "Returns public player information only. Private fields such as email are intentionally omitted.",
+        "operationId": "UsersController_getPublicProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User id",
+            "schema": {
+              "format": "uuid",
+              "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "error": "USER_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get another player's public profile",
+        "tags": ["users"]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "description": "Creates a player account, initializes its default ELO rating and returns tokens.",
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              },
+              "examples": {
+                "player": {
+                  "summary": "New player",
+                  "value": {
+                    "email": "player@example.com",
+                    "password": "password1234",
+                    "displayName": "player1"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": ["email must be an email"],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Unable to complete registration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 409,
+                    "message": "Unable to complete registration",
+                    "error": "Conflict"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Register a new player account",
+        "tags": ["auth"]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "description": "Authenticates an existing player and returns a JWT access token plus refresh token.",
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              },
+              "examples": {
+                "player": {
+                  "summary": "Player credentials",
+                  "value": {
+                    "email": "player@example.com",
+                    "password": "password1234"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": ["email must be an email"],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Login with email and password",
+        "tags": ["auth"]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "description": "Exchanges a valid opaque refresh token for a new access/refresh token pair and revokes the previous refresh token.",
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              },
+              "examples": {
+                "refresh": {
+                  "summary": "Refresh token rotation",
+                  "value": {
+                    "refreshToken": "dGhpcyBpcyBhbiBvcGFxdWUgcmVmcmVzaCB0b2tlbg"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": ["refreshToken must be longer than or equal to 20 characters"],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, expired, revoked or unknown refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rotate refresh token and issue a new access token",
+        "tags": ["auth"]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "description": "Adds the current JWT jti to the Redis blacklist until token expiry and revokes active refresh tokens for the user.",
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Access token blacklisted and refresh tokens revoked"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Logout and revoke the current access token",
+        "tags": ["auth"]
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "description": "Sends a password reset link to the provided email if an account exists. Always responds 200 to prevent account enumeration.",
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              },
+              "examples": {
+                "player": {
+                  "summary": "Forgot password request",
+                  "value": {
+                    "email": "player@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reset email requested (idempotent, anti-enumeration)"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": ["email must be an email"],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Request a password reset email",
+        "tags": ["auth"]
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "description": "Validates the opaque reset token, updates the password (Argon2id) and revokes all active refresh tokens for the user. Existing access tokens are not blacklisted and stay valid until their short expiry.",
+        "operationId": "AuthController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              },
+              "examples": {
+                "player": {
+                  "summary": "Reset password",
+                  "value": {
+                    "token": "5a7a7a8e-6c4a-4b1a-9f24-9b6f7c2a4e8c",
+                    "newPassword": "newPassword1234"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password updated and refresh tokens revoked"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": ["newPassword must be longer than or equal to 10 characters"],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, expired or already used reset token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reset the account password using a reset token",
+        "tags": ["auth"]
+      }
+    },
+    "/me": {
+      "get": {
+        "description": "Returns private profile data for the current player, including email and ELO stats.",
+        "operationId": "MeController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeProfileDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked JWT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get authenticated user profile",
+        "tags": ["me"]
+      }
+    },
+    "/me/history": {
+      "get": {
+        "description": "Returns ended matches sorted by `endedAt DESC` using an opaque cursor.",
+        "operationId": "MeController_getHistory",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor returned by a previous page",
+            "schema": {
+              "example": "eyJ0cyI6IjIwMjYtMDEtMDFUMDA6MDA6MzEuMDAwWiIsImlkIjoiIn0",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Match history page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeHistoryResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": ["limit must be ≤ 100"],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or revoked JWT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 401,
+                    "message": "Unauthorized"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Paginated match history for the authenticated user",
+        "tags": ["me"]
+      }
+    },
+    "/leaderboard": {
+      "get": {
+        "description": "Public leaderboard sorted by `rating DESC, gamesPlayed DESC`. Results are cached in Redis for 30 seconds.",
+        "operationId": "LeaderboardController_getLeaderboard",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "example": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leaderboard page",
+            "headers": {
+              "X-Cache": {
+                "description": "Cache status returned by the API: HIT when Redis served the response, MISS otherwise.",
+                "schema": {
+                  "type": "string",
+                  "enum": ["HIT", "MISS"]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "statusCode": 400,
+                    "message": ["limit must be ≤ 100"],
+                    "error": "Bad Request"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get global top players by rating",
+        "tags": ["leaderboard"]
+      }
+    },
+    "/matches/{id}/audit": {
+      "get": {
+        "description": "Returns commits, reveals, nonces and server-side hash verification so anyone can replay a finished match and detect cheating.",
+        "operationId": "MatchesController_getAudit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Match id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit trail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchAuditResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "MATCH_NOT_ENDED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "error": "MATCH_NOT_ENDED"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MATCH_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "error": "MATCH_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Public commit-reveal audit trail for an ended match",
+        "tags": ["matches"]
+      }
+    },
+    "/.well-known/jwks.json": {
+      "get": {
+        "operationId": "JwksController_getJwks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Jwks"]
+      }
+    }
+  },
+  "info": {
+    "title": "Chifoumi API",
+    "description": "API REST Chifoumi Ranked pour l'authentification, le profil joueur, l'historique de matchs et le leaderboard.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "JWT-auth": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "description": "RS256 access token returned by register/login. Paste only the token value."
+      }
+    },
+    "schemas": {
+      "PublicProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "player1"
+          },
+          "rating": {
+            "type": "number",
+            "example": 1000
+          },
+          "gamesPlayed": {
+            "type": "number",
+            "example": 0
+          },
+          "winRate": {
+            "type": "number",
+            "example": 0,
+            "description": "Wins divided by games played, rounded to 2 decimals."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-08T12:00:00.000Z"
+          }
+        },
+        "required": ["id", "displayName", "rating", "gamesPlayed", "winRate", "createdAt"]
+      },
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "player@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 128,
+            "example": "password1234"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 30,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "example": "player1"
+          }
+        },
+        "required": ["email", "password", "displayName"]
+      },
+      "SafeUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "player@example.com"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "player1"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["player", "admin"],
+            "example": "player"
+          }
+        },
+        "required": ["id", "email", "displayName", "role"]
+      },
+      "TokensDto": {
+        "type": "object",
+        "properties": {
+          "access": {
+            "type": "string",
+            "description": "RS256 JWT access token (15 min TTL)",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "refresh": {
+            "type": "string",
+            "description": "Opaque refresh token (7 day TTL)",
+            "example": "vJ6E3j6bU5Wc3cS8mQf9Rk5H2q3T4p1N"
+          }
+        },
+        "required": ["access", "refresh"]
+      },
+      "AuthResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/SafeUserDto"
+          },
+          "tokens": {
+            "$ref": "#/components/schemas/TokensDto"
+          }
+        },
+        "required": ["user", "tokens"]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "player@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "example": "password1234"
+          }
+        },
+        "required": ["email", "password"]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque refresh token issued at login or a prior refresh",
+            "minLength": 20,
+            "example": "dGhpcyBpcyBhbiBvcGFxdWUgcmVmcmVzaCB0b2tlbg"
+          }
+        },
+        "required": ["refreshToken"]
+      },
+      "RefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "tokens": {
+            "$ref": "#/components/schemas/TokensDto"
+          }
+        },
+        "required": ["tokens"]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "player@example.com"
+          }
+        },
+        "required": ["email"]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Opaque password reset token received by email",
+            "example": "5a7a7a8e-6c4a-4b1a-9f24-9b6f7c2a4e8c"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 128,
+            "example": "newPassword1234"
+          }
+        },
+        "required": ["token", "newPassword"]
+      },
+      "MeProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "player@example.com"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "player1"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["player", "admin"],
+            "example": "player"
+          },
+          "rating": {
+            "type": "number",
+            "example": 1000
+          },
+          "gamesPlayed": {
+            "type": "number",
+            "example": 0
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-08T12:00:00.000Z"
+          }
+        },
+        "required": ["id", "email", "displayName", "role", "rating", "gamesPlayed", "createdAt"]
+      },
+      "MeHistoryOpponentDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "example": "opponent42"
+          },
+          "ratingAtMatch": {
+            "type": "number",
+            "description": "Opponent rating at match time",
+            "example": 1040
+          }
+        },
+        "required": ["displayName", "ratingAtMatch"]
+      },
+      "MeHistoryItemDto": {
+        "type": "object",
+        "properties": {
+          "matchId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "499abac5-30b8-4a28-bf95-4ef0b3df6098"
+          },
+          "opponent": {
+            "$ref": "#/components/schemas/MeHistoryOpponentDto"
+          },
+          "scoreA": {
+            "type": "number",
+            "example": 2
+          },
+          "scoreB": {
+            "type": "number",
+            "example": 1
+          },
+          "isWinner": {
+            "type": "boolean",
+            "example": true
+          },
+          "eloDelta": {
+            "type": "number",
+            "example": 16
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-08T12:00:00.000Z"
+          }
+        },
+        "required": ["matchId", "opponent", "scoreA", "scoreB", "isWinner", "eloDelta", "endedAt"]
+      },
+      "MeHistoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MeHistoryItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "object",
+            "description": "Cursor for the next page; omitted on the last page",
+            "nullable": true
+          }
+        },
+        "required": ["items"]
+      },
+      "LeaderboardEntryDto": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "number",
+            "example": 1
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "player1"
+          },
+          "rating": {
+            "type": "number",
+            "example": 1600
+          },
+          "gamesPlayed": {
+            "type": "number",
+            "example": 42
+          }
+        },
+        "required": ["rank", "userId", "displayName", "rating", "gamesPlayed"]
+      },
+      "LeaderboardResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardEntryDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "RoundHashCheckDto": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "string",
+            "enum": ["match", "mismatch"],
+            "example": "match"
+          },
+          "b": {
+            "type": "string",
+            "enum": ["match", "mismatch"],
+            "example": "match"
+          }
+        },
+        "required": ["a", "b"]
+      },
+      "MatchAuditRoundDto": {
+        "type": "object",
+        "properties": {
+          "roundNumber": {
+            "type": "number",
+            "example": 1
+          },
+          "commitA": {
+            "type": "object",
+            "nullable": true,
+            "example": "a1b2c3..."
+          },
+          "commitB": {
+            "type": "object",
+            "nullable": true,
+            "example": "d4e5f6..."
+          },
+          "moveA": {
+            "type": "string",
+            "enum": ["rock", "paper", "scissors"],
+            "nullable": true,
+            "example": "rock"
+          },
+          "moveB": {
+            "type": "string",
+            "enum": ["rock", "paper", "scissors"],
+            "nullable": true,
+            "example": "paper"
+          },
+          "nonceA": {
+            "type": "object",
+            "nullable": true,
+            "example": "deadbeef..."
+          },
+          "nonceB": {
+            "type": "object",
+            "nullable": true,
+            "example": "cafebabe..."
+          },
+          "hashCheck": {
+            "$ref": "#/components/schemas/RoundHashCheckDto"
+          }
+        },
+        "required": [
+          "roundNumber",
+          "commitA",
+          "commitB",
+          "moveA",
+          "moveB",
+          "nonceA",
+          "nonceB",
+          "hashCheck"
+        ]
+      },
+      "MatchAuditFinalScoreDto": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "number",
+            "example": 2
+          },
+          "b": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": ["a", "b"]
+      },
+      "MatchAuditResponseDto": {
+        "type": "object",
+        "properties": {
+          "matchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "players": {
+            "description": "Player A and player B user ids",
+            "example": [
+              "7b6b95f2-39d9-4f2d-8a58-fb8580d2f7a1",
+              "8c7c06a3-40ea-5a3e-9b69-ac9691e3a8b2"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchAuditRoundDto"
+            }
+          },
+          "finalScore": {
+            "$ref": "#/components/schemas/MatchAuditFinalScoreDto"
+          },
+          "winner": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": ["matchId", "players", "rounds", "finalScore", "winner"]
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+export const AUTH_GRPC_CLIENT = "AUTH_GRPC_CLIENT";

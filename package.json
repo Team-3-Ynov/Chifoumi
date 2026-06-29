@@ -1,0 +1,30 @@
+{
+  "name": "@chifoumi/root",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tests/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --parallel --filter @chifoumi/api --filter @chifoumi/game-service --filter @chifoumi/job-runner --filter @chifoumi/front dev",
+    "prepare": "test ! -d .git || lefthook install",
+    "biome:check": "biome check apps packages tests .github .devcontainer biome.json package.json pnpm-workspace.yaml lefthook.yml",
+    "biome:fix": "biome check --write apps packages tests .github .devcontainer biome.json package.json pnpm-workspace.yaml lefthook.yml",
+    "typecheck": "pnpm --filter @chifoumi/db typecheck && pnpm -r --if-present typecheck",
+    "db:seed": "pnpm --filter @chifoumi/db seed",
+    "docs:openapi": "pnpm --filter @chifoumi/api docs:openapi",
+    "test:e2e:smoke": "pnpm --filter @chifoumi/e2e test:smoke",
+    "lefthook:install": "lefthook install"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "~2.3.15",
+    "lefthook": "1.10.11",
+    "typescript": "~5.7.3"
+  }
+}

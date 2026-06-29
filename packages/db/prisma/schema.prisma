@@ -1,0 +1,279 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  player
+  admin
+}
+
+enum SeasonStatus {
+  upcoming
+  active
+  closed
+}
+
+enum MatchStatus {
+  in_progress
+  ended
+  aborted
+}
+
+enum Move {
+  rock
+  paper
+  scissors
+}
+
+enum RoundWinner {
+  a
+  b
+  draw
+}
+
+enum TournamentFormat {
+  single_elim
+  double_elim
+}
+
+enum TournamentStatus {
+  upcoming
+  registration_open
+  in_progress
+  completed
+}
+
+enum WinnerSlot {
+  a
+  b
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  displayName  String     @unique @map("display_name")
+  passwordHash String     @map("password_hash")
+  role         UserRole   @default(player)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  eloRating           EloRating?
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  matchesAsPlayerA    Match[]                  @relation("PlayerA")
+  matchesAsPlayerB    Match[]                  @relation("PlayerB")
+  matchesWon          Match[]                  @relation("Winner")
+  eloHistory          EloHistory[]
+  seasonStandings     SeasonStanding[]
+  tournamentsWon      Tournament[]             @relation("TournamentWinner")
+  tournamentRegistrations TournamentRegistration[]
+  tournamentSlotA     TournamentMatch[]        @relation("SlotA")
+  tournamentSlotB     TournamentMatch[]        @relation("SlotB")
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model EloRating {
+  userId      String   @id @map("user_id") @db.Uuid
+  rating      Int      @default(1000)
+  gamesPlayed Int      @default(0) @map("games_played")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([rating(sort: Desc), gamesPlayed(sort: Desc)], map: "elo_ratings_rating_desc_idx")
+  @@map("elo_ratings")
+}
+
+model Match {
+  id         String      @id @default(uuid()) @db.Uuid
+  playerAId  String      @map("player_a_id") @db.Uuid
+  playerBId  String      @map("player_b_id") @db.Uuid
+  winnerId   String?     @map("winner_id") @db.Uuid
+  scoreA     Int         @map("score_a")
+  scoreB     Int         @map("score_b")
+  startedAt  DateTime    @map("started_at")
+  endedAt    DateTime?   @map("ended_at")
+  status     MatchStatus @default(in_progress)
+
+  playerA    User         @relation("PlayerA", fields: [playerAId], references: [id])
+  playerB    User         @relation("PlayerB", fields: [playerBId], references: [id])
+  winner     User?        @relation("Winner", fields: [winnerId], references: [id])
+  rounds     Round[]
+  eloHistory EloHistory[]
+  tournamentMatch TournamentMatch?
+
+  @@index([playerAId, endedAt(sort: Desc)])
+  @@index([playerBId, endedAt(sort: Desc)])
+  @@map("matches")
+}
+
+model Round {
+  id          String      @id @default(uuid()) @db.Uuid
+  matchId     String      @map("match_id") @db.Uuid
+  roundNumber Int         @map("round_number")
+  moveA       Move?       @map("move_a")
+  moveB       Move?       @map("move_b")
+  commitA     String?     @map("commit_a")
+  commitB     String?     @map("commit_b")
+  nonceA      String?     @map("nonce_a")
+  nonceB      String?     @map("nonce_b")
+  winner      RoundWinner
+  resolvedAt  DateTime    @map("resolved_at")
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, roundNumber])
+  @@map("rounds")
+}
+
+model EloHistory {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  matchId      String   @map("match_id") @db.Uuid
+  ratingBefore Int      @map("rating_before")
+  ratingAfter  Int      @map("rating_after")
+  delta        Int
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("elo_history")
+}
+
+model League {
+  id        String @id @default(uuid()) @db.Uuid
+  name      String @unique
+  minRating Int    @map("min_rating")
+  maxRating Int?   @map("max_rating")
+  tier      Int    @unique
+
+  seasonStandings SeasonStanding[]
+
+  @@map("leagues")
+}
+
+model Season {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  startedAt DateTime     @map("started_at")
+  endsAt    DateTime?    @map("ends_at")
+  status    SeasonStatus @default(upcoming)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  standings SeasonStanding[]
+
+  @@index([status])
+  @@map("seasons")
+}
+
+model SeasonStanding {
+  id                 String  @id @default(uuid()) @db.Uuid
+  seasonId           String  @map("season_id") @db.Uuid
+  userId             String  @map("user_id") @db.Uuid
+  finalRating        Int     @map("final_rating")
+  finalLeagueId      String  @map("final_league_id") @db.Uuid
+  rank               Int
+  rewardsDistributed Boolean @default(false) @map("rewards_distributed")
+
+  season      Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  finalLeague League @relation(fields: [finalLeagueId], references: [id])
+
+  @@unique([seasonId, userId])
+  @@index([seasonId, rank])
+  @@index([userId])
+  @@map("season_standings")
+}
+
+model Tournament {
+  id                   String           @id @default(uuid()) @db.Uuid
+  name                 String
+  format               TournamentFormat
+  // must be a power of 2 (8, 16, 32, 64); enforced at the application layer
+  bracketSize          Int              @map("bracket_size")
+  registrationOpensAt  DateTime         @map("registration_opens_at")
+  startsAt             DateTime         @map("starts_at")
+  endedAt              DateTime?        @map("ended_at")
+  status               TournamentStatus @default(upcoming)
+  winnerId             String?          @map("winner_id") @db.Uuid
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+
+  winner        User?                    @relation("TournamentWinner", fields: [winnerId], references: [id])
+  registrations TournamentRegistration[]
+  matches       TournamentMatch[]
+
+  @@map("tournaments")
+}
+
+model TournamentRegistration {
+  tournamentId String   @map("tournament_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  seed         Int?
+  registeredAt DateTime @default(now()) @map("registered_at")
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@index([userId])
+  @@map("tournament_registrations")
+}
+
+model TournamentMatch {
+  id           String     @id @default(uuid()) @db.Uuid
+  tournamentId String     @map("tournament_id") @db.Uuid
+  round        Int
+  positionIndex Int       @map("position_index")
+  matchId      String?    @unique @map("match_id") @db.Uuid
+  slotAId      String?    @map("slot_a_id") @db.Uuid
+  slotBId      String?    @map("slot_b_id") @db.Uuid
+  nextMatchId  String?    @map("next_match_id") @db.Uuid
+  winnerSlot   WinnerSlot? @map("winner_slot")
+
+  tournament  Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  match       Match?            @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  slotA       User?             @relation("SlotA", fields: [slotAId], references: [id], onDelete: SetNull)
+  slotB       User?             @relation("SlotB", fields: [slotBId], references: [id], onDelete: SetNull)
+  nextMatch   TournamentMatch?  @relation("BracketChain", fields: [nextMatchId], references: [id], onDelete: SetNull)
+  prevMatches TournamentMatch[] @relation("BracketChain")
+
+  @@index([tournamentId, round])
+  @@index([nextMatchId])
+  @@map("tournament_matches")
+}

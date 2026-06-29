@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "tests/*"
+  - "!**/dist/**"
+  - "!**/build/**"
+  - "!**/node_modules/**"
+  - "!**/coverage/**"
+  - "!**/.volumes/**"

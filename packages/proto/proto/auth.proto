@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package chifoumi.auth.v1;
+
+service Auth {
+  rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse);
+}
+
+service Users {
+  rpc GetRating(GetRatingRequest) returns (GetRatingResponse);
+}
+
+message VerifyTokenRequest {
+  string token = 1;
+}
+
+message VerifyTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string role = 3;
+  string display_name = 4;
+  string reason = 5;
+  string jti = 6;
+}
+
+message GetRatingRequest {
+  string user_id = 1;
+}
+
+message GetRatingResponse {
+  int32 rating = 1;
+  int32 games_played = 2;
+}

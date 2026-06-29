@@ -14,6 +14,8 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.prod.example
+packages/db/.env
 
 # Logs
 *.log
@@ -34,3 +36,7 @@ Thumbs.db
 
 # Docker volumes
 .volumes/
+
+# JWT dev private key — never commit
+infra/keys/*
+!infra/keys/README.md

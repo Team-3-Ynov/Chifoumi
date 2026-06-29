@@ -1,0 +1,5 @@
+Bonjour __DISPLAY_NAME__,
+
+Ton prochain match du tournoi « __TOURNAMENT_NAME__ » est prêt contre __OPPONENT_DISPLAY_NAME__.
+
+Connecte-toi pour jouer ton match.

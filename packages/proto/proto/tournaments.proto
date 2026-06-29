@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package chifoumi.tournaments.v1;
+
+service Tournaments {
+  rpc StartMatch(StartMatchRequest) returns (StartMatchResponse);
+}
+
+message TournamentPlayer {
+  string user_id = 1;
+  string display_name = 2;
+}
+
+message StartMatchRequest {
+  string tournament_match_id = 1;
+  TournamentPlayer slot_a = 2;
+  TournamentPlayer slot_b = 3;
+}
+
+message StartMatchResponse {
+  bool success = 1;
+  string match_id = 2;
+  string error_code = 3;
+}
