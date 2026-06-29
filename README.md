@@ -30,18 +30,28 @@ Plateforme web compétitive Pierre-Feuille-Ciseaux avec matchmaking ELO, parties
 ```bash
 pnpm install
 cp .env.example .env
-docker compose up -d
+mkdir -p infra/keys
+openssl genrsa -out infra/keys/jwt-private.pem 2048
+openssl rsa -in infra/keys/jwt-private.pem -pubout -out infra/keys/jwt-public.pem
+docker compose up -d postgres redis mailhog
 pnpm --filter @chifoumi/db generate
 pnpm --filter @chifoumi/db migrate:deploy
+pnpm db:seed
 pnpm dev
 ```
+
+Sous PowerShell, remplace `cp .env.example .env` par `Copy-Item .env.example .env` et `mkdir -p infra/keys` par `New-Item -ItemType Directory -Force infra/keys`.
+
+`pnpm dev` lance les apps sur la machine hôte. Il faut donc démarrer uniquement les dépendances Docker (`postgres`, `redis`, `mailhog`) pour éviter les conflits de ports avec les conteneurs applicatifs du `docker-compose.yml`.
+
+Si les clés JWT existent déjà dans `infra/keys/`, ne les régénère pas : les tokens déjà émis seraient invalides.
 
 ## Premier lancement
 
 Au premier démarrage (base Postgres vide), appliquer les migrations puis le seed :
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres redis mailhog
 pnpm --filter @chifoumi/db migrate:deploy
 pnpm db:seed
 ```
@@ -68,7 +78,24 @@ Services lancés par `pnpm dev` :
 | Game service | `http://localhost:3001/health` | Service temps réel Socket.io |
 | Job runner | terminal uniquement | Workers et traitements asynchrones |
 
-Si le schéma Postgres évolue, relancer une base vide avec `docker compose down -v`, puis `docker compose up -d`.
+Si le schéma Postgres évolue et que tu veux repartir d'une base vide :
+
+```bash
+docker compose down -v
+docker compose up -d postgres redis mailhog
+pnpm --filter @chifoumi/db migrate:deploy
+pnpm db:seed
+```
+
+### Stack Docker complète
+
+Pour lancer aussi les apps en conteneurs (API x2, Game Service x2, Job Runner x2, Prometheus, Grafana), utilise :
+
+```bash
+docker compose up -d --build
+```
+
+Dans ce mode, ne pas exécuter `pnpm dev` en parallèle : les ports locaux `3000`, `3001`, `3002`, `3003` sont déjà utilisés par les conteneurs.
 
 ## Devcontainer
 
@@ -254,7 +281,7 @@ En local, copier `.env.example` vers `.env` : `DATABASE_URL` est partagée entre
 Tests d'intégration du worker match-events (Postgres + Redis requis) :
 
 ```bash
-docker compose up -d
+docker compose up -d postgres redis mailhog
 pnpm --filter @chifoumi/db migrate:deploy
 pnpm --filter @chifoumi/job-runner test:integration
 ```
@@ -268,8 +295,9 @@ pnpm --filter @chifoumi/job-runner test:integration
 | Game service health | `http://localhost:3001/health` | disponible |
 | Swagger | `http://localhost:3000/api/docs` | disponible |
 | OpenAPI JSON | `http://localhost:3000/api/docs-json` | disponible |
-| MailHog | `http://localhost:8025` | disponible après `docker compose up -d` |
+| MailHog | `http://localhost:8025` | disponible après `docker compose up -d postgres redis mailhog` |
 | Grafana | `http://localhost:3002` | disponible avec `docker-compose.scale.yml` |
+| Grafana | `http://localhost:3030` | disponible avec `docker-compose.yml` seul |
 
 En production, la documentation Swagger est protégée par Basic Auth via `SWAGGER_USER` et `SWAGGER_PASSWORD`.
 Sans ces deux variables en production, les routes `/api/docs` et `/api/docs-json` ne sont pas exposées.

@@ -1,6 +1,6 @@
 import { MatchStatus, Prisma } from "@chifoumi/db";
 import { computeElo, type Outcome } from "@chifoumi/elo";
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import type { MatchEndedPayload } from "../match-events/match-ended.types.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 
@@ -11,7 +11,7 @@ export type MatchPersistenceResult = "created" | "already_exists";
 
 @Injectable()
 export class MatchPersistenceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async persistMatchEnded(payload: MatchEndedPayload): Promise<MatchPersistenceResult> {
     try {

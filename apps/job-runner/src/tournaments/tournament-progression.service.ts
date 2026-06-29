@@ -32,6 +32,7 @@ type TournamentMatchRecord = {
 @Injectable()
 export class TournamentProgressionService {
   constructor(
+    @Inject(PrismaService)
     private readonly prisma: PrismaService,
     @Inject(NotificationsQueueService)
     private readonly notificationsQueue: NotificationsQueueService,
