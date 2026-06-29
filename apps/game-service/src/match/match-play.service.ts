@@ -6,9 +6,7 @@ import {
   MatchSessionService,
 } from "../match-session/match-session.service.js";
 import {
-  emptyRoundCommits,
   emptyRoundPlays,
-  emptyRoundReveals,
   type MatchState,
   type Move,
   playerIndex,
@@ -22,6 +20,8 @@ import { MatchDisconnectSchedulerService } from "./match-disconnect-scheduler.se
 import { MatchEndedPublisher } from "./match-ended-publisher.service.js";
 import type { MatchTimeoutExpectedState } from "./match-timeout.types.js";
 import { MatchTimeoutSchedulerService } from "./match-timeout-scheduler.service.js";
+
+const MATCH_FINALIZE_LOCK_TTL_SECONDS = 86400;
 
 export type PlayInput = {
   userId: string;
@@ -69,20 +69,6 @@ export class MatchPlayService {
       this.timeoutStateForStatus(state.status),
       state.roundDeadline,
     );
-  }
-
-  async onCommitPhaseStarted(state: MatchState): Promise<void> {
-    await this.schedulePhaseTimeout(
-      state.matchId,
-      state.currentRound,
-      "WAITING_COMMITS",
-      state.roundDeadline,
-    );
-  }
-
-  async onRevealPhaseStarted(state: MatchState): Promise<void> {
-    const deadline = state.revealDeadline ?? state.roundDeadline;
-    await this.schedulePhaseTimeout(state.matchId, state.currentRound, "WAITING_REVEALS", deadline);
   }
 
   async submitPlay(input: PlayInput): Promise<void> {
@@ -186,16 +172,6 @@ export class MatchPlayService {
   ): Promise<void> {
     if (expectedState === "WAITING_PLAYS") {
       await this.handleRoundTimeout(matchId, roundNumber);
-      return;
-    }
-
-    if (expectedState === "WAITING_COMMITS") {
-      await this.handleCommitPhaseTimeout(matchId, roundNumber);
-      return;
-    }
-
-    if (expectedState === "WAITING_REVEALS") {
-      await this.handleRevealPhaseTimeout(matchId, roundNumber);
     }
   }
 
@@ -205,38 +181,6 @@ export class MatchPlayService {
       roundNumber,
       "WAITING_PLAYS",
       () => "BOTH",
-    );
-
-    if (nextState.status === "ENDED") {
-      await this.finalizeMatch(nextState);
-    }
-  }
-
-  async handleCommitPhaseTimeout(matchId: string, roundNumber: number): Promise<void> {
-    const nextState = await this.applyPhaseTimeout(
-      matchId,
-      roundNumber,
-      "WAITING_COMMITS",
-      (state) => {
-        const commits = state.roundCommits ?? emptyRoundCommits();
-        return this.resolveSilentPlayer(commits.a, commits.b);
-      },
-    );
-
-    if (nextState.status === "ENDED") {
-      await this.finalizeMatch(nextState);
-    }
-  }
-
-  async handleRevealPhaseTimeout(matchId: string, roundNumber: number): Promise<void> {
-    const nextState = await this.applyPhaseTimeout(
-      matchId,
-      roundNumber,
-      "WAITING_REVEALS",
-      (state) => {
-        const reveals = state.roundReveals ?? emptyRoundReveals();
-        return this.resolveSilentPlayer(reveals.a, reveals.b);
-      },
     );
 
     if (nextState.status === "ENDED") {
@@ -403,42 +347,57 @@ export class MatchPlayService {
     await this.matchSessionService.broadcastRoundStart(state);
   }
 
-  private timeoutStateForStatus(status: MatchState["status"]): MatchTimeoutExpectedState {
-    if (status === "WAITING_COMMITS") {
-      return "WAITING_COMMITS";
-    }
-    if (status === "WAITING_REVEALS") {
-      return "WAITING_REVEALS";
-    }
+  private timeoutStateForStatus(_status: MatchState["status"]): MatchTimeoutExpectedState {
     return "WAITING_PLAYS";
   }
 
   private async finalizeMatch(state: MatchState): Promise<void> {
-    await this.clearTimer(state.matchId);
-    this.metrics.recordMatchPlayed(this.resolveMatchOutcome(state));
-    await this.matchDisconnectScheduler.cancelForfeitForPlayers(
-      state.players.map((player) => player.userId),
-    );
+    // one-shot guard: BullMQ jobId dedup prevents double-processing at the worker,
+    // but two concurrent paths (timeout + disconnect-forfeit) can both reach here
+    // before either job is consumed. setnx ensures only the first caller proceeds.
+    const finalizedKey = `match:${state.matchId}:finalized`;
+    const claimed = await this.redisService.setnx(finalizedKey, MATCH_FINALIZE_LOCK_TTL_SECONDS);
+    if (!claimed) {
+      return;
+    }
 
-    const payload = {
-      matchId: state.matchId,
-      winner: state.winnerId ?? null,
-      finalScore: { a: state.scoreA, b: state.scoreB },
-      eloDelta: { a: 0, b: 0 },
-      reason: state.endReason,
-    };
+    try {
+      await this.clearTimer(state.matchId);
+      this.metrics.recordMatchPlayed(this.resolveMatchOutcome(state));
+      await this.matchDisconnectScheduler.cancelForfeitForPlayers(
+        state.players.map((player) => player.userId),
+      );
 
-    await Promise.all([
-      this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
-        recipientUserId: state.players[0].userId,
-      }),
-      this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
-        recipientUserId: state.players[1].userId,
-      }),
-    ]);
+      const payload = {
+        matchId: state.matchId,
+        winner: state.winnerId ?? null,
+        finalScore: { a: state.scoreA, b: state.scoreB },
+        eloDelta: { a: 0, b: 0 },
+        reason: state.endReason,
+      };
 
-    await this.matchSessionService.cleanupUserMappings(state);
-    await this.matchEndedPublisher.publishMatchEnded(state);
+      await Promise.all([
+        this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
+          recipientUserId: state.players[0].userId,
+        }),
+        this.eventBus.broadcastToMatch(state.matchId, "matchEnded", payload, {
+          recipientUserId: state.players[1].userId,
+        }),
+      ]);
+
+      await this.matchSessionService.cleanupUserMappings(state);
+      await this.matchEndedPublisher.publishMatchEnded(state);
+    } catch (error) {
+      try {
+        await this.redisService.del(finalizedKey);
+      } catch (releaseError) {
+        this.logger.warn(
+          { matchId: state.matchId, error: releaseError },
+          "failed to release match finalized guard",
+        );
+      }
+      throw error;
+    }
   }
 
   private resolveMatchOutcome(state: MatchState): "win" | "draw" | "forfeit" {

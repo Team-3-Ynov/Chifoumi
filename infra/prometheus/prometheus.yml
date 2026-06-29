@@ -18,8 +18,8 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - game-service-1:3001
-          - game-service-2:3001
+          - game-1:3001
+          - game-2:3001
 
   - job_name: chifoumi-job-runner
     metrics_path: /metrics

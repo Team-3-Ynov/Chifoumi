@@ -1,4 +1,4 @@
-import { type PrismaClient, UserRole } from "@prisma/client";
+import { type PrismaClient, TournamentFormat, TournamentStatus, UserRole } from "@prisma/client";
 import { getSeedConfig, type SeedConfig } from "./config.js";
 import { seedLeaguesAndActiveSeason } from "./leagues.js";
 import { hashPassword } from "./password.js";
@@ -44,13 +44,36 @@ export async function seedAdminUser(
   });
 }
 
+async function seedDemoTournament(prisma: PrismaClient): Promise<void> {
+  const existing = await prisma.tournament.findFirst({
+    where: { name: "Tournoi de démonstration" },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  const now = new Date();
+  const registrationOpensAt = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const startsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  await prisma.tournament.create({
+    data: {
+      name: "Tournoi de démonstration",
+      format: TournamentFormat.single_elim,
+      bracketSize: 8,
+      registrationOpensAt,
+      startsAt,
+      status: TournamentStatus.upcoming,
+    },
+  });
+  console.log("Seeded demo tournament.");
+}
+
 export async function runSeed(
   prisma: PrismaClient,
   config: SeedConfig = getSeedConfig(),
 ): Promise<void> {
   await seedLeaguesAndActiveSeason(prisma);
-
-  // TODO sprint 4: seed default skins reference data
+  await seedDemoTournament(prisma);
 
   if (await adminUserExists(prisma, config.adminEmail)) {
     console.log(`Admin user ${config.adminEmail} already exists, skipping seed.`);
