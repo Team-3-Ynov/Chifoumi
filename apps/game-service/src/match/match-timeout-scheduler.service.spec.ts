@@ -53,12 +53,12 @@ describe("MatchTimeoutSchedulerService", () => {
     queueGetJob.mockResolvedValue({ remove } as never);
 
     await service.scheduleTimeout("match-1", 1, "WAITING_PLAYS", 5000);
-    await service.scheduleTimeout("match-1", 1, "WAITING_COMMITS", 5000);
+    await service.scheduleTimeout("match-1", 2, "WAITING_PLAYS", 5000);
 
     expect(remove).toHaveBeenCalled();
     expect(queueAdd).toHaveBeenCalledTimes(2);
     expect(queueAdd.mock.calls[1]?.[1]).toMatchObject({
-      expectedState: "WAITING_COMMITS",
+      expectedState: "WAITING_PLAYS",
     });
   });
 

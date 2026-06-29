@@ -175,7 +175,7 @@ export function useGameSocket(
         setRoundResult(null);
         setMatchEnded(null);
         setScore({ a: parsed.scoreA, b: parsed.scoreB });
-        setAwaitingOpponent(parsed.currentState !== "WAITING_PLAYS");
+        setAwaitingOpponent(false);
       }
     });
 

@@ -40,11 +40,7 @@ export function transitionMatchState(state: MatchState, event: MatchStateMachine
   }
 
   if (event.type === "TIMEOUT") {
-    if (
-      state.status !== "WAITING_PLAYS" &&
-      state.status !== "WAITING_COMMITS" &&
-      state.status !== "WAITING_REVEALS"
-    ) {
+    if (state.status !== "WAITING_PLAYS") {
       throw new InvalidMatchTransitionError(state.status, event.type);
     }
     if (event.silentPlayer === "BOTH") {
