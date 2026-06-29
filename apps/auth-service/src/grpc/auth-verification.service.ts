@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { JwtService, TokenExpiredError } from "@nestjs/jwt";
 import type { AccessTokenPayload } from "../auth/token.service.js";
 import { RedisService } from "../redis/redis.service.js";
+import { UserService } from "../user-service/user.service.js";
 
 @Injectable()
 export class AuthVerificationService {
@@ -11,6 +12,7 @@ export class AuthVerificationService {
   constructor(
     @Inject(JwtService) private readonly jwtService: JwtService,
     @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(UserService) private readonly userService: UserService,
   ) {}
 
   async verifyToken(token: string): Promise<VerifyTokenResponse> {
@@ -44,12 +46,46 @@ export class AuthVerificationService {
       return { valid: false, reason: "REVOKED" };
     }
 
+    const user = await this.userService.findById(payload.sub);
+    if (!user) {
+      return { valid: false, reason: "INVALID" };
+    }
+
     return {
       valid: true,
       userId: payload.sub,
-      role: payload.role,
-      displayName: payload.displayName,
+      role: user.role,
+      displayName: user.displayName,
+      email: user.email,
       jti: payload.jti,
+    };
+  }
+
+  async verifySession(jti: string, userId: string): Promise<VerifyTokenResponse> {
+    let revoked: boolean;
+    try {
+      revoked = await this.redisService.isAccessTokenRevoked(jti);
+    } catch (error) {
+      this.logger.error("Redis blacklist check failed during session verification", error);
+      return { valid: false, reason: "UNAVAILABLE" };
+    }
+
+    if (revoked) {
+      return { valid: false, reason: "REVOKED" };
+    }
+
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      return { valid: false, reason: "INVALID" };
+    }
+
+    return {
+      valid: true,
+      userId,
+      role: user.role,
+      displayName: user.displayName,
+      email: user.email,
+      jti,
     };
   }
 }

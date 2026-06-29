@@ -1,8 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { jest } from "@jest/globals";
 import { ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
-import type { RedisService } from "../../redis/redis.service.js";
-import type { UsersService } from "../../users/users.service.js";
+import type { AuthService } from "../auth.service.js";
 import { JwtStrategy } from "./jwt.strategy.js";
 
 describe("JwtStrategy", () => {
@@ -12,51 +11,65 @@ describe("JwtStrategy", () => {
     publicKeyEncoding: { type: "spki", format: "pem" },
   });
 
-  const usersService = {
-    findById: jest.fn<UsersService["findById"]>(),
-    toSafeUser: jest.fn<UsersService["toSafeUser"]>(),
+  const authService = {
+    verifySession: jest.fn<AuthService["verifySession"]>(),
   };
-  const redisService = {
-    isAccessTokenRevoked: jest.fn<RedisService["isAccessTokenRevoked"]>(),
+
+  const payload = {
+    sub: "user-1",
+    role: "player",
+    jti: "jti-1",
+    exp: Math.floor(Date.now() / 1000) + 60,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("returns service unavailable when Redis revocation check fails", async () => {
-    redisService.isAccessTokenRevoked.mockRejectedValue(new Error("redis down"));
+  it("returns service unavailable when auth-service verification fails", async () => {
+    authService.verifySession.mockRejectedValue(new Error("auth down"));
     const strategy = new JwtStrategy(
       { publicKey, privateKey: "unused", accessTtlSeconds: 900, refreshTtlSeconds: 604800 },
-      usersService as unknown as UsersService,
-      redisService as unknown as RedisService,
+      authService as unknown as AuthService,
     );
 
-    await expect(
-      strategy.validate({
-        sub: "user-1",
-        role: "player",
-        jti: "jti-1",
-        exp: Math.floor(Date.now() / 1000) + 60,
-      }),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(strategy.validate(payload)).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it("rejects revoked access tokens", async () => {
-    redisService.isAccessTokenRevoked.mockResolvedValue(true);
+  it("rejects invalid access tokens", async () => {
+    authService.verifySession.mockResolvedValue({ valid: false, reason: "REVOKED" });
     const strategy = new JwtStrategy(
       { publicKey, privateKey: "unused", accessTtlSeconds: 900, refreshTtlSeconds: 604800 },
-      usersService as unknown as UsersService,
-      redisService as unknown as RedisService,
+      authService as unknown as AuthService,
     );
 
-    await expect(
-      strategy.validate({
-        sub: "user-1",
-        role: "player",
-        jti: "jti-1",
-        exp: Math.floor(Date.now() / 1000) + 60,
-      }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(strategy.validate(payload)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it("returns user object for a valid session", async () => {
+    authService.verifySession.mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+      role: "player",
+      displayName: "Alice",
+      email: "alice@example.com",
+      jti: "jti-1",
+    });
+    const strategy = new JwtStrategy(
+      { publicKey, privateKey: "unused", accessTtlSeconds: 900, refreshTtlSeconds: 604800 },
+      authService as unknown as AuthService,
+    );
+
+    const result = await strategy.validate(payload);
+
+    expect(result).toMatchObject({
+      id: "user-1",
+      email: "alice@example.com",
+      displayName: "Alice",
+      role: "player",
+      tokenJti: "jti-1",
+    });
+    expect(result.tokenExpiresAt).toBeInstanceOf(Date);
+    expect(authService.verifySession).toHaveBeenCalledWith("jti-1", "user-1");
   });
 });

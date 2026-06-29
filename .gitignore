@@ -37,6 +37,9 @@ Thumbs.db
 # Docker volumes
 .volumes/
 
+# Git worktrees
+.worktrees/
+
 # JWT dev private key — never commit
 infra/keys/*
 !infra/keys/README.md

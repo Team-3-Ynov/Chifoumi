@@ -14,17 +14,17 @@ import { Roles } from "../auth/decorators/roles.decorator.js";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
 import { RolesGuard } from "../auth/guards/roles.guard.js";
 import { SWAGGER_BEARER_AUTH } from "../swagger.js";
+import { UserService } from "../user-service/user.service.js";
 import { AdminUsersResponseDto } from "./dto/admin-users-response.dto.js";
 import { ListUsersQueryDto } from "./dto/list-users-query.dto.js";
 import { PublicProfileDto } from "./dto/public-profile.dto.js";
-import { UsersService } from "./users.service.js";
 
 @ApiTags("users")
 @ApiBearerAuth(SWAGGER_BEARER_AUTH)
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller("users")
 export class UsersController {
-  constructor(@Inject(UsersService) private readonly usersService: UsersService) {}
+  constructor(@Inject(UserService) private readonly userService: UserService) {}
 
   @Get()
   @Roles("admin")
@@ -45,7 +45,7 @@ export class UsersController {
     schema: { example: { error: "FORBIDDEN" } },
   })
   listUsers(@Query() query: ListUsersQueryDto): Promise<AdminUsersResponseDto> {
-    return this.usersService.listUsers(query.page, query.limit);
+    return this.userService.listUsers(query.page, query.limit);
   }
 
   @Get(":id/profile")
@@ -79,6 +79,6 @@ export class UsersController {
     },
   })
   getPublicProfile(@Param("id", new ParseUUIDPipe()) userId: string): Promise<PublicProfileDto> {
-    return this.usersService.getPublicProfile(userId);
+    return this.userService.getPublicProfile(userId);
   }
 }

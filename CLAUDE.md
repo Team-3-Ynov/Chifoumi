@@ -46,7 +46,9 @@ Fonctionnalités principales : matchmaking ELO, BO3 temps réel, anti-triche com
 ynov-rps/
 ├── apps/
 │   ├── api/           ← NestJS REST + Swagger
+│   ├── auth-service/  ← NestJS gRPC auth + JWT + refresh/reset
 │   ├── game-service/  ← NestJS WebSocket + state machine BO3
+│   ├── user-service/  ← NestJS gRPC profils/users/ratings
 │   ├── job-runner/    ← NestJS standalone + BullMQ
 │   └── front/         ← React + Vite
 ├── packages/
@@ -68,7 +70,9 @@ ynov-rps/
 1. Une app dans `apps/` = un binaire lançable.
 2. Un package dans `packages/` = code partagé. Ses dépendances tierces (`nestjs/common`, `react`, `zod`…) sont déclarées en **`peerDependencies` avec version `*`**. Les versions précises sont portées par les apps consommatrices.
 3. Chaque app/package a son propre `package.json` nommé `@chifoumi/<nom>`, son `tsconfig.json` (étendant `packages/tsconfig`), et son `biome.json` (étendant `packages/biome`).
-4. Le **Game Service n'accède pas à la BDD directement** : il passe par gRPC vers l'API.
+4. Le **Game Service n'accède pas à la BDD directement** : il vérifie les JWT via gRPC vers l'Auth Service et garde son état temps réel dans Redis.
+5. L'**API** est le BFF REST public : elle expose Swagger/DTO/guards HTTP et délègue l'auth profonde à `auth-service` et les profils/users à `user-service` via gRPC.
+6. `auth-service` et `user-service` sont des microservices internes : ils ne doivent pas être exposés par le gateway public, hors endpoints `/health` accessibles dans le réseau Docker.
 
 ---
 
@@ -84,6 +88,23 @@ pnpm biome check                      # lint + format check
 pnpm biome check --write              # auto-fix
 pnpm -r test --coverage               # tests + coverage
 pnpm -r build                         # build de toutes les apps/packages
+```
+
+Ports locaux par défaut :
+
+| Service | HTTP | gRPC | Notes |
+|---|---:|---:|---|
+| `api` | 3000 | 50051 | BFF REST public + Swagger |
+| `game-service` | 3001 | 50052 | Socket.io `/game` |
+| `user-service` | 3004 | 50053 | Interne, profils/users/ratings |
+| `auth-service` | 3006 | 50054 | Interne, JWT/refresh/reset |
+
+Variables gRPC principales :
+
+```bash
+AUTH_SERVICE_GRPC_URL=localhost:50054
+USER_SERVICE_GRPC_URL=localhost:50053
+API_GRPC_URL=localhost:50054 # côté game-service, pointe vers auth-service
 ```
 
 ---
@@ -122,6 +143,7 @@ pnpm -r build                         # build de toutes les apps/packages
 - **Rate limiting** : `@nestjs/throttler` sur `/auth/*` (5 req/min/IP) et `joinQueue` WS.
 - **CORS** : whitelist explicite, jamais `*`.
 - **Helmet** activé sur l'API.
+- **Gateway** : Traefik est le seul point d'entrée public en mode scale. Il expose `front.localhost`, `api.localhost` et `game.localhost`, applique headers sécurité + rate limiting, et garde `auth-service` / `user-service` internes.
 - **Anti-triche** : protocole commit-reveal, voir spec §5.2. Toute modification de la state machine **impose** de mettre à jour les tests `jest.useFakeTimers`.
 
 ---
