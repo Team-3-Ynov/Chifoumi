@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { useSlideContext } from '@slidev/client'
+import { useSlideContext } from "@slidev/client";
 
-const { $nav } = useSlideContext()
+// biome-ignore lint/correctness/useHookAtTopLevel: useSlideContext est un composable Vue (Slidev), pas un hook React
+// biome-ignore lint/correctness/noUnusedVariables: $nav est consommé dans le <template>, non analysé par Biome
+const { $nav } = useSlideContext();
 </script>
 
 <template>
