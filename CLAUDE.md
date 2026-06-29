@@ -52,7 +52,7 @@ ynov-rps/
 ├── packages/
 │   ├── biome/         ← config Biome partagée
 │   ├── tsconfig/      ← tsconfig.base.json strict
-│   ├── schemas/       ← schémas Zod (DTOs API + payloads WS)
+│   ├── schemas/       ← schémas Zod (payloads WebSocket partagés)
 │   ├── elo/           ← moteur ELO pur, 100 % testable
 │   ├── proto/         ← définitions gRPC + stubs générés
 │   └── db/            ← schéma Prisma + client généré
@@ -99,7 +99,7 @@ pnpm -r build                         # build de toutes les apps/packages
   const payload: any = parseLegacyFormat(input);
   ```
 - Préfère les **types nominaux** (`type UserId = Brand<string, 'UserId'>`) pour les IDs critiques.
-- Les DTOs API sont **dérivés des schémas Zod** de `packages/schemas`, pas dupliqués.
+- Les DTO REST de l'API restent en `class-validator` + Swagger ; les schémas Zod de `packages/schemas` couvrent les payloads WebSocket partagés.
 
 ### NestJS
 
