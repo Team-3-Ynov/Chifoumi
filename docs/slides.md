@@ -76,94 +76,6 @@ layout: default
 layout: section
 ---
 
-# Démo
-
-*La magie d'abord, les explications ensuite.*
-
----
-layout: default
----
-
-# Démo — Authentification
-
-> 🎬 **Montrer en live :** ouvrir `http://localhost:5173`
-
-<v-clicks>
-
-1. **Inscription** → formulaire → email de bienvenue reçu dans MailHog
-2. **Connexion** → JWT RS256 (15 min) + refresh token (7 jours) stocké
-3. **Profil** `/me` → ELO initial 1000, 0 parties jouées
-4. **Déconnexion** → JWT blacklisté dans Redis, refresh révoqué en DB
-
-</v-clicks>
-
-<div class="mt-6 text-sm opacity-60">
-Points clés à montrer : la réponse JSON des tokens, le header Authorization dans les requêtes suivantes.
-</div>
-
----
-layout: default
----
-
-# Démo — Matchmaking
-
-> 🎬 **Montrer en live :** deux onglets / deux comptes
-
-<v-clicks>
-
-1. **Joueur A** se connecte, clique sur "Rejoindre la file"
-2. **Joueur B** (ELO proche) rejoins la file → **match trouvé** instantanément
-3. Les deux joueurs reçoivent l'événement `matchFound` via WebSocket
-4. Redirection automatique vers la page de match `/match/:id`
-
-</v-clicks>
-
-<div class="mt-6 text-sm opacity-60">
-La file utilise un Redis Sorted Set trié par ELO — le worker de matchmaking appaire les joueurs par fenêtre de ±200 points.
-</div>
-
----
-layout: default
----
-
-# Démo — Partie BO3 avec anti-triche
-
-> 🎬 **Montrer en live :** la partie en cours, les deux fenêtres côte à côte
-
-<v-clicks>
-
-1. **Round 1 — Phase commit** : chaque joueur choisit son coup → le client envoie `SHA256(coup:nonce)` au serveur
-2. **Phase reveal** : une fois les deux commits reçus, chaque joueur envoie son coup + nonce en clair
-3. **Résolution** : le serveur vérifie `SHA256(coup:nonce) == commit` pour les deux joueurs, annonce le gagnant
-4. **Après 3 rounds** : résultat final + delta ELO calculé et appliqué de façon asynchrone
-
-</v-clicks>
-
-<div class="mt-4 p-3 bg-orange-50 rounded text-sm">
-⚠️ Si un joueur envoie un nonce invalide (tricherie) → le round est annulé et la vérification échoue dans l'audit trail.
-</div>
-
----
-layout: default
----
-
-# Démo — Stats & Audit
-
-> 🎬 **Montrer en live :** leaderboard, historique, audit trail
-
-<v-clicks>
-
-1. **Leaderboard** `/leaderboard` → top joueurs par ELO, mis à jour après chaque match
-2. **Historique** `/me/history` → pagination curseur, résultats et deltas ELO par match
-3. **Audit trail** `/matches/:id/audit` → vérification publique du commit-reveal pour chaque round
-4. **Grafana** `http://localhost:3002` → métriques HTTP, latences, jobs BullMQ
-
-</v-clicks>
-
----
-layout: section
----
-
 # Architecture technique
 
 *10 minutes · Contrôleurs · Auth · BDD · Redis · BullMQ · CI/CD*
@@ -244,6 +156,18 @@ layout: default
 | **UsersController** | `GET /users/:id/profile` | JWT | Profil public |
 | **LeaderboardController** | `GET /leaderboard` | Public | Top ELO (Redis cache 30s) |
 | **MatchesController** | `GET /matches/:id/audit` | Public | Audit commit-reveal |
+| **SeasonsController** | `GET /seasons/current` | JWT | Saison active + classement joueur |
+| | `GET /seasons/closed` | Public | Saisons terminées |
+| | `GET /seasons/:id/standings` | Public | Classement saisonnier (paginé, filtre league) |
+| **AdminSeasonsController** | `POST /admin/seasons` | Admin | Créer une saison |
+| | `PATCH /admin/seasons/:id/close` | Admin | Clôturer une saison |
+| **TournamentsController** | `GET /tournaments` | JWT | Liste des tournois |
+| | `GET /tournaments/:id` | JWT | Détail d'un tournoi |
+| | `POST /tournaments/:id/register` | JWT | Inscription |
+| | `DELETE /tournaments/:id/register` | JWT | Désinscription |
+| **AdminTournamentsController** | `POST /admin/tournaments` | Admin | Créer un tournoi |
+| | `PATCH /admin/tournaments/:id/open` | Admin | Ouvrir les inscriptions |
+| | `PATCH /admin/tournaments/:id/start` | Admin | Démarrer le tournoi |
 | **HealthController** | `GET /health` | Public | Santé + gRPC readiness |
 | **MetricsController** | `GET /metrics` | Public | Scrape Prometheus |
 | **JwksController** | `GET /.well-known/jwks.json` | Public | Clé publique RS256 |
@@ -299,13 +223,13 @@ erDiagram
     uuid id PK
     string tokenHash UK
     datetime expiresAt
-    bool revoked
+    datetime revokedAt "nullable"
   }
   PasswordResetToken {
     uuid id PK
     string tokenHash UK
     datetime expiresAt
-    bool used
+    datetime usedAt "nullable"
   }
   EloRating {
     uuid id PK
@@ -379,7 +303,7 @@ layout: default
 
 **Deux workers Docker distincts :**
 - `job-runner-match` → écoute `match-events`
-- `job-runner-misc` → écoute `notifications` + cron
+- `job-runner-misc` → écoute `notifications`, `seasons`, `tournaments` + cron
 
 **Isolation par `BULLMQ_PREFIX`** : les environnements dev/staging/prod n'interfèrent pas.
 
@@ -491,8 +415,6 @@ layout: default
 ---
 
 # Observabilité — Prometheus + Grafana
-
-> 🎬 **Montrer en live :** `http://localhost:3002` (Grafana)
 
 <v-clicks>
 
@@ -634,7 +556,7 @@ layout: default
 3. **Vérification** : le serveur recalcule `SHA256(coup:nonce)` et compare au commit initial
 4. Si mismatch → tricherie détectée, round invalidé, trace dans l'audit trail public
 
-**State machine BO3 :** `WAITING_PLAYS` → `WAITING_COMMITS` → `WAITING_REVEALS` → `RESOLVING` → `ENDED`
+**State machine BO3 :** `WAITING_PLAYS` → `RESOLVING` → `WAITING_PLAYS` (round suivant) ou `ENDED`
 
 </v-clicks>
 
@@ -787,7 +709,7 @@ layout: end
 **Liens utiles (dev)**
 - Front : `http://localhost:5173`
 - API : `http://localhost:3000/api/docs`
-- Grafana : `http://localhost:3002`
+- Grafana : `http://localhost:3030`
 - MailHog : `http://localhost:8025`
 
 </div>
