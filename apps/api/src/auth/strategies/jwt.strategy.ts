@@ -7,8 +7,7 @@ import {
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { JWT_CONFIG, type JwtConfig } from "../../config/jwt.config.js";
-import { RedisService } from "../../redis/redis.service.js";
-import { UserService } from "../../user-service/user.service.js";
+import { AuthService } from "../auth.service.js";
 
 export type JwtPayload = {
   sub: string;
@@ -21,8 +20,7 @@ export type JwtPayload = {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     @Inject(JWT_CONFIG) jwtConfig: JwtConfig,
-    @Inject(UserService) private readonly userService: UserService,
-    @Inject(RedisService) private readonly redisService: RedisService,
+    @Inject(AuthService) private readonly authService: AuthService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -33,23 +31,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    let revoked: boolean;
+    let result: Awaited<ReturnType<AuthService["verifySession"]>>;
     try {
-      revoked = await this.redisService.isAccessTokenRevoked(payload.jti);
+      result = await this.authService.verifySession(payload.jti, payload.sub);
     } catch {
       throw new ServiceUnavailableException("Authentication revocation store unavailable");
     }
 
-    if (revoked) {
+    if (!result.valid || !result.userId || !result.role || !result.displayName) {
       throw new UnauthorizedException();
     }
 
-    const user = await this.userService.findById(payload.sub);
-    if (!user) {
-      throw new UnauthorizedException();
-    }
     return {
-      ...this.userService.toSafeUser(user),
+      id: result.userId,
+      email: result.email ?? "",
+      displayName: result.displayName,
+      role: result.role,
       tokenJti: payload.jti,
       tokenExpiresAt: new Date(payload.exp * 1000),
     };

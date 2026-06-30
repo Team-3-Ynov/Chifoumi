@@ -1,3 +1,4 @@
+import { computeElo, type Outcome } from "@chifoumi/elo";
 import { Inject, Injectable } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import { MatchEventBus } from "../match-session/match-event-bus.js";
@@ -372,7 +373,7 @@ export class MatchPlayService {
         matchId: state.matchId,
         winner: state.winnerId ?? null,
         finalScore: { a: state.scoreA, b: state.scoreB },
-        eloDelta: { a: 0, b: 0 },
+        eloDelta: this.resolveEloDelta(state),
         reason: state.endReason,
       };
 
@@ -406,6 +407,19 @@ export class MatchPlayService {
     }
 
     return state.winnerId ? "win" : "draw";
+  }
+
+  private resolveEloDelta(state: MatchState): { a: number; b: number } {
+    const outcome = this.toEloOutcome(state);
+    const elo = computeElo(state.players[0].rating, state.players[1].rating, outcome, 0, 0);
+    return { a: elo.deltaA, b: elo.deltaB };
+  }
+
+  private toEloOutcome(state: MatchState): Outcome {
+    if (!state.winnerId) {
+      return "DRAW";
+    }
+    return state.winnerId === state.players[0].userId ? "A" : "B";
   }
 
   private async schedulePhaseTimeout(

@@ -1,20 +1,43 @@
-import { Prisma, type User, UserRole } from "@chifoumi/db";
-import { getLeagueSummaryForRating, type LeagueSummary } from "@chifoumi/leagues";
-import { Inject, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service.js";
+import type {
+  CompetitionStatsResponse,
+  CurrentUserProfileResponse,
+  ListLeaderboardResponse,
+  ListUsersResponse,
+  PublicUserProfileResponse,
+  UserRecordResponse,
+  UserRole,
+} from "@chifoumi/proto";
+import { status as GrpcStatus } from "@grpc/grpc-js";
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  type OnModuleInit,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import type { ClientGrpc } from "@nestjs/microservices";
+import { firstValueFrom, timeout } from "rxjs";
+
+export type UserRecord = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  createdAt: Date;
+};
 
 export type SafeUser = {
   id: string;
   email: string;
   displayName: string;
-  role: "player" | "admin";
+  role: UserRole;
 };
 
 export type AdminUserSummary = {
   id: string;
   email: string;
   displayName: string;
-  role: "player" | "admin";
+  role: UserRole;
   rating: number;
   gamesPlayed: number;
   createdAt: Date;
@@ -32,7 +55,7 @@ export type PublicUserProfile = {
   displayName: string;
   rating: number;
   gamesPlayed: number;
-  league: LeagueSummary;
+  league: PublicUserProfileResponse["league"];
   winRate: number;
   createdAt: Date;
 };
@@ -41,185 +64,198 @@ export type CurrentUserProfile = {
   id: string;
   email: string;
   displayName: string;
-  role: "player" | "admin";
+  role: UserRole;
   rating: number;
   gamesPlayed: number;
-  league: LeagueSummary;
+  league: CurrentUserProfileResponse["league"];
   createdAt: Date;
 };
 
+type UsersGrpcService = {
+  findByEmail(request: { email: string }): import("rxjs").Observable<UserRecordResponse>;
+  findById(request: { userId: string }): import("rxjs").Observable<UserRecordResponse>;
+  createUser(request: {
+    email: string;
+    passwordHash: string;
+    displayName: string;
+  }): import("rxjs").Observable<UserRecordResponse>;
+  updatePassword(request: {
+    userId: string;
+    passwordHash: string;
+  }): import("rxjs").Observable<Record<string, never>>;
+  getRating(request: { userId: string }): import("rxjs").Observable<{
+    rating: number;
+    gamesPlayed: number;
+  }>;
+  getCurrentProfile(request: {
+    userId: string;
+  }): import("rxjs").Observable<CurrentUserProfileResponse>;
+  getPublicProfile(request: {
+    userId: string;
+  }): import("rxjs").Observable<PublicUserProfileResponse>;
+  listUsers(request: { page: number; limit: number }): import("rxjs").Observable<ListUsersResponse>;
+  listLeaderboard(request: {
+    limit: number;
+    leagueName?: string;
+  }): import("rxjs").Observable<ListLeaderboardResponse>;
+  getCompetitionStats(request: {
+    userId: string;
+  }): import("rxjs").Observable<CompetitionStatsResponse>;
+};
+
+export const USER_SERVICE_GRPC_CLIENT = "USER_SERVICE_GRPC_CLIENT";
+
+const DEFAULT_TIMEOUT_MS = 5000;
+
 @Injectable()
-export class UserService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+export class UserService implements OnModuleInit {
+  private usersService!: UsersGrpcService;
 
-  findByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { email } });
+  constructor(@Inject(USER_SERVICE_GRPC_CLIENT) private readonly client: ClientGrpc) {}
+
+  onModuleInit(): void {
+    this.usersService = this.client.getService<UsersGrpcService>("Users");
   }
 
-  findById(id: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { id } });
+  async findByEmail(email: string): Promise<UserRecord | null> {
+    const response = await this.call(() => this.usersService.findByEmail({ email }));
+    return this.toUserRecordOrNull(response);
   }
 
-  async getRating(userId: string): Promise<{ rating: number; gamesPlayed: number }> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { eloRating: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException({ error: "USER_NOT_FOUND" });
-    }
-
-    return {
-      rating: user.eloRating?.rating ?? 1000,
-      gamesPlayed: user.eloRating?.gamesPlayed ?? 0,
-    };
-  }
-
-  async getCurrentProfile(userId: string): Promise<CurrentUserProfile> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { eloRating: true },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException();
-    }
-
-    const rating = user.eloRating?.rating ?? 1000;
-
-    return {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      role: user.role === UserRole.admin ? "admin" : "player",
-      rating,
-      gamesPlayed: user.eloRating?.gamesPlayed ?? 0,
-      league: getLeagueSummaryForRating(rating),
-      createdAt: user.createdAt,
-    };
-  }
-
-  async getPublicProfile(userId: string): Promise<PublicUserProfile> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { eloRating: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException({ error: "USER_NOT_FOUND" });
-    }
-
-    const gamesPlayed = user.eloRating?.gamesPlayed ?? 0;
-    const rating = user.eloRating?.rating ?? 1000;
-    const wins = gamesPlayed === 0 ? 0 : await this.countWins(userId);
-
-    return {
-      id: user.id,
-      displayName: user.displayName,
-      rating,
-      gamesPlayed,
-      league: getLeagueSummaryForRating(rating),
-      winRate: this.calculateWinRate(wins, gamesPlayed),
-      createdAt: user.createdAt,
-    };
-  }
-
-  async listUsers(page: number, limit: number): Promise<AdminUsersPage> {
-    const skip = (page - 1) * limit;
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-        include: { eloRating: true },
-      }),
-      this.prisma.user.count(),
-    ]);
-
-    return {
-      items: rows.map((user) => ({
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        role: user.role === UserRole.admin ? "admin" : "player",
-        rating: user.eloRating?.rating ?? 1000,
-        gamesPlayed: user.eloRating?.gamesPlayed ?? 0,
-        createdAt: user.createdAt,
-      })),
-      total,
-      page,
-      limit,
-    };
+  async findById(id: string): Promise<UserRecord | null> {
+    const response = await this.call(() => this.usersService.findById({ userId: id }));
+    return this.toUserRecordOrNull(response);
   }
 
   async createUser(input: {
     email: string;
     passwordHash: string;
     displayName: string;
-  }): Promise<User> {
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email: input.email,
-          passwordHash: input.passwordHash,
-          displayName: input.displayName,
-          role: UserRole.player,
-        },
-      });
-      await tx.eloRating.create({
-        data: { userId: user.id },
-      });
-      return user;
-    });
-  }
-
-  toSafeUser(user: User): SafeUser {
-    return {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      role: user.role === UserRole.admin ? "admin" : "player",
-    };
-  }
-
-  isNotFoundError(error: unknown): boolean {
-    return error instanceof NotFoundException;
-  }
-
-  isUniqueConstraintError(error: unknown): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
-  }
-
-  private calculateWinRate(wins: number, gamesPlayed: number): number {
-    if (gamesPlayed === 0) {
-      return 0;
+  }): Promise<UserRecord> {
+    const response = await this.call(() => this.usersService.createUser(input));
+    const user = this.toUserRecordOrNull(response);
+    if (!user) {
+      throw new ServiceUnavailableException("User service returned an empty user");
     }
-    return Math.round((wins / gamesPlayed) * 100) / 100;
+    return user;
   }
 
-  private async countWins(userId: string): Promise<number> {
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    await this.call(() => this.usersService.updatePassword({ userId, passwordHash }));
+  }
+
+  async getRating(userId: string): Promise<{ rating: number; gamesPlayed: number }> {
+    return this.call(() => this.usersService.getRating({ userId }));
+  }
+
+  async getCurrentProfile(userId: string): Promise<CurrentUserProfile> {
     try {
-      const rows = await this.prisma.$queryRaw<Array<{ wins: number | bigint }>>`
-        SELECT COUNT(*)::int AS wins
-        FROM matches
-        WHERE winner_id = ${userId}::uuid
-      `;
-      return Number(rows[0]?.wins ?? 0);
+      const profile = await this.call(() => this.usersService.getCurrentProfile({ userId }));
+      return {
+        ...profile,
+        createdAt: new Date(profile.createdAt),
+      };
     } catch (error) {
-      if (this.isUndefinedTableError(error)) {
-        return 0;
+      if (this.isNotFoundError(error)) {
+        throw new NotFoundException({ error: "USER_NOT_FOUND" });
       }
       throw error;
     }
   }
 
-  private isUndefinedTableError(error: unknown): boolean {
-    return (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2010" &&
-      typeof error.meta?.code === "string" &&
-      error.meta.code === "42P01"
-    );
+  async getPublicProfile(userId: string): Promise<PublicUserProfile> {
+    try {
+      const profile = await this.call(() => this.usersService.getPublicProfile({ userId }));
+      return {
+        ...profile,
+        createdAt: new Date(profile.createdAt),
+      };
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new NotFoundException({ error: "USER_NOT_FOUND" });
+      }
+      throw error;
+    }
+  }
+
+  async listUsers(page: number, limit: number): Promise<AdminUsersPage> {
+    const response = await this.call(() => this.usersService.listUsers({ page, limit }));
+    return {
+      ...response,
+      items: response.items.map((user) => ({
+        ...user,
+        createdAt: new Date(user.createdAt),
+      })),
+    };
+  }
+
+  async listLeaderboard(limit: number, leagueName?: string): Promise<ListLeaderboardResponse> {
+    return this.call(() => this.usersService.listLeaderboard({ limit, leagueName }));
+  }
+
+  async getCompetitionStats(userId: string): Promise<CompetitionStatsResponse> {
+    return this.call(() => this.usersService.getCompetitionStats({ userId }));
+  }
+
+  toSafeUser(user: UserRecord): SafeUser {
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+    };
+  }
+
+  isNotFoundError(error: unknown): boolean {
+    return this.getGrpcCode(error) === GrpcStatus.NOT_FOUND || error instanceof NotFoundException;
+  }
+
+  isUniqueConstraintError(error: unknown): boolean {
+    return this.getGrpcCode(error) === GrpcStatus.ALREADY_EXISTS;
+  }
+
+  private async call<T>(factory: () => import("rxjs").Observable<T>): Promise<T> {
+    try {
+      return await firstValueFrom(
+        factory().pipe(
+          timeout(Number(process.env.USER_SERVICE_GRPC_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS)),
+        ),
+      );
+    } catch (error) {
+      if (this.isNotFoundError(error) || this.isUniqueConstraintError(error)) {
+        throw error;
+      }
+      throw new ServiceUnavailableException("User service unavailable");
+    }
+  }
+
+  private toUserRecordOrNull(response: UserRecordResponse): UserRecord | null {
+    if (!response.found) {
+      return null;
+    }
+    if (
+      !response.id ||
+      !response.email ||
+      !response.displayName ||
+      !response.role ||
+      !response.createdAt
+    ) {
+      throw new ServiceUnavailableException("User service returned an incomplete user");
+    }
+    return {
+      id: response.id,
+      email: response.email,
+      displayName: response.displayName,
+      role: response.role,
+      createdAt: new Date(response.createdAt),
+    };
+  }
+
+  private getGrpcCode(error: unknown): number | undefined {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+      return undefined;
+    }
+    const code = (error as { code: unknown }).code;
+    return typeof code === "number" ? code : undefined;
   }
 }

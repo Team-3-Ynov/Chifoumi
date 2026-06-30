@@ -29,11 +29,11 @@ layout: two-cols
 
 <v-clicks>
 
-- **[Membre 1]** — Product Owner · Auth & JWT
-- **[Membre 2]** — ELO Engine & Matchmaking
-- **[Membre 3]** — BO3 State Machine & Anti-triche
-- **[Membre 4]** — Job Runner & Notifications
-- **[Membre 5]** — DevOps · CI/CD · Observabilité
+- **[Adrien]** - Product Owner · Auth & JWT
+- **[Eliot]** - ELO Engine & Matchmaking
+- **[Florentin]** - BO3 State Machine & Anti-triche
+- **[Rayan]** - Job Runner & Notifications
+- **[Charles]** - DevOps · CI/CD · Observabilité
 
 </v-clicks>
 
@@ -53,7 +53,7 @@ layout: two-cols
 layout: default
 ---
 
-# Le pitch — 1 min 30
+# Le pitch - 1 min 30
 
 <v-clicks>
 
@@ -62,7 +62,7 @@ layout: default
 **La solution** : Chifoumi Ranked implémente un protocole **commit-reveal** anti-triche inspiré de la cryptographie, couplé à un moteur ELO complet pour un classement compétitif juste.
 
 **Ce qu'on a construit :**
-- 4 services découplés (API, Game Service, Job Runner, Front)
+- 6 services découplés (API, auth-service, user-service, Game Service, Job Runner, Front)
 - Matchmaking par fenêtre ELO sur Redis
 - Parties Best-of-3 en temps réel via WebSocket
 - Persistance async des résultats via BullMQ
@@ -76,89 +76,9 @@ layout: default
 layout: section
 ---
 
-# Démo
+# Démonstration
 
-*La magie d'abord, les explications ensuite.*
-
----
-layout: default
----
-
-# Démo — Authentification
-
-> 🎬 **Montrer en live :** ouvrir `http://localhost:5173`
-
-<v-clicks>
-
-1. **Inscription** → formulaire → email de bienvenue reçu dans MailHog
-2. **Connexion** → JWT RS256 (15 min) + refresh token (7 jours) stocké
-3. **Profil** `/me` → ELO initial 1000, 0 parties jouées
-4. **Déconnexion** → JWT blacklisté dans Redis, refresh révoqué en DB
-
-</v-clicks>
-
-<div class="mt-6 text-sm opacity-60">
-Points clés à montrer : la réponse JSON des tokens, le header Authorization dans les requêtes suivantes.
-</div>
-
----
-layout: default
----
-
-# Démo — Matchmaking
-
-> 🎬 **Montrer en live :** deux onglets / deux comptes
-
-<v-clicks>
-
-1. **Joueur A** se connecte, clique sur "Rejoindre la file"
-2. **Joueur B** (ELO proche) rejoins la file → **match trouvé** instantanément
-3. Les deux joueurs reçoivent l'événement `matchFound` via WebSocket
-4. Redirection automatique vers la page de match `/match/:id`
-
-</v-clicks>
-
-<div class="mt-6 text-sm opacity-60">
-La file utilise un Redis Sorted Set trié par ELO — le worker de matchmaking appaire les joueurs par fenêtre de ±200 points.
-</div>
-
----
-layout: default
----
-
-# Démo — Partie BO3 avec anti-triche
-
-> 🎬 **Montrer en live :** la partie en cours, les deux fenêtres côte à côte
-
-<v-clicks>
-
-1. **Round 1 — Phase commit** : chaque joueur choisit son coup → le client envoie `SHA256(coup:nonce)` au serveur
-2. **Phase reveal** : une fois les deux commits reçus, chaque joueur envoie son coup + nonce en clair
-3. **Résolution** : le serveur vérifie `SHA256(coup:nonce) == commit` pour les deux joueurs, annonce le gagnant
-4. **Après 3 rounds** : résultat final + delta ELO calculé et appliqué de façon asynchrone
-
-</v-clicks>
-
-<div class="mt-4 p-3 bg-orange-50 rounded text-sm">
-⚠️ Si un joueur envoie un nonce invalide (tricherie) → le round est annulé et la vérification échoue dans l'audit trail.
-</div>
-
----
-layout: default
----
-
-# Démo — Stats & Audit
-
-> 🎬 **Montrer en live :** leaderboard, historique, audit trail
-
-<v-clicks>
-
-1. **Leaderboard** `/leaderboard` → top joueurs par ELO, mis à jour après chaque match
-2. **Historique** `/me/history` → pagination curseur, résultats et deltas ELO par match
-3. **Audit trail** `/matches/:id/audit` → vérification publique du commit-reveal pour chaque round
-4. **Grafana** `http://localhost:3002` → métriques HTTP, latences, jobs BullMQ
-
-</v-clicks>
+*Matchmaking · Partie BO3 · Anti-triche commit-reveal · Multi-réplicas*
 
 ---
 layout: section
@@ -174,28 +94,37 @@ layout: default
 
 # Vue d'ensemble
 
-```mermaid
+<div class="overflow-y-auto h-[430px]">
+
+```mermaid {scale: 0.62}
 graph TD
   Browser["Navigateur React/Vite :5173"]
-  API["API NestJS :3000<br/>REST + Swagger + gRPC"]
+  API["API NestJS :3000<br/>REST + Swagger — BFF public"]
+  AS["auth-service :50054<br/>gRPC — JWT RS256 + refresh/reset"]
+  US["user-service :50053<br/>gRPC — profils + ratings"]
   GS["Game Service :3001<br/>Socket.io /game"]
   JR["Job Runner<br/>BullMQ Workers"]
   PG[("PostgreSQL 16")]
   RD[("Redis 7")]
   MH["MailHog SMTP"]
 
-  Browser -->|"HTTP / REST"| API
+  Browser -->|"HTTP REST"| API
   Browser -->|"WebSocket wss://"| GS
-  GS -->|"gRPC VerifyToken / GetRating"| API
+  API -->|"gRPC Auth.*"| AS
+  API -->|"gRPC Users.*"| US
+  AS -->|"gRPC Users.FindBy* / CreateUser"| US
+  GS -->|"gRPC Auth.VerifyToken"| AS
   GS -->|"Pub/Sub + Sessions"| RD
-  API -->|"Prisma ORM"| PG
-  API -->|"Blacklist + Cache"| RD
-  JR -->|"Prisma ORM"| PG
+  GS -->|"BullMQ match-ended"| RD
+  AS -->|"Prisma — auth tokens"| PG
+  US -->|"Prisma — users + ratings"| PG
+  JR -->|"Prisma — matchs + ELO"| PG
   JR -->|"Invalidation cache"| RD
   JR -->|"SMTP"| MH
-  GS -->|"BullMQ match-ended"| RD
   JR -->|"BullMQ workers"| RD
 ```
+
+</div>
 
 ---
 layout: default
@@ -203,50 +132,83 @@ layout: default
 
 # Structure du monorepo
 
+<div class="grid grid-cols-2 gap-4 text-sm">
+<div>
+
 ```
-ynov-rps/
-├── apps/
-│   ├── api/          ← NestJS REST + Swagger + gRPC server
-│   ├── game-service/ ← NestJS + Socket.io namespace /game
-│   ├── job-runner/   ← NestJS standalone + BullMQ workers
-│   └── front/        ← React + Vite
-├── packages/
-│   ├── db/           ← Prisma schema, migrations, seed
-│   ├── elo/          ← Moteur ELO pur (0 dépendance framework)
-│   ├── schemas/      ← Schémas Zod partagés (WS events, commit-hash)
-│   ├── proto/        ← Définitions gRPC + stubs générés
-│   ├── biome/        ← Config Biome partagée
-│   └── tsconfig/     ← tsconfig.base.json strict
-├── tests/e2e/        ← Smoke tests cross-instance BO3
-└── .github/workflows/
-    ├── pr.yml        ← lint + typecheck + test + build + e2e
-    └── deploy.yml    ← build images GHCR + SSH rolling deploy VPS
+apps/
+├── api/          ← REST + Swagger (BFF public)
+├── auth-service/ ← gRPC JWT RS256 + refresh
+├── user-service/ ← gRPC profils + ratings
+├── game-service/ ← Socket.io /game
+├── job-runner/   ← BullMQ workers
+└── front/        ← React + Vite
 ```
 
-**Règle clé :** le Game Service n'accède jamais à Postgres directement. Il passe par BullMQ → Job Runner pour la persistance.
+</div>
+<div>
+
+```
+packages/
+├── db/       ← Prisma schema + migrations
+├── elo/      ← Moteur ELO pur
+├── bracket/  ← Logique bracket tournois
+├── leagues/  ← Tiers ELO
+├── schemas/  ← Zod WS events + commit-hash
+└── proto/    ← Définitions gRPC
+
+.github/workflows/
+├── pr.yml     ← lint + typecheck + test + e2e
+└── deploy.yml ← GHCR + rolling VPS deploy
+```
+
+</div>
+</div>
+
+> **Règle clé :** Game Service → jamais Postgres (BullMQ → Job Runner). `auth-service` / `user-service` internes, non exposés par Traefik.
 
 ---
 layout: default
 ---
 
-# API — Contrôleurs & routes
+# API — Contrôleurs & routes (1/2)
 
-| Contrôleur | Route | Auth | Description |
-|---|---|---|---|
-| **AuthController** | `POST /auth/register` | Public | Inscription + tokens |
-| | `POST /auth/login` | Public | Connexion |
-| | `POST /auth/refresh` | Public | Rotation refresh token |
-| | `POST /auth/logout` | JWT | Blacklist + révocation |
-| | `POST /auth/forgot-password` | Public | Email reset (anti-enum) |
-| | `POST /auth/reset-password` | Public | Reset avec token opaque |
-| **MeController** | `GET /me` | JWT | Profil + ELO |
-| | `GET /me/history` | JWT | Historique (cursor-paginé) |
-| **UsersController** | `GET /users/:id/profile` | JWT | Profil public |
-| **LeaderboardController** | `GET /leaderboard` | Public | Top ELO (Redis cache 30s) |
-| **MatchesController** | `GET /matches/:id/audit` | Public | Audit commit-reveal |
-| **HealthController** | `GET /health` | Public | Santé + gRPC readiness |
-| **MetricsController** | `GET /metrics` | Public | Scrape Prometheus |
-| **JwksController** | `GET /.well-known/jwks.json` | Public | Clé publique RS256 |
+| Contrôleur                | Route                        | Auth   | Description                    |
+|---------------------------|------------------------------|--------|--------------------------------|
+| **AuthController**        | `POST /auth/register`        | Public | Inscription + tokens           |
+|                           | `POST /auth/login`           | Public | Connexion                      |
+|                           | `POST /auth/refresh`         | Public | Rotation refresh token         |
+|                           | `POST /auth/logout`          | JWT    | Blacklist + révocation         |
+|                           | `POST /auth/forgot-password` | Public | Email reset (anti-enum)        |
+|                           | `POST /auth/reset-password`  | Public | Reset avec token opaque        |
+| **MeController**          | `GET /me`                    | JWT    | Profil + ELO                   |
+|                           | `GET /me/history`            | JWT    | Historique (cursor-paginé)     |
+| **UsersController**       | `GET /users/:id/profile`     | JWT    | Profil public                  |
+| **LeaderboardController** | `GET /leaderboard`           | Public | Top ELO (cache Redis 30 s)     |
+| **MatchesController**     | `GET /matches/:id/audit`     | Public | Audit commit-reveal            |
+| **HealthController**      | `GET /health`                | Public | Santé + gRPC readiness         |
+| **JwksController**        | `GET /.well-known/jwks.json` | Public | Clé publique RS256             |
+
+---
+layout: default
+---
+
+# API — Contrôleurs & routes (2/2)
+
+| Contrôleur                     | Route                                | Auth  | Description                                   |
+|--------------------------------|--------------------------------------|-------|-----------------------------------------------|
+| **SeasonsController**          | `GET /seasons/current`               | JWT   | Saison active + classement joueur             |
+|                                | `GET /seasons/closed`                | Public| Saisons terminées                             |
+|                                | `GET /seasons/:id/standings`         | Public| Classement saisonnier (paginé, filtre league) |
+| **AdminSeasonsController**     | `POST /admin/seasons`                | Admin | Créer une saison                              |
+|                                | `PATCH /admin/seasons/:id/close`     | Admin | Clôturer une saison                           |
+| **TournamentsController**      | `GET /tournaments`                   | JWT   | Liste des tournois                            |
+|                                | `GET /tournaments/:id`               | JWT   | Détail d'un tournoi                           |
+|                                | `POST /tournaments/:id/register`     | JWT   | Inscription                                   |
+|                                | `DELETE /tournaments/:id/register`   | JWT   | Désinscription                                |
+| **AdminTournamentsController** | `POST /admin/tournaments`            | Admin | Créer un tournoi                              |
+|                                | `PATCH /admin/tournaments/:id/open`  | Admin | Ouvrir les inscriptions                       |
+|                                | `PATCH /admin/tournaments/:id/start` | Admin | Démarrer le tournoi                           |
 
 ---
 layout: default
@@ -254,29 +216,40 @@ layout: default
 
 # Authentification — JWT RS256 + Refresh Rotation
 
-```mermaid
+<div class="overflow-y-auto h-[380px] pr-1">
+
+```mermaid {scale: 0.52}
 sequenceDiagram
   participant C as Client
-  participant A as API
+  participant A as API :3000
+  participant AS as auth-service :50054
   participant DB as PostgreSQL
   participant R as Redis
 
   C->>A: POST /auth/login
-  A->>DB: Vérifier passwordHash (Argon2id)
-  A->>A: Générer JWT RS256 (jti, 15min)
-  A->>DB: Stocker SHA256(refreshToken)
+  A->>AS: gRPC Auth.Login(email, password)
+  AS->>DB: Vérifier passwordHash (Argon2id)
+  AS->>AS: Générer JWT RS256 (jti, 15min)
+  AS->>DB: Stocker SHA256(refreshToken)
+  AS-->>A: AuthResultResponse
   A-->>C: accessToken + refreshToken
 
   C->>A: POST /auth/refresh (refreshToken)
-  A->>R: Acquérir lock userId (5s TTL)
-  A->>DB: Valider + révoquer ancien token
-  A->>DB: Stocker nouveau SHA256(refreshToken)
+  A->>AS: gRPC Auth.Refresh(refreshToken)
+  AS->>R: Acquérir lock userId (5s TTL)
+  AS->>DB: Valider + révoquer ancien token
+  AS->>DB: Stocker nouveau SHA256(refreshToken)
+  AS-->>A: RefreshResponse
   A-->>C: nouveau accessToken + refreshToken
 
   C->>A: POST /auth/logout
-  A->>R: Blacklister jti jusqu'à expiry
-  A->>DB: Révoquer tous les refresh tokens
+  A->>AS: gRPC Auth.Logout(userId, jti, expiresAt)
+  AS->>R: Blacklister jti jusqu'à expiry
+  AS->>DB: Révoquer tous les refresh tokens
+  A-->>C: 204 No Content
 ```
+
+</div>
 
 **Sécurité :** Argon2id `memoryCost:19456, timeCost:2` · RS256 · blacklist Redis · rotation atomique
 
@@ -284,54 +257,65 @@ sequenceDiagram
 layout: default
 ---
 
-# Base de données — Schéma Prisma
+# Base de données — Schéma Prisma (core)
 
-```mermaid
+<div class="overflow-y-auto h-[400px]">
+
+```mermaid {scale: 0.38}
 erDiagram
   User {
     uuid id PK
     string email UK
-    string displayName
+    string displayName UK
     string passwordHash
     enum role "player|admin"
+    datetime createdAt
   }
   RefreshToken {
     uuid id PK
     string tokenHash UK
     datetime expiresAt
-    bool revoked
+    datetime revokedAt "nullable"
   }
   PasswordResetToken {
     uuid id PK
     string tokenHash UK
     datetime expiresAt
-    bool used
+    datetime usedAt "nullable"
   }
   EloRating {
-    uuid id PK
+    uuid userId PK
     int rating "default 1000"
     int gamesPlayed
   }
   Match {
     uuid id PK
+    uuid playerAId FK
+    uuid playerBId FK
+    uuid winnerId FK "nullable"
     enum status "in_progress|ended|aborted"
     int scoreA
     int scoreB
     datetime startedAt
+    datetime endedAt "nullable"
   }
   Round {
     uuid id PK
+    uuid matchId FK
     int roundNumber
+    enum moveA "rock|paper|scissors nullable"
+    enum moveB "rock|paper|scissors nullable"
     string commitA
     string commitB
-    string moveA
-    string moveB
     string nonceA
     string nonceB
     enum winner "a|b|draw"
+    datetime resolvedAt
   }
   EloHistory {
     uuid id PK
+    uuid userId FK
+    uuid matchId FK
     int ratingBefore
     int ratingAfter
     int delta
@@ -341,10 +325,89 @@ erDiagram
   User ||--|| EloRating : "possède"
   User ||--o{ Match : "joue (A)"
   User ||--o{ Match : "joue (B)"
+  User |o--o{ Match : "gagne"
   Match ||--o{ Round : "contient"
   Match ||--o{ EloHistory : "génère"
   User ||--o{ EloHistory : "concerne"
 ```
+
+</div>
+
+---
+layout: default
+---
+
+# Base de données — Features compétitives
+
+<div class="overflow-y-auto h-[400px]">
+
+```mermaid {scale: 0.36}
+erDiagram
+  User {
+    uuid id PK
+  }
+  League {
+    uuid id PK
+    string name UK
+    int minRating
+    int maxRating "nullable"
+    int tier UK
+  }
+  Season {
+    uuid id PK
+    string name
+    datetime startedAt
+    datetime endsAt "nullable"
+    enum status "upcoming|active|closed"
+  }
+  SeasonStanding {
+    uuid id PK
+    uuid seasonId FK
+    uuid userId FK
+    int finalRating
+    uuid finalLeagueId FK
+    int rank
+    bool rewardsDistributed
+  }
+  Tournament {
+    uuid id PK
+    string name
+    enum format "single_elim|double_elim"
+    int bracketSize "power of 2"
+    datetime registrationOpensAt
+    datetime startsAt
+    datetime endedAt "nullable"
+    enum status "upcoming|registration_open|in_progress|completed"
+    uuid winnerId FK "nullable"
+  }
+  TournamentRegistration {
+    uuid tournamentId FK
+    uuid userId FK
+    int seed "nullable"
+    datetime registeredAt
+  }
+  TournamentMatch {
+    uuid id PK
+    uuid tournamentId FK
+    int round
+    int positionIndex
+    uuid matchId FK "nullable"
+    uuid slotAId FK "nullable"
+    uuid slotBId FK "nullable"
+    uuid nextMatchId FK "nullable"
+    enum winnerSlot "a|b nullable"
+  }
+  League ||--o{ SeasonStanding : "attribuée dans"
+  Season ||--o{ SeasonStanding : "contient"
+  User ||--o{ SeasonStanding : "a"
+  User |o--o{ Tournament : "gagne"
+  Tournament ||--o{ TournamentRegistration : "inscriptions"
+  User ||--o{ TournamentRegistration : "s inscrit"
+  Tournament ||--o{ TournamentMatch : "matches"
+  TournamentMatch |o--|| TournamentMatch : "suivant"
+```
+
+</div>
 
 ---
 layout: default
@@ -352,16 +415,16 @@ layout: default
 
 # Redis — Table des clés
 
-| Clé | Type Redis | TTL | Justification |
-|---|---|---|---|
-| `blacklist:{jti}` | String | Durée restante du JWT | Invalidation immédiate au logout |
-| `matchmaking:queue` | Sorted Set (score = ELO) | — | File triée par rating pour le matchmaking |
-| `matchmaking:inQueue:{userId}` | String | — | Déduplication : empêche double inscription |
-| `match:session:{matchId}` | Hash | Durée du match | État in-memory partagé entre les réplicas |
-| `socket:user:{userId}` | String (instanceId) | — | Routage cross-réplica des événements WS |
-| `leaderboard:top` | String (JSON sérialisé) | 30 s | Cache du classement (évite les lectures DB répétées) |
-| `refresh:lock:{userId}` | String (NX) | 5 s | Prévention des races conditions sur le refresh concurrent |
-| `bull:{prefix}:*` | Structures BullMQ | Selon job | Queues, états et résultats des jobs asynchrones |
+| Clé                            | Type Redis               | TTL                   | Justification                                             |
+|--------------------------------|--------------------------|-----------------------|-----------------------------------------------------------|
+| `blacklist:{jti}`              | String                   | Durée restante du JWT | Invalidation immédiate au logout                          |
+| `matchmaking:queue`            | Sorted Set (score = ELO) | —                     | File triée par rating pour le matchmaking                 |
+| `matchmaking:inQueue:{userId}` | String                   | —                     | Déduplication : empêche double inscription                |
+| `match:session:{matchId}`      | Hash                     | Durée du match        | État in-memory partagé entre les réplicas                 |
+| `socket:user:{userId}`         | String (instanceId)      | —                     | Routage cross-réplica des événements WS                   |
+| `leaderboard:top`              | String (JSON sérialisé)  | 30 s                  | Cache du classement (évite les lectures DB répétées)      |
+| `refresh:lock:{userId}`        | String (NX)              | 5 s                   | Prévention des races conditions sur le refresh concurrent |
+| `bull:{prefix}:*`              | Structures BullMQ        | Selon job             | Queues, états et résultats des jobs asynchrones           |
 
 ---
 layout: default
@@ -369,17 +432,17 @@ layout: default
 
 # BullMQ — Queues asynchrones
 
-| Queue | Job | Statut | Rôle |
-|---|---|---|---|
-| `match-events` | `match-ended` | ✅ Implémenté | Persiste les rounds en DB, calcule et applique les deltas ELO, invalide le cache leaderboard Redis |
-| `notifications` | `welcome-email` | ✅ Implémenté | Envoie l'email de bienvenue après inscription |
-| `notifications` | `password-reset-email` | ✅ Implémenté | Envoie le lien de reset de mot de passe |
-| `seasons` | `season-reset` | 🔜 Stub | Réinitialisation saisonnière (sprint 2) |
-| `tournaments` | `generate-bracket` | 🔜 Stub | Génération de brackets (sprint 2) |
+| Queue           | Job                    | Statut       | Rôle                                                                                               |
+|-----------------|------------------------|--------------|----------------------------------------------------------------------------------------------------|
+| `match-events`  | `match-ended`          | ✅ Implémenté | Persiste les rounds en DB, calcule et applique les deltas ELO, invalide le cache leaderboard Redis |
+| `notifications` | `welcome-email`        | ✅ Implémenté | Envoie l'email de bienvenue après inscription                                                      |
+| `notifications` | `password-reset-email` | ✅ Implémenté | Envoie le lien de reset de mot de passe                                                            |
+| `seasons`       | `season-reset`         | ✅ Implémenté | Clôture la saison, calcule les standings finaux et distribue les récompenses                       |
+| `tournaments`   | `generate-bracket`     | ✅ Implémenté | Génère le bracket (single/double élimination) et lance les premiers matchs via gRPC Game Service   |
 
 **Deux workers Docker distincts :**
 - `job-runner-match` → écoute `match-events`
-- `job-runner-misc` → écoute `notifications` + cron
+- `job-runner-misc` → écoute `notifications`, `seasons`, `tournaments` + cron
 
 **Isolation par `BULLMQ_PREFIX`** : les environnements dev/staging/prod n'interfèrent pas.
 
@@ -389,26 +452,40 @@ layout: default
 
 # gRPC — Communication inter-services
 
-```mermaid
+<div class="overflow-y-auto h-[380px]">
+
+```mermaid {scale: 0.62}
 sequenceDiagram
-  participant GS as Game Service
-  participant A as API (gRPC :50051)
-  participant R as Redis
+  participant C as Client
+  participant A as API :3000
+  participant GS as Game Service :3001
+  participant AS as auth-service :50054
+  participant US as user-service :50053
 
-  note over GS: Handshake WebSocket — ?token=JWT
-  GS->>A: Auth.VerifyToken(token)
-  A->>R: Vérifier blacklist jti
-  A-->>GS: { valid, userId, role }
+  note over C,A: Flux REST — register / login
+  C->>A: POST /auth/register
+  A->>AS: Auth.Register(email, password, displayName)
+  AS->>US: Users.CreateUser(email, passwordHash, displayName)
+  US-->>AS: UserRecordResponse
+  AS-->>A: AuthResultResponse (user + tokens)
+  A-->>C: accessToken + refreshToken
 
-  note over GS: Lors du matchmaking
-  GS->>A: Users.GetRating(userId)
-  A-->>GS: { rating, gamesPlayed }
+  note over GS,AS: Handshake WebSocket — ?token=JWT
+  GS->>AS: Auth.VerifyToken(token)
+  AS-->>GS: { valid, userId, role, displayName }
+
+  note over GS,US: Lors du matchmaking
+  GS->>US: Users.GetRating(userId)
+  US-->>GS: { rating, gamesPlayed }
 ```
 
-**Pourquoi gRPC plutôt que REST ?**
-- Contrat fort typé (Protobuf) entre les services
-- Latence faible pour des appels synchrones fréquents (auth WS à chaque connexion)
-- Le Game Service reste sans accès Prisma — il délègue à l'API
+</div>
+
+**Frontières de responsabilité**
+- `auth-service` : JWT RS256, Argon2id, refresh rotation, blacklist Redis
+- `user-service` : enregistrements users, ratings ELO, leaderboard, profils
+- Le Game Service n'accède jamais à Prisma — il passe par gRPC
+- L'API est un BFF pur : elle orchestre, ne stocke pas
 
 ---
 layout: default
@@ -416,11 +493,17 @@ layout: default
 
 # Déploiement multi-réplicas
 
-```mermaid
+<div class="overflow-y-auto h-[400px]">
+
+```mermaid {scale: 0.52}
 graph LR
   T["Traefik<br/>Reverse Proxy"]
   A1["api-1"]
   A2["api-2"]
+  AS1["auth-service-1<br/>:50054"]
+  AS2["auth-service-2<br/>:50054"]
+  US1["user-service-1<br/>:50053"]
+  US2["user-service-2<br/>:50053"]
   G1["game-service-1"]
   G2["game-service-2"]
   JRM["job-runner-match"]
@@ -432,7 +515,16 @@ graph LR
   T -->|"Round Robin"| A2
   T -->|"Sticky Session"| G1
   T -->|"Sticky Session"| G2
-  A1 & A2 --> PG
+  A1 -->|"gRPC"| AS1
+  A2 -->|"gRPC"| AS2
+  A1 -->|"gRPC"| US1
+  A2 -->|"gRPC"| US2
+  AS1 -->|"gRPC"| US1
+  AS2 -->|"gRPC"| US2
+  G1 -->|"gRPC VerifyToken"| AS1
+  G2 -->|"gRPC VerifyToken"| AS2
+  AS1 & AS2 --> PG
+  US1 & US2 --> PG
   A1 & A2 --> RD
   G1 & G2 --> RD
   G1 & G2 -->|"BullMQ"| RD
@@ -440,7 +532,9 @@ graph LR
   JRM & JRN --> RD
 ```
 
-**Sessions sticky** sur le Game Service (nécessaire pour le WebSocket) · **Round-robin** sur l'API (stateless) · Redis comme seul état partagé entre réplicas.
+</div>
+
+**Sessions sticky** sur le Game Service (WebSocket) · **Round-robin** sur l'API (stateless) · `auth-service` / `user-service` internes, non exposés par Traefik · Redis : seul état partagé entre réplicas.
 
 ---
 layout: default
@@ -448,7 +542,9 @@ layout: default
 
 # CI/CD — Pipeline GitHub Actions
 
-```mermaid
+<div class="overflow-y-auto h-[380px]">
+
+```mermaid {scale: 0.6}
 flowchart LR
   PR[/"PR ouverte<br/>→ develop / main"/]
   L["lint<br/>Biome CI"]
@@ -457,7 +553,7 @@ flowchart LR
   B["build<br/>pnpm -r build"]
   E["e2e smoke<br/>BO3 cross-instance"]
   MERGE["Merge → main"]
-  D["deploy.yml<br/>Build 4 images GHCR"]
+  D["deploy.yml<br/>Build 6 images GHCR"]
   VPS["Rolling deploy VPS<br/>SSH + docker compose"]
 
   PR --> L & TC & T & B
@@ -465,6 +561,8 @@ flowchart LR
   L & TC & T & B & E --> MERGE
   MERGE --> D --> VPS
 ```
+
+</div>
 
 **Artefacts CI :** rapports de couverture `lcov` uploadés à chaque PR. **Conditions de merge :** lint vert + typecheck vert + tous les tests passants.
 
@@ -474,38 +572,17 @@ layout: default
 
 # Couverture de tests
 
-| Package | Runner | Seuil lignes | Seuil branches | Seuil fonctions | Résultat actuel |
-|---|---|---|---|---|---|
-| `apps/api` | Jest | 70 % | 60 % | 70 % | ~91 % / ~80 % / ~89 % ✅ |
-| `apps/game-service` | Jest | 70 % | 60 % | 70 % | ✅ CI verte |
-| `apps/job-runner` | Jest | 70 % | 60 % | 70 % | ✅ CI verte |
-| `packages/elo` | Jest | **95 %** | **95 %** | **100 %** | ✅ 100 % |
-| `apps/front` | Vitest | 60 % | 50 % | — | ~79 % / ~83 % ✅ |
+| Package             | Runner | Seuil lignes | Seuil branches | Seuil fonctions | Résultat actuel         |
+|---------------------|--------|--------------|----------------|-----------------|-------------------------|
+| `apps/api`          | Jest   | 70 %         | 60 %           | 70 %            | ~91 % / ~80 % / ~89 % ✅ |
+| `apps/game-service` | Jest   | 70 %         | 60 %           | 70 %            | ✅ CI verte              |
+| `apps/job-runner`   | Jest   | 70 %         | 60 %           | 70 %            | ✅ CI verte              |
+| `packages/elo`      | Jest   | **95 %**     | **95 %**       | **100 %**       | ✅ 100 %                 |
+| `apps/front`        | Vitest | 60 %         | 50 %           | —               | ~79 % / ~83 % ✅         |
 
 **Exclusions justifiées :** DTOs, fichiers bootstrap `main.ts`, code généré Prisma/gRPC, pages CRUD triviales du front.
 
 Les seuils sont **enforced en CI** — une PR qui fait baisser la couverture sous le seuil est bloquée automatiquement.
-
----
-layout: default
----
-
-# Observabilité — Prometheus + Grafana
-
-> 🎬 **Montrer en live :** `http://localhost:3002` (Grafana)
-
-<v-clicks>
-
-- **Métriques HTTP** : latence par route, code de réponse, throughput — middleware `HttpMetricsMiddleware` sur l'API
-- **Métriques BullMQ** : jobs traités, en attente, échoués par queue — `WorkerMetricsService` dans le Job Runner
-- **Dashboard Grafana** pré-provisionné : aucune configuration manuelle
-- **Prometheus scrape** : `GET /metrics` sur l'API et le Job Runner (endpoint Prometheus natif)
-
-</v-clicks>
-
-<div class="mt-4 text-sm opacity-60">
-Logs structurés Pino avec <code>requestId</code> corrélé — JWT et passwords sont <strong>redactés</strong> automatiquement dans les logs.
-</div>
 
 ---
 layout: section
@@ -519,7 +596,7 @@ layout: section
 layout: default
 ---
 
-# [Membre 1] — Auth JWT RS256 & Refresh Token Rotation
+# [Adrien] — Auth JWT RS256 & Refresh Token Rotation
 
 **Problématique :** comment invalider un JWT (stateless par nature) et prévenir les races conditions sur le refresh ?
 
@@ -539,7 +616,7 @@ layout: default
 layout: default
 ---
 
-# [Membre 1] — Implémentation clé
+# [Adrien] — Implémentation clé
 
 ```ts {all|8-13|16-21|23-27}
 // token.service.ts
@@ -569,7 +646,7 @@ issueRefreshToken(): { refreshToken: string; refreshTokenHash: string } {
 layout: default
 ---
 
-# [Membre 2] — Moteur ELO (`packages/elo`)
+# [Eliot] — Moteur ELO (`packages/elo`)
 
 **Problématique :** calculer l'évolution du rating ELO de façon juste, testable et indépendante de tout framework.
 
@@ -590,7 +667,7 @@ layout: default
 layout: default
 ---
 
-# [Membre 2] — Implémentation clé
+# [Eliot] — Implémentation clé
 
 ```ts {all|1-8|10-16|18-22}
 // computeElo.ts
@@ -621,7 +698,7 @@ export function getKFactor(rating: number, gamesPlayed: number): number {
 layout: default
 ---
 
-# [Membre 3] — BO3 State Machine & Anti-triche Commit-Reveal
+# [Florentin] — BO3 State Machine & Anti-triche Commit-Reveal
 
 **Problématique :** garantir qu'un joueur ne peut pas choisir son coup *après* avoir vu celui de l'adversaire.
 
@@ -634,7 +711,7 @@ layout: default
 3. **Vérification** : le serveur recalcule `SHA256(coup:nonce)` et compare au commit initial
 4. Si mismatch → tricherie détectée, round invalidé, trace dans l'audit trail public
 
-**State machine BO3 :** `WAITING_PLAYS` → `WAITING_COMMITS` → `WAITING_REVEALS` → `RESOLVING` → `ENDED`
+**State machine BO3 :** `WAITING_PLAYS` → `RESOLVING` → `WAITING_PLAYS` (round suivant) ou `ENDED`
 
 </v-clicks>
 
@@ -642,7 +719,7 @@ layout: default
 layout: default
 ---
 
-# [Membre 3] — Implémentation clé
+# [Florentin] — Implémentation clé
 
 ```ts {all|1-5|7-15}
 // packages/schemas/src/commit-hash.ts
@@ -666,7 +743,7 @@ export function verifyCommit(
 layout: default
 ---
 
-# [Membre 4] — Job Runner & BullMQ
+# [Rayan] - Job Runner & BullMQ
 
 **Problématique :** le Game Service est temps réel — persister les matchs et envoyer des emails de façon synchrone bloquerait le WebSocket.
 
@@ -685,7 +762,7 @@ layout: default
 layout: default
 ---
 
-# [Membre 4] — Implémentation clé
+# [Rayan] - Implémentation clé
 
 ```ts {all|1-10|12-20}
 // match-ended.processor.ts
@@ -716,7 +793,7 @@ export function createMatchEndedProcessor(deps: MatchEventsProcessorDependencies
 layout: default
 ---
 
-# [Membre 5] — CI/CD, Docker multi-réplicas & Observabilité
+# [Charles] - CI/CD, Docker multi-réplicas & Observabilité
 
 **Problématique :** comment garantir que chaque PR est déployable, et que la production est tolérante aux pannes d'un réplica ?
 
@@ -730,7 +807,7 @@ layout: default
 - `e2e` : smoke test BO3 cross-instance (2 réplicas game-service distincts)
 
 **CD — `deploy.yml` :**
-- Build & push 4 images Docker vers GHCR
+- Build & push 6 images Docker vers GHCR (api, auth-service, user-service, game-service, job-runner, front)
 - SSH rolling deploy VPS via `docker-compose.prod.yml`
 - Smoke post-deploy : `/health`, Swagger, front
 
@@ -740,38 +817,42 @@ layout: default
 layout: default
 ---
 
-# [Membre 5] — Stack multi-réplicas
+# [Charles] - Stack multi-réplicas
+
+<div class="grid grid-cols-2 gap-4">
+<div>
 
 ```yaml
 # docker-compose.scale.yml (extrait)
-services:
-  traefik:
-    labels:
-      - "traefik.enable=true"
-  api-1: &api
-    labels:
-      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
-      - "traefik.http.services.api.loadbalancer.server.port=3000"
-  api-2: *api  # round-robin automatique
+api-1: &api
+  labels:
+    - "traefik.http.routers.api.rule=Host(`api.localhost`)"
+    - "traefik.http.services.api.loadbalancer.server.port=3000"
+api-2: *api  # round-robin automatique
 
-  game-service-1: &game
-    labels:
-      - "traefik.http.services.game.loadbalancer.sticky.cookie=true"
-  game-service-2: *game  # sticky session WebSocket
+game-service-1: &game
+  labels:
+    - "traefik.http.services.game.loadbalancer.sticky.cookie=true"
+game-service-2: *game  # sticky WebSocket
 ```
 
-<v-clicks>
+</div>
+<div>
 
 **Résilience démontrée :**
+
 ```bash
 docker stop chifoumi-api-1
-curl http://api.localhost/health  # répond toujours via api-2
+# api-2 répond toujours
+curl http://api.localhost/health
 docker start chifoumi-api-1
 ```
 
-Redis est le seul état partagé : les sessions WS (`match:session:{id}`), la blacklist JWT et les queues BullMQ survivent à la perte d'un réplica.
+Redis = seul état partagé.  
+Sessions WS, blacklist JWT et queues BullMQ **survivent** à la perte d'un réplica.
 
-</v-clicks>
+</div>
+</div>
 
 ---
 layout: end
@@ -787,7 +868,7 @@ layout: end
 **Liens utiles (dev)**
 - Front : `http://localhost:5173`
 - API : `http://localhost:3000/api/docs`
-- Grafana : `http://localhost:3002`
+- Grafana : `http://localhost:3030`
 - MailHog : `http://localhost:8025`
 
 </div>

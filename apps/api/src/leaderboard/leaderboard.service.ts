@@ -1,12 +1,7 @@
-import {
-  getLeagueSummaryForRating,
-  getReferenceLeagueByName,
-  type ReferenceLeague,
-  toLeagueSummary,
-} from "@chifoumi/leagues";
+import { getReferenceLeagueByName, type ReferenceLeague } from "@chifoumi/leagues";
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service.js";
 import { LEADERBOARD_CACHE_KEY_PREFIX, RedisService } from "../redis/redis.service.js";
+import { UserService } from "../user-service/user.service.js";
 import type { LeaderboardResponseDto } from "./dto/leaderboard-response.dto.js";
 
 export const LEADERBOARD_CACHE_TTL_SECONDS = 30;
@@ -21,7 +16,7 @@ export type LeaderboardResult = {
 @Injectable()
 export class LeaderboardService {
   constructor(
-    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(UserService) private readonly userService: UserService,
     @Inject(RedisService) private readonly redis: RedisService,
   ) {}
 
@@ -47,30 +42,7 @@ export class LeaderboardService {
     limit: number,
     league: ReferenceLeague | null,
   ): Promise<LeaderboardResponseDto> {
-    const rows = await this.prisma.eloRating.findMany({
-      where: league ? this.toRatingWhere(league) : undefined,
-      orderBy: [{ rating: "desc" }, { gamesPlayed: "desc" }],
-      take: Math.trunc(Number(limit)),
-      include: {
-        user: {
-          select: {
-            id: true,
-            displayName: true,
-          },
-        },
-      },
-    });
-
-    return {
-      items: rows.map((row, index) => ({
-        rank: index + 1,
-        userId: row.user.id,
-        displayName: row.user.displayName,
-        rating: row.rating,
-        gamesPlayed: row.gamesPlayed,
-        league: league ? toLeagueSummary(league) : getLeagueSummaryForRating(row.rating),
-      })),
-    };
+    return this.userService.listLeaderboard(Math.trunc(Number(limit)), league?.name);
   }
 
   private resolveLeague(leagueName: string | undefined): ReferenceLeague | null {
@@ -84,14 +56,5 @@ export class LeaderboardService {
     }
 
     return league;
-  }
-
-  private toRatingWhere(league: ReferenceLeague): { rating: { gte: number; lte?: number } } {
-    return {
-      rating: {
-        gte: league.minRating,
-        ...(league.maxRating === null ? {} : { lte: league.maxRating }),
-      },
-    };
   }
 }

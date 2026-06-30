@@ -8,6 +8,10 @@ import { config } from "dotenv";
 import request from "supertest";
 import { AppModule } from "../src/app.module.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
+import {
+  type InternalServicesHandle,
+  startInternalAuthUserServices,
+} from "./helpers/internal-services.js";
 
 const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
 config({ path: resolve(repoRoot, ".env") });
@@ -34,8 +38,11 @@ process.env.JWT_PUBLIC_KEY_PATH = resolve(
 describe("GET /me/history (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let internalServices: InternalServicesHandle;
 
   beforeEach(async () => {
+    internalServices = await startInternalAuthUserServices();
+
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -62,6 +69,9 @@ describe("GET /me/history (e2e)", () => {
   afterEach(async () => {
     if (app) {
       await app.close();
+    }
+    if (internalServices) {
+      await internalServices.close();
     }
   });
 

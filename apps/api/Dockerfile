@@ -7,9 +7,11 @@ RUN npm install -g pnpm@9.15.9
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
+COPY apps/auth-service/package.json apps/auth-service/package.json
 COPY apps/front/package.json apps/front/package.json
 COPY apps/game-service/package.json apps/game-service/package.json
 COPY apps/job-runner/package.json apps/job-runner/package.json
+COPY apps/user-service/package.json apps/user-service/package.json
 COPY packages/biome/package.json packages/biome/package.json
 COPY packages/bracket/package.json packages/bracket/package.json
 COPY packages/db/package.json packages/db/package.json

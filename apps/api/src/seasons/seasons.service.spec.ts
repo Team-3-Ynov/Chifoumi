@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import type { PrismaService } from "../prisma/prisma.service.js";
 import type { SeasonsQueueService } from "../queues/seasons-queue.service.js";
+import type { UserService } from "../user-service/user.service.js";
 import { SeasonsService } from "./seasons.service.js";
 
 // Mirrors the reference leagues seeded in the database (tier-ordered).
@@ -33,11 +34,11 @@ describe("SeasonsService", () => {
       findUnique: ReturnType<typeof jest.fn>;
       updateMany: ReturnType<typeof jest.fn>;
     };
-    eloRating: { findUnique: ReturnType<typeof jest.fn>; count: ReturnType<typeof jest.fn> };
     league: { findMany: ReturnType<typeof jest.fn> };
     seasonStanding: { findMany: ReturnType<typeof jest.fn>; count: ReturnType<typeof jest.fn> };
   };
   let enqueueSeasonReset: ReturnType<typeof jest.fn>;
+  let userService: { getCompetitionStats: ReturnType<typeof jest.fn> };
 
   beforeEach(() => {
     prisma = {
@@ -48,24 +49,24 @@ describe("SeasonsService", () => {
         findUnique: jest.fn(),
         updateMany: jest.fn(),
       },
-      eloRating: { findUnique: jest.fn(), count: jest.fn() },
       league: { findMany: jest.fn() },
       seasonStanding: { findMany: jest.fn(), count: jest.fn() },
     };
     prisma.league.findMany.mockResolvedValue(DB_LEAGUES);
     enqueueSeasonReset = jest.fn();
     enqueueSeasonReset.mockResolvedValue(undefined);
+    userService = { getCompetitionStats: jest.fn() };
     service = new SeasonsService(
       prisma as unknown as PrismaService,
       { enqueueSeasonReset } as unknown as SeasonsQueueService,
+      userService as unknown as UserService,
     );
   });
 
   describe("getCurrent", () => {
     it("returns the active season with the player's league, rank and progress (ryu -> Silver)", async () => {
       prisma.season.findFirst.mockResolvedValue(ACTIVE_SEASON);
-      prisma.eloRating.findUnique.mockResolvedValue({ rating: 1150, gamesPlayed: 12 });
-      prisma.eloRating.count.mockResolvedValue(6); // 6 players strictly ahead
+      userService.getCompetitionStats.mockResolvedValue({ rating: 1150, gamesPlayed: 12, rank: 7 });
 
       const result = await service.getCurrent("ryu-id");
 
@@ -83,25 +84,19 @@ describe("SeasonsService", () => {
       expect(result.me.progressToNextLeague).toBeCloseTo(0.505, 3);
     });
 
-    it("ranks using rating DESC then gamesPlayed DESC (competition rank)", async () => {
+    it("loads the competition rank from user-service", async () => {
       prisma.season.findFirst.mockResolvedValue(ACTIVE_SEASON);
-      prisma.eloRating.findUnique.mockResolvedValue({ rating: 1150, gamesPlayed: 12 });
-      prisma.eloRating.count.mockResolvedValue(0);
+      userService.getCompetitionStats.mockResolvedValue({ rating: 1150, gamesPlayed: 12, rank: 1 });
 
       const result = await service.getCurrent("ryu-id");
 
-      expect(prisma.eloRating.count).toHaveBeenCalledWith({
-        where: {
-          OR: [{ rating: { gt: 1150 } }, { rating: 1150, gamesPlayed: { gt: 12 } }],
-        },
-      });
+      expect(userService.getCompetitionStats).toHaveBeenCalledWith("ryu-id");
       expect(result.me.rank).toBe(1);
     });
 
     it("falls back to the starting rating when the player has no elo row", async () => {
       prisma.season.findFirst.mockResolvedValue(ACTIVE_SEASON);
-      prisma.eloRating.findUnique.mockResolvedValue(null);
-      prisma.eloRating.count.mockResolvedValue(3);
+      userService.getCompetitionStats.mockResolvedValue({ rating: 1000, gamesPlayed: 0, rank: 4 });
 
       const result = await service.getCurrent("new-player");
 
@@ -116,7 +111,7 @@ describe("SeasonsService", () => {
       await expect(service.getCurrent("ryu-id")).rejects.toMatchObject({
         response: { code: "NO_ACTIVE_SEASON" },
       });
-      expect(prisma.eloRating.count).not.toHaveBeenCalled();
+      expect(userService.getCompetitionStats).not.toHaveBeenCalled();
     });
   });
 

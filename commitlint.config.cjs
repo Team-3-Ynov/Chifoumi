@@ -6,6 +6,8 @@ module.exports = {
       "always",
       [
         "api",
+        "auth-service",
+        "user-service",
         "game-service",
         "job-runner",
         "front",
@@ -20,6 +22,7 @@ module.exports = {
         "infra",
         "ci",
         "deps",
+        "docs",
       ],
     ],
     "scope-empty": [1, "never"],

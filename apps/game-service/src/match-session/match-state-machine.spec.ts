@@ -12,7 +12,7 @@ const baseState: MatchState = {
   currentRound: 1,
   status: "WAITING_PLAYS",
   startedAt: "2026-06-09T10:00:00.000Z",
-  roundDeadline: "2026-06-09T10:00:05.000Z",
+  roundDeadline: "2026-06-09T10:00:12.000Z",
   roundPlays: { a: null, b: null },
 };
 
@@ -36,7 +36,7 @@ describe("match state machine", () => {
       scoreA: 1,
       scoreB: 0,
       currentRound: 2,
-      roundDeadline: "2026-06-09T10:00:06.000Z",
+      roundDeadline: "2026-06-09T10:00:13.000Z",
       roundPlays: { a: null, b: null },
     });
   });
@@ -54,7 +54,7 @@ describe("match state machine", () => {
       scoreA: 0,
       scoreB: 0,
       currentRound: 2,
-      roundDeadline: "2026-06-09T10:00:06.000Z",
+      roundDeadline: "2026-06-09T10:00:13.000Z",
       roundPlays: { a: null, b: null },
     });
   });
@@ -105,7 +105,7 @@ describe("match state machine", () => {
     const next = transitionMatchState(baseState, {
       type: "TIMEOUT",
       silentPlayer: "B",
-      now: new Date("2026-06-09T10:00:06.000Z"),
+      now: new Date("2026-06-09T10:00:13.000Z"),
     });
 
     expect(next).toMatchObject({
@@ -119,7 +119,7 @@ describe("match state machine", () => {
     const next = transitionMatchState(baseState, {
       type: "TIMEOUT",
       silentPlayer: "BOTH",
-      now: new Date("2026-06-09T10:00:06.000Z"),
+      now: new Date("2026-06-09T10:00:13.000Z"),
     });
 
     expect(next).toMatchObject({

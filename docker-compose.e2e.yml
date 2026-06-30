@@ -42,11 +42,17 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
       REDIS_URL: redis://redis:6379
       API_PORT: 3000
       API_GRPC_PORT: 50051
+      AUTH_SERVICE_GRPC_URL: auth-service:50054
+      USER_SERVICE_GRPC_URL: user-service:50053
       BULLMQ_PREFIX: rps
       JWT_PRIVATE_KEY_PATH: /app/infra/keys/jwt-private.pem
       JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
@@ -67,6 +73,69 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  user-service:
+    build:
+      context: .
+      dockerfile: apps/user-service/Dockerfile
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+      USER_SERVICE_PORT: 3004
+      USER_SERVICE_GRPC_PORT: 50053
+      INSTANCE_ID: user-service-e2e
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3004/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:chifoumi_dev@postgres:5432/chifoumi
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_PORT: 3006
+      AUTH_SERVICE_GRPC_PORT: 50054
+      USER_SERVICE_GRPC_URL: user-service:50053
+      BULLMQ_PREFIX: rps
+      JWT_PRIVATE_KEY_PATH: /app/infra/keys/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /app/infra/keys/jwt-public.pem
+      INSTANCE_ID: auth-service-e2e
+    volumes:
+      - ./infra/keys:/app/infra/keys:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3006/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
   game-service-1:
     build:
       context: .
@@ -76,7 +145,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      api:
+      auth-service:
         condition: service_healthy
     environment:
       REDIS_URL: redis://redis:6379
@@ -84,7 +153,7 @@ services:
       INSTANCE_ID: game-1
       BULLMQ_PREFIX: rps
       MATCHMAKING_WORKER_ENABLED: "true"
-      API_GRPC_URL: api:50051
+      API_GRPC_URL: auth-service:50054
       CORS_ORIGINS: http://localhost:5173
     healthcheck:
       test:
@@ -109,7 +178,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      api:
+      auth-service:
         condition: service_healthy
     environment:
       REDIS_URL: redis://redis:6379
@@ -117,7 +186,7 @@ services:
       INSTANCE_ID: game-2
       BULLMQ_PREFIX: rps
       MATCHMAKING_WORKER_ENABLED: "true"
-      API_GRPC_URL: api:50051
+      API_GRPC_URL: auth-service:50054
       CORS_ORIGINS: http://localhost:5173
     healthcheck:
       test:

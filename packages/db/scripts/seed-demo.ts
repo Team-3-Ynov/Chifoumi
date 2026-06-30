@@ -1,4 +1,10 @@
-import "dotenv/config";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { config } from "dotenv";
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(scriptDir, "../../../.env") });
+
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { MatchStatus, Move, PrismaClient, RoundWinner, UserRole } from "@prisma/client";

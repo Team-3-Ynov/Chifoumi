@@ -22,7 +22,7 @@ function createState(matchId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"): MatchSta
     currentRound: 1,
     status: "WAITING_PLAYS",
     startedAt: "2026-06-09T10:00:00.000Z",
-    roundDeadline: "2026-06-09T10:00:05.000Z",
+    roundDeadline: "2026-06-09T10:00:12.000Z",
     roundPlays: { a: null, b: null },
     tournamentMatchId,
   };

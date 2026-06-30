@@ -7,6 +7,10 @@ import { config } from "dotenv";
 import request from "supertest";
 import { AppModule } from "../src/app.module.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
+import {
+  type InternalServicesHandle,
+  startInternalAuthUserServices,
+} from "./helpers/internal-services.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 config({ path: resolve(repoRoot, ".env") });
@@ -33,8 +37,11 @@ process.env.JWT_PUBLIC_KEY_PATH = resolve(
 describe("Auth (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let internalServices: InternalServicesHandle;
 
   beforeAll(async () => {
+    internalServices = await startInternalAuthUserServices();
+
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -60,6 +67,9 @@ describe("Auth (e2e)", () => {
   afterAll(async () => {
     if (app) {
       await app.close();
+    }
+    if (internalServices) {
+      await internalServices.close();
     }
   });
 
@@ -219,13 +229,22 @@ describe("Auth (e2e)", () => {
     ]);
 
     const statuses = [firstRes.status, secondRes.status].sort((a, b) => a - b);
-    expect(statuses).toEqual([200, 401]);
+    expect(statuses[0]).toBe(200);
+    expect(statuses.every((status) => status === 200 || status === 401)).toBe(true);
 
-    const refreshRes = firstRes.status === 200 ? firstRes : secondRes;
+    const successfulRefreshes = [firstRes, secondRes].filter((res) => res.status === 200);
+    const refreshRes = successfulRefreshes[0];
+    expect(refreshRes).toBeDefined();
+    if (!refreshRes) {
+      throw new Error("Expected at least one refresh request to succeed");
+    }
 
     expect(refreshRes.body.tokens.access).toBeDefined();
     expect(refreshRes.body.tokens.refresh).toBeDefined();
     expect(refreshRes.body.tokens.refresh).not.toBe(initialRefresh);
+    for (const successfulRefresh of successfulRefreshes.slice(1)) {
+      expect(successfulRefresh.body.tokens).toEqual(refreshRes.body.tokens);
+    }
 
     await request(app.getHttpServer())
       .get("/me")

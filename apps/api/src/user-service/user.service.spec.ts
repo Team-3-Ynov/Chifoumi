@@ -1,124 +1,77 @@
-import { UserRole } from "@chifoumi/db";
+import { status as GrpcStatus } from "@grpc/grpc-js";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { PrismaService } from "../prisma/prisma.service.js";
+import type { ClientGrpc } from "@nestjs/microservices";
+import { of, throwError } from "rxjs";
 import { UserService } from "./user.service.js";
 
-describe("UserService", () => {
-  let service: UserService;
-  let prisma: {
-    $transaction: ReturnType<typeof jest.fn>;
-    $queryRaw: ReturnType<typeof jest.fn>;
-    user: {
-      findMany: ReturnType<typeof jest.fn>;
-      findUnique: ReturnType<typeof jest.fn>;
-      count: ReturnType<typeof jest.fn>;
-    };
+describe("UserService gRPC client", () => {
+  const grpcUsers = {
+    findByEmail: jest.fn(),
+    findById: jest.fn(),
+    createUser: jest.fn(),
+    updatePassword: jest.fn(),
+    getRating: jest.fn(),
+    getCurrentProfile: jest.fn(),
+    getPublicProfile: jest.fn(),
+    listUsers: jest.fn(),
+    listLeaderboard: jest.fn(),
+    getCompetitionStats: jest.fn(),
   };
+  const client = {
+    getService: jest.fn(() => grpcUsers),
+  };
+  let service: UserService;
 
   beforeEach(() => {
-    prisma = {
-      $transaction: jest.fn(),
-      $queryRaw: jest.fn(),
-      user: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
-    };
-    service = new UserService(prisma as unknown as PrismaService);
+    jest.clearAllMocks();
+    service = new UserService(client as unknown as ClientGrpc);
+    service.onModuleInit();
   });
 
-  it("maps users with their elo rating and pagination metadata", async () => {
-    prisma.$transaction.mockResolvedValue([
-      [
-        {
-          id: "user-1",
-          email: "admin@example.com",
-          displayName: "admin",
-          role: UserRole.admin,
-          createdAt: new Date("2026-01-01T00:00:00.000Z"),
-          eloRating: { rating: 1200, gamesPlayed: 5 },
-        },
-        {
-          id: "user-2",
-          email: "player@example.com",
-          displayName: "player",
-          role: UserRole.player,
-          createdAt: new Date("2026-02-01T00:00:00.000Z"),
-          eloRating: null,
-        },
-      ],
-      42,
-    ]);
+  it("maps a found user record from the user microservice", async () => {
+    grpcUsers.findByEmail.mockReturnValue(
+      of({
+        found: true,
+        id: "user-1",
+        email: "a@b.com",
+        displayName: "alice",
+        role: "player",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
 
-    const result = await service.listUsers(2, 20);
-
-    expect(result.total).toBe(42);
-    expect(result.page).toBe(2);
-    expect(result.limit).toBe(20);
-    expect(result.items[0]).toEqual({
+    await expect(service.findByEmail("a@b.com")).resolves.toEqual({
       id: "user-1",
-      email: "admin@example.com",
-      displayName: "admin",
-      role: "admin",
-      rating: 1200,
-      gamesPlayed: 5,
+      email: "a@b.com",
+      displayName: "alice",
+      role: "player",
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
     });
-    // Falls back to defaults when no elo rating row exists.
-    expect(result.items[1]).toMatchObject({ role: "player", rating: 1000, gamesPlayed: 0 });
   });
 
-  it("computes the skip offset from the requested page", async () => {
-    prisma.$transaction.mockImplementation((operations: unknown) => {
-      void operations;
-      return Promise.resolve([[], 0]);
-    });
+  it("returns null when the user microservice reports no match", async () => {
+    grpcUsers.findById.mockReturnValue(of({ found: false }));
 
-    await service.listUsers(3, 10);
-
-    expect(prisma.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ skip: 20, take: 10, orderBy: { createdAt: "desc" } }),
-    );
+    await expect(service.findById("missing")).resolves.toBeNull();
   });
 
-  it("adds the current league to public profiles", async () => {
-    prisma.user.findUnique.mockResolvedValue({
-      id: "user-1",
-      displayName: "gold-player",
-      createdAt: new Date("2026-03-01T00:00:00.000Z"),
-      eloRating: { rating: 1250, gamesPlayed: 10 },
-    });
-    prisma.$queryRaw.mockResolvedValue([{ wins: 4 }]);
+  it("recognizes unique constraint errors from gRPC ALREADY_EXISTS", async () => {
+    const error = { code: GrpcStatus.ALREADY_EXISTS };
+    grpcUsers.createUser.mockReturnValue(throwError(() => error));
 
-    const result = await service.getPublicProfile("user-1");
-
-    expect(result).toEqual({
-      id: "user-1",
-      displayName: "gold-player",
-      rating: 1250,
-      gamesPlayed: 10,
-      league: { name: "Gold", tier: 3 },
-      winRate: 0.4,
-      createdAt: new Date("2026-03-01T00:00:00.000Z"),
-    });
+    await expect(
+      service.createUser({ email: "a@b.com", passwordHash: "hash", displayName: "alice" }),
+    ).rejects.toBe(error);
+    expect(service.isUniqueConstraintError(error)).toBe(true);
   });
 
-  it("builds the current user profile with private fields", async () => {
-    prisma.user.findUnique.mockResolvedValue({
-      id: "user-1",
-      email: "player@example.com",
-      displayName: "player",
-      role: UserRole.player,
-      createdAt: new Date("2026-04-01T00:00:00.000Z"),
-      eloRating: { rating: 980, gamesPlayed: 3 },
-    });
+  it("maps missing public profiles to a REST 404", async () => {
+    const error = { code: GrpcStatus.NOT_FOUND };
+    grpcUsers.getPublicProfile.mockReturnValue(throwError(() => error));
 
-    await expect(service.getCurrentProfile("user-1")).resolves.toEqual({
-      id: "user-1",
-      email: "player@example.com",
-      displayName: "player",
-      role: "player",
-      rating: 980,
-      gamesPlayed: 3,
-      league: { name: "Bronze", tier: 1 },
-      createdAt: new Date("2026-04-01T00:00:00.000Z"),
+    await expect(service.getPublicProfile("missing")).rejects.toMatchObject({
+      status: 404,
+      response: { error: "USER_NOT_FOUND" },
     });
   });
 });

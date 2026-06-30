@@ -1,332 +1,211 @@
-import { ConflictException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service.js";
-import { NotificationsQueueService } from "../queues/notifications-queue.service.js";
-import { RedisService } from "../redis/redis.service.js";
-import { type SafeUser, UserService } from "../user-service/user.service.js";
-import { PasswordService } from "./password.service.js";
-import { TokenService } from "./token.service.js";
+import type {
+  AuthResultResponse,
+  RefreshResponse,
+  SafeUserMessage,
+  UserRole,
+  VerifyTokenResponse,
+} from "@chifoumi/proto";
+import { status as GrpcStatus } from "@grpc/grpc-js";
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  type OnModuleInit,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
+import type { ClientGrpc } from "@nestjs/microservices";
+import { firstValueFrom, timeout } from "rxjs";
+
+export type SafeUser = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+};
 
 export type AuthTokens = { access: string; refresh: string };
 export type AuthResult = { user: SafeUser; tokens: AuthTokens };
 
-const REFRESH_ROTATION_CACHE_SECONDS = 30;
-const REFRESH_ROTATION_LOCK_SECONDS = 10;
-const REFRESH_ROTATION_WAIT_ATTEMPTS = 10;
-const REFRESH_ROTATION_WAIT_MS = 25;
+type AuthGrpcService = {
+  register(request: {
+    email: string;
+    password: string;
+    displayName: string;
+  }): import("rxjs").Observable<AuthResultResponse>;
+  login(request: {
+    email: string;
+    password: string;
+  }): import("rxjs").Observable<AuthResultResponse>;
+  refresh(request: { refreshToken: string }): import("rxjs").Observable<RefreshResponse>;
+  logout(request: {
+    userId: string;
+    jti: string;
+    expiresAt: string;
+  }): import("rxjs").Observable<Record<string, never>>;
+  requestPasswordReset(request: {
+    email: string;
+  }): import("rxjs").Observable<Record<string, never>>;
+  resetPassword(request: {
+    token: string;
+    newPassword: string;
+  }): import("rxjs").Observable<Record<string, never>>;
+  verifyToken(request: { token: string }): import("rxjs").Observable<{
+    valid: boolean;
+    userId?: string;
+    role?: string;
+    displayName?: string;
+    email?: string;
+    reason?: string;
+    jti?: string;
+  }>;
+  verifySession(request: { jti: string; userId: string }): import("rxjs").Observable<{
+    valid: boolean;
+    userId?: string;
+    role?: string;
+    displayName?: string;
+    email?: string;
+    reason?: string;
+    jti?: string;
+  }>;
+};
 
-const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
-const DEFAULT_FRONTEND_URL = "http://localhost:5173";
+export const AUTH_SERVICE_GRPC_CLIENT = "AUTH_SERVICE_GRPC_CLIENT";
+
+const DEFAULT_TIMEOUT_MS = 5000;
 
 @Injectable()
-export class AuthService {
-  constructor(
-    @Inject(UserService) private readonly userService: UserService,
-    @Inject(PasswordService) private readonly passwordService: PasswordService,
-    @Inject(TokenService) private readonly tokenService: TokenService,
-    @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(RedisService) private readonly redisService: RedisService,
-    @Inject(NotificationsQueueService)
-    private readonly notificationsQueue: NotificationsQueueService,
-  ) {}
+export class AuthService implements OnModuleInit {
+  private authService!: AuthGrpcService;
+
+  constructor(@Inject(AUTH_SERVICE_GRPC_CLIENT) private readonly client: ClientGrpc) {}
+
+  onModuleInit(): void {
+    this.authService = this.client.getService<AuthGrpcService>("Auth");
+  }
 
   async register(input: {
     email: string;
     password: string;
     displayName: string;
   }): Promise<AuthResult> {
-    const email = input.email.toLowerCase();
-    const existing = await this.userService.findByEmail(email);
-    if (existing) {
-      throw new ConflictException("Unable to complete registration");
-    }
-
-    const passwordHash = await this.passwordService.hash(input.password);
-
-    try {
-      const user = await this.userService.createUser({
-        email,
-        passwordHash,
-        displayName: input.displayName,
-      });
-      void this.notificationsQueue
-        .enqueueWelcomeMail({
-          to: email,
-          displayName: input.displayName,
-        })
-        .catch(() => undefined);
-      return this.issueTokensForUser(user.id, user);
-    } catch (error) {
-      if (this.userService.isUniqueConstraintError(error)) {
-        throw new ConflictException("Unable to complete registration");
-      }
-      throw error;
-    }
+    const response = await this.call(() => this.authService.register(input));
+    return this.toAuthResult(response);
   }
 
   async login(input: { email: string; password: string }): Promise<AuthResult> {
-    const user = await this.userService.findByEmail(input.email.toLowerCase());
-    if (!user) {
-      throw new UnauthorizedException("Invalid credentials");
-    }
-    const valid = await this.passwordService.verify(user.passwordHash, input.password);
-    if (!valid) {
-      throw new UnauthorizedException("Invalid credentials");
-    }
-    return this.issueTokensForUser(user.id, user);
+    const response = await this.call(() => this.authService.login(input));
+    return this.toAuthResult(response);
   }
 
   async refresh(refreshToken: string): Promise<{ tokens: AuthTokens }> {
-    const tokenHash = this.tokenService.hashRefreshToken(refreshToken);
-    const cacheKey = this.refreshRotationCacheKey(tokenHash);
-    const lockKey = this.refreshRotationLockKey(tokenHash);
-
-    const stored = await this.prisma.refreshToken.findUnique({
-      where: { tokenHash },
-    });
-
-    if (!stored) {
-      throw new UnauthorizedException();
+    const response = await this.call(() => this.authService.refresh({ refreshToken }));
+    if (!response.tokens) {
+      throw new ServiceUnavailableException("Auth service returned an empty refresh response");
     }
-
-    if (stored.revokedAt !== null) {
-      await this.revokeAllRefreshTokens(stored.userId);
-      throw new UnauthorizedException();
-    }
-
-    if (stored.expiresAt.getTime() <= Date.now()) {
-      throw new UnauthorizedException();
-    }
-
-    const user = await this.userService.findById(stored.userId);
-    if (!user) {
-      throw new UnauthorizedException();
-    }
-
-    const lockAcquired = await this.redisService.setnx(lockKey, REFRESH_ROTATION_LOCK_SECONDS);
-    if (!lockAcquired) {
-      const racedTokens = await this.waitForCachedRotation(cacheKey);
-      if (racedTokens) {
-        return { tokens: racedTokens };
-      }
-      throw new UnauthorizedException();
-    }
-
-    const safeUser = this.userService.toSafeUser(user);
-
-    try {
-      const newRefreshToken = await this.prisma.$transaction(async (tx) => {
-        const revoked = await tx.refreshToken.updateMany({
-          where: {
-            id: stored.id,
-            revokedAt: null,
-            expiresAt: { gt: new Date() },
-          },
-          data: { revokedAt: new Date() },
-        });
-
-        if (revoked.count === 0) {
-          throw new UnauthorizedException();
-        }
-
-        const issued = this.tokenService.issueRefreshToken();
-        await tx.refreshToken.create({
-          data: {
-            userId: stored.userId,
-            tokenHash: issued.refreshTokenHash,
-            expiresAt: this.tokenService.getRefreshExpiresAt(),
-          },
-        });
-        return issued.refreshToken;
-      });
-
-      const { accessToken } = await this.tokenService.issueAccessToken({
-        userId: stored.userId,
-        role: safeUser.role,
-        displayName: safeUser.displayName,
-      });
-      const tokens = { access: accessToken, refresh: newRefreshToken };
-      await this.cacheRotation(cacheKey, tokens);
-      return { tokens };
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        const racedTokens = await this.waitForCachedRotation(cacheKey);
-        if (racedTokens) {
-          return { tokens: racedTokens };
-        }
-      }
-      throw error;
-    } finally {
-      await this.redisService.del(lockKey);
-    }
-  }
-
-  async requestPasswordReset(email: string): Promise<void> {
-    const normalizedEmail = email.toLowerCase();
-    const user = await this.userService.findByEmail(normalizedEmail);
-    if (!user) {
-      return;
-    }
-
-    const { token, tokenHash } = this.tokenService.issuePasswordResetToken();
-    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
-
-    // Invalidate any previously issued, still-unused reset token so only the
-    // latest reset link remains valid for a given user.
-    await this.prisma.passwordResetToken.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { usedAt: new Date() },
-    });
-
-    const created = await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        expiresAt,
-      },
-    });
-
-    const resetUrl = this.buildPasswordResetUrl(token);
-    try {
-      await this.notificationsQueue.enqueuePasswordResetMail({
-        to: normalizedEmail,
-        resetUrl,
-      });
-    } catch {
-      // Compensation: if the mail job cannot be enqueued, drop the token we just
-      // persisted so no unusable orphan reset token is left behind. The error is
-      // swallowed to preserve the anti-enumeration contract (always responds 200).
-      await this.prisma.passwordResetToken
-        .delete({ where: { id: created.id } })
-        .catch(() => undefined);
-    }
-  }
-
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    const tokenHash = this.tokenService.hashPasswordResetToken(token);
-    const stored = await this.prisma.passwordResetToken.findUnique({
-      where: { tokenHash },
-    });
-
-    if (!stored) {
-      throw new UnauthorizedException();
-    }
-    if (stored.usedAt !== null) {
-      throw new UnauthorizedException();
-    }
-    if (stored.expiresAt.getTime() <= Date.now()) {
-      throw new UnauthorizedException();
-    }
-
-    const newPasswordHash = await this.passwordService.hash(newPassword);
-
-    await this.prisma.$transaction(async (tx) => {
-      const consumed = await tx.passwordResetToken.updateMany({
-        where: {
-          id: stored.id,
-          usedAt: null,
-          expiresAt: { gt: new Date() },
-        },
-        data: { usedAt: new Date() },
-      });
-
-      if (consumed.count === 0) {
-        throw new UnauthorizedException();
-      }
-
-      await tx.user.update({
-        where: { id: stored.userId },
-        data: { passwordHash: newPasswordHash },
-      });
-
-      // AC4: only refresh tokens are revoked here. Existing access JWTs are NOT
-      // blacklisted on reset — they remain valid until their short (15 min)
-      // expiry. This is an accepted trade-off documented for the reset flow.
-      await tx.refreshToken.updateMany({
-        where: { userId: stored.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
-    });
+    return { tokens: response.tokens };
   }
 
   async logout(input: { userId: string; jti: string; expiresAt: Date }): Promise<void> {
-    const ttlSeconds = Math.ceil((input.expiresAt.getTime() - Date.now()) / 1000);
-    if (ttlSeconds <= 0) {
-      throw new UnauthorizedException();
+    await this.call(() =>
+      this.authService.logout({
+        userId: input.userId,
+        jti: input.jti,
+        expiresAt: input.expiresAt.toISOString(),
+      }),
+    );
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    await this.call(() => this.authService.requestPasswordReset({ email }));
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await this.call(() => this.authService.resetPassword({ token, newPassword }));
+  }
+
+  async verifyToken(token: string): Promise<VerifyTokenResponse> {
+    const response = await this.call(() => this.authService.verifyToken({ token }));
+    return this.toVerifyTokenResponse(response);
+  }
+
+  async verifySession(jti: string, userId: string): Promise<VerifyTokenResponse> {
+    const response = await this.call(() => this.authService.verifySession({ jti, userId }));
+    return this.toVerifyTokenResponse(response);
+  }
+
+  private toVerifyTokenResponse(response: {
+    valid: boolean;
+    userId?: string;
+    role?: string;
+    displayName?: string;
+    email?: string;
+    reason?: string;
+    jti?: string;
+  }): VerifyTokenResponse {
+    if (!response.valid) {
+      const reason =
+        response.reason === "REVOKED" ||
+        response.reason === "EXPIRED" ||
+        response.reason === "INVALID" ||
+        response.reason === "UNAVAILABLE"
+          ? response.reason
+          : "INVALID";
+      return { valid: false, reason };
     }
-
-    await this.redisService.revokeAccessToken(input.jti, ttlSeconds);
-    await this.revokeAllRefreshTokens(input.userId);
-  }
-
-  private buildPasswordResetUrl(token: string): string {
-    const frontendUrl = (process.env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL).replace(/\/+$/, "");
-    return `${frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
-  }
-
-  private refreshRotationCacheKey(tokenHash: string): string {
-    return `refresh:rotation:${tokenHash}`;
-  }
-
-  private refreshRotationLockKey(tokenHash: string): string {
-    return `refresh:lock:${tokenHash}`;
-  }
-
-  private async getCachedRotation(cacheKey: string): Promise<AuthTokens | null> {
-    const cached = await this.redisService.get(cacheKey);
-    if (!cached) {
-      return null;
-    }
-    return JSON.parse(cached) as AuthTokens;
-  }
-
-  private async waitForCachedRotation(cacheKey: string): Promise<AuthTokens | null> {
-    for (let attempt = 0; attempt < REFRESH_ROTATION_WAIT_ATTEMPTS; attempt += 1) {
-      const cached = await this.getCachedRotation(cacheKey);
-      if (cached) {
-        return cached;
-      }
-      await new Promise((resolve) => setTimeout(resolve, REFRESH_ROTATION_WAIT_MS));
-    }
-    return null;
-  }
-
-  private async cacheRotation(cacheKey: string, tokens: AuthTokens): Promise<void> {
-    await this.redisService.setex(cacheKey, REFRESH_ROTATION_CACHE_SECONDS, JSON.stringify(tokens));
-  }
-
-  private async revokeAllRefreshTokens(userId: string): Promise<void> {
-    await this.prisma.refreshToken.updateMany({
-      where: {
-        userId,
-        revokedAt: null,
-      },
-      data: {
-        revokedAt: new Date(),
-      },
-    });
-  }
-
-  private async issueTokensForUser(
-    userId: string,
-    user: Parameters<UserService["toSafeUser"]>[0],
-  ): Promise<AuthResult> {
-    const safeUser = this.userService.toSafeUser(user);
-    const { accessToken } = await this.tokenService.issueAccessToken({
-      userId,
-      role: safeUser.role,
-      displayName: safeUser.displayName,
-    });
-    const { refreshToken, refreshTokenHash } = this.tokenService.issueRefreshToken();
-    await this.prisma.refreshToken.create({
-      data: {
-        userId,
-        tokenHash: refreshTokenHash,
-        expiresAt: this.tokenService.getRefreshExpiresAt(),
-      },
-    });
     return {
-      user: safeUser,
-      tokens: { access: accessToken, refresh: refreshToken },
+      valid: true,
+      userId: response.userId,
+      role: response.role,
+      displayName: response.displayName,
+      email: response.email,
+      jti: response.jti,
     };
+  }
+
+  private async call<T>(factory: () => import("rxjs").Observable<T>): Promise<T> {
+    try {
+      return await firstValueFrom(
+        factory().pipe(
+          timeout(Number(process.env.AUTH_SERVICE_GRPC_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS)),
+        ),
+      );
+    } catch (error) {
+      const code = this.getGrpcCode(error);
+      if (code === GrpcStatus.ALREADY_EXISTS) {
+        throw new ConflictException("Unable to complete registration");
+      }
+      if (code === GrpcStatus.UNAUTHENTICATED) {
+        throw new UnauthorizedException();
+      }
+      throw new ServiceUnavailableException("Auth service unavailable");
+    }
+  }
+
+  private toAuthResult(response: AuthResultResponse): AuthResult {
+    if (!response.user || !response.tokens) {
+      throw new ServiceUnavailableException("Auth service returned an incomplete auth result");
+    }
+    return {
+      user: this.toSafeUser(response.user),
+      tokens: response.tokens,
+    };
+  }
+
+  private toSafeUser(user: SafeUserMessage): SafeUser {
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+    };
+  }
+
+  private getGrpcCode(error: unknown): number | undefined {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+      return undefined;
+    }
+    const code = (error as { code: unknown }).code;
+    return typeof code === "number" ? code : undefined;
   }
 }
