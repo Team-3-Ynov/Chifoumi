@@ -18,7 +18,9 @@ const { $nav } = useSlideContext();
 </template>
 
 <style>
-.slidev-layout {
+.slidev-layout,
+.slidev-slide-content,
+.slidev-slide-content > div {
   overflow-y: auto !important;
 }
 </style>
