@@ -16,3 +16,9 @@ const { $nav } = useSlideContext();
     {{ $nav.currentPage }} / {{ $nav.total }}
   </div>
 </template>
+
+<style>
+.slidev-layout {
+  overflow-y: auto !important;
+}
+</style>

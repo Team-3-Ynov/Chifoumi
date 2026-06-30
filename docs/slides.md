@@ -76,6 +76,14 @@ layout: default
 layout: section
 ---
 
+# Démonstration
+
+*Matchmaking · Partie BO3 · Anti-triche commit-reveal · Multi-réplicas*
+
+---
+layout: section
+---
+
 # Architecture technique
 
 *10 minutes · Contrôleurs · Auth · BDD · Redis · BullMQ · CI/CD*
@@ -120,72 +128,91 @@ layout: default
 
 # Structure du monorepo
 
+<div class="grid grid-cols-2 gap-4 text-sm">
+<div>
+
 ```
-ynov-rps/
-├── apps/
-│   ├── api/           ← NestJS REST + Swagger (BFF public)
-│   ├── auth-service/  ← NestJS gRPC — JWT RS256, refresh, reset
-│   ├── user-service/  ← NestJS gRPC — profils, ratings, leaderboard
-│   ├── game-service/  ← NestJS + Socket.io namespace /game
-│   ├── job-runner/    ← NestJS standalone + BullMQ workers
-│   └── front/         ← React + Vite
-├── packages/
-│   ├── db/            ← Prisma schema, migrations, seed
-│   ├── elo/           ← Moteur ELO pur (0 dépendance framework)
-│   ├── bracket/       ← Logique bracket tournois (single/double elim)
-│   ├── leagues/       ← Logique ligues / tiers ELO
-│   ├── schemas/       ← Schémas Zod partagés (WS events, commit-hash)
-│   ├── proto/         ← Définitions gRPC + stubs générés
-│   ├── biome/         ← Config Biome partagée
-│   └── tsconfig/      ← tsconfig.base.json strict
-├── tests/e2e/         ← Smoke tests cross-instance BO3
-└── .github/workflows/
-    ├── pr.yml         ← lint + typecheck + test + build + e2e
-    └── deploy.yml     ← build images GHCR + SSH rolling deploy VPS
+apps/
+├── api/          ← REST + Swagger (BFF public)
+├── auth-service/ ← gRPC JWT RS256 + refresh
+├── user-service/ ← gRPC profils + ratings
+├── game-service/ ← Socket.io /game
+├── job-runner/   ← BullMQ workers
+└── front/        ← React + Vite
 ```
 
-**Règles clés :** le Game Service n'accède jamais à Postgres — persistance via BullMQ → Job Runner. `auth-service` et `user-service` sont internes (non exposés par Traefik).
+</div>
+<div>
+
+```
+packages/
+├── db/       ← Prisma schema + migrations
+├── elo/      ← Moteur ELO pur
+├── bracket/  ← Logique bracket tournois
+├── leagues/  ← Tiers ELO
+├── schemas/  ← Zod WS events + commit-hash
+└── proto/    ← Définitions gRPC
+
+.github/workflows/
+├── pr.yml     ← lint + typecheck + test + e2e
+└── deploy.yml ← GHCR + rolling VPS deploy
+```
+
+</div>
+</div>
+
+> **Règle clé :** Game Service → jamais Postgres (BullMQ → Job Runner). `auth-service` / `user-service` internes, non exposés par Traefik.
 
 ---
 layout: default
 ---
 
-# API — Contrôleurs & routes
+# API — Contrôleurs & routes (1/2)
 
-| Contrôleur                     | Route                                | Auth   | Description                                   |
-|--------------------------------|--------------------------------------|--------|-----------------------------------------------|
-| **AuthController**             | `POST /auth/register`                | Public | Inscription + tokens                          |
-|                                | `POST /auth/login`                   | Public | Connexion                                     |
-|                                | `POST /auth/refresh`                 | Public | Rotation refresh token                        |
-|                                | `POST /auth/logout`                  | JWT    | Blacklist + révocation                        |
-|                                | `POST /auth/forgot-password`         | Public | Email reset (anti-enum)                       |
-|                                | `POST /auth/reset-password`          | Public | Reset avec token opaque                       |
-| **MeController**               | `GET /me`                            | JWT    | Profil + ELO                                  |
-|                                | `GET /me/history`                    | JWT    | Historique (cursor-paginé)                    |
-| **UsersController**            | `GET /users/:id/profile`             | JWT    | Profil public                                 |
-| **LeaderboardController**      | `GET /leaderboard`                   | Public | Top ELO (Redis cache 30s)                     |
-| **MatchesController**          | `GET /matches/:id/audit`             | Public | Audit commit-reveal                           |
-| **SeasonsController**          | `GET /seasons/current`               | JWT    | Saison active + classement joueur             |
-|                                | `GET /seasons/closed`                | Public | Saisons terminées                             |
-|                                | `GET /seasons/:id/standings`         | Public | Classement saisonnier (paginé, filtre league) |
-| **AdminSeasonsController**     | `POST /admin/seasons`                | Admin  | Créer une saison                              |
-|                                | `PATCH /admin/seasons/:id/close`     | Admin  | Clôturer une saison                           |
-| **TournamentsController**      | `GET /tournaments`                   | JWT    | Liste des tournois                            |
-|                                | `GET /tournaments/:id`               | JWT    | Détail d'un tournoi                           |
-|                                | `POST /tournaments/:id/register`     | JWT    | Inscription                                   |
-|                                | `DELETE /tournaments/:id/register`   | JWT    | Désinscription                                |
-| **AdminTournamentsController** | `POST /admin/tournaments`            | Admin  | Créer un tournoi                              |
-|                                | `PATCH /admin/tournaments/:id/open`  | Admin  | Ouvrir les inscriptions                       |
-|                                | `PATCH /admin/tournaments/:id/start` | Admin  | Démarrer le tournoi                           |
-| **HealthController**           | `GET /health`                        | Public | Santé + gRPC readiness                        |
-| **MetricsController**          | `GET /metrics`                       | Public | Scrape Prometheus                             |
-| **JwksController**             | `GET /.well-known/jwks.json`         | Public | Clé publique RS256                            |
+| Contrôleur                | Route                        | Auth   | Description                    |
+|---------------------------|------------------------------|--------|--------------------------------|
+| **AuthController**        | `POST /auth/register`        | Public | Inscription + tokens           |
+|                           | `POST /auth/login`           | Public | Connexion                      |
+|                           | `POST /auth/refresh`         | Public | Rotation refresh token         |
+|                           | `POST /auth/logout`          | JWT    | Blacklist + révocation         |
+|                           | `POST /auth/forgot-password` | Public | Email reset (anti-enum)        |
+|                           | `POST /auth/reset-password`  | Public | Reset avec token opaque        |
+| **MeController**          | `GET /me`                    | JWT    | Profil + ELO                   |
+|                           | `GET /me/history`            | JWT    | Historique (cursor-paginé)     |
+| **UsersController**       | `GET /users/:id/profile`     | JWT    | Profil public                  |
+| **LeaderboardController** | `GET /leaderboard`           | Public | Top ELO (cache Redis 30 s)     |
+| **MatchesController**     | `GET /matches/:id/audit`     | Public | Audit commit-reveal            |
+| **HealthController**      | `GET /health`                | Public | Santé + gRPC readiness         |
+| **JwksController**        | `GET /.well-known/jwks.json` | Public | Clé publique RS256             |
+
+---
+layout: default
+---
+
+# API — Contrôleurs & routes (2/2)
+
+| Contrôleur                     | Route                                | Auth  | Description                                   |
+|--------------------------------|--------------------------------------|-------|-----------------------------------------------|
+| **SeasonsController**          | `GET /seasons/current`               | JWT   | Saison active + classement joueur             |
+|                                | `GET /seasons/closed`                | Public| Saisons terminées                             |
+|                                | `GET /seasons/:id/standings`         | Public| Classement saisonnier (paginé, filtre league) |
+| **AdminSeasonsController**     | `POST /admin/seasons`                | Admin | Créer une saison                              |
+|                                | `PATCH /admin/seasons/:id/close`     | Admin | Clôturer une saison                           |
+| **TournamentsController**      | `GET /tournaments`                   | JWT   | Liste des tournois                            |
+|                                | `GET /tournaments/:id`               | JWT   | Détail d'un tournoi                           |
+|                                | `POST /tournaments/:id/register`     | JWT   | Inscription                                   |
+|                                | `DELETE /tournaments/:id/register`   | JWT   | Désinscription                                |
+| **AdminTournamentsController** | `POST /admin/tournaments`            | Admin | Créer un tournoi                              |
+|                                | `PATCH /admin/tournaments/:id/open`  | Admin | Ouvrir les inscriptions                       |
+|                                | `PATCH /admin/tournaments/:id/start` | Admin | Démarrer le tournoi                           |
 
 ---
 layout: default
 ---
 
 # Authentification — JWT RS256 + Refresh Rotation
+
+<div class="overflow-y-auto h-[380px] pr-1">
 
 ```mermaid {scale: 0.52}
 sequenceDiagram
@@ -218,6 +245,8 @@ sequenceDiagram
   A-->>C: 204 No Content
 ```
 
+</div>
+
 **Sécurité :** Argon2id `memoryCost:19456, timeCost:2` · RS256 · blacklist Redis · rotation atomique
 
 ---
@@ -225,6 +254,8 @@ layout: default
 ---
 
 # Base de données — Schéma Prisma (core)
+
+<div class="overflow-y-auto h-[400px]">
 
 ```mermaid {scale: 0.38}
 erDiagram
@@ -296,11 +327,15 @@ erDiagram
   User ||--o{ EloHistory : "concerne"
 ```
 
+</div>
+
 ---
 layout: default
 ---
 
 # Base de données — Features compétitives
+
+<div class="overflow-y-auto h-[400px]">
 
 ```mermaid {scale: 0.36}
 erDiagram
@@ -367,6 +402,8 @@ erDiagram
   Tournament ||--o{ TournamentMatch : "matches"
   TournamentMatch |o--|| TournamentMatch : "suivant"
 ```
+
+</div>
 
 ---
 layout: default
@@ -530,25 +567,6 @@ layout: default
 **Exclusions justifiées :** DTOs, fichiers bootstrap `main.ts`, code généré Prisma/gRPC, pages CRUD triviales du front.
 
 Les seuils sont **enforced en CI** — une PR qui fait baisser la couverture sous le seuil est bloquée automatiquement.
-
----
-layout: default
----
-
-# Observabilité — Prometheus + Grafana
-
-<v-clicks>
-
-- **Métriques HTTP** : latence par route, code de réponse, throughput — middleware `HttpMetricsMiddleware` sur l'API
-- **Métriques BullMQ** : jobs traités, en attente, échoués par queue — `WorkerMetricsService` dans le Job Runner
-- **Dashboard Grafana** pré-provisionné : aucune configuration manuelle
-- **Prometheus scrape** : `GET /metrics` sur l'API et le Job Runner (endpoint Prometheus natif)
-
-</v-clicks>
-
-<div class="mt-4 text-sm opacity-60">
-Logs structurés Pino avec <code>requestId</code> corrélé — JWT et passwords sont <strong>redactés</strong> automatiquement dans les logs.
-</div>
 
 ---
 layout: section
@@ -785,36 +803,40 @@ layout: default
 
 # [Charles] - Stack multi-réplicas
 
+<div class="grid grid-cols-2 gap-4">
+<div>
+
 ```yaml
 # docker-compose.scale.yml (extrait)
-services:
-  traefik:
-    labels:
-      - "traefik.enable=true"
-  api-1: &api
-    labels:
-      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
-      - "traefik.http.services.api.loadbalancer.server.port=3000"
-  api-2: *api  # round-robin automatique
+api-1: &api
+  labels:
+    - "traefik.http.routers.api.rule=Host(`api.localhost`)"
+    - "traefik.http.services.api.loadbalancer.server.port=3000"
+api-2: *api  # round-robin automatique
 
-  game-service-1: &game
-    labels:
-      - "traefik.http.services.game.loadbalancer.sticky.cookie=true"
-  game-service-2: *game  # sticky session WebSocket
+game-service-1: &game
+  labels:
+    - "traefik.http.services.game.loadbalancer.sticky.cookie=true"
+game-service-2: *game  # sticky WebSocket
 ```
 
-<v-clicks>
+</div>
+<div>
 
 **Résilience démontrée :**
+
 ```bash
 docker stop chifoumi-api-1
-curl http://api.localhost/health  # répond toujours via api-2
+# api-2 répond toujours
+curl http://api.localhost/health
 docker start chifoumi-api-1
 ```
 
-Redis est le seul état partagé : les sessions WS (`match:session:{id}`), la blacklist JWT et les queues BullMQ survivent à la perte d'un réplica.
+Redis = seul état partagé.  
+Sessions WS, blacklist JWT et queues BullMQ **survivent** à la perte d'un réplica.
 
-</v-clicks>
+</div>
+</div>
 
 ---
 layout: end
