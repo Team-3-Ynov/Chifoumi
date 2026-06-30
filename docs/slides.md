@@ -94,6 +94,8 @@ layout: default
 
 # Vue d'ensemble
 
+<div class="overflow-y-auto h-[430px]">
+
 ```mermaid {scale: 0.62}
 graph TD
   Browser["Navigateur React/Vite :5173"]
@@ -121,6 +123,8 @@ graph TD
   JR -->|"SMTP"| MH
   JR -->|"BullMQ workers"| RD
 ```
+
+</div>
 
 ---
 layout: default
@@ -448,6 +452,8 @@ layout: default
 
 # gRPC — Communication inter-services
 
+<div class="overflow-y-auto h-[380px]">
+
 ```mermaid {scale: 0.62}
 sequenceDiagram
   participant C as Client
@@ -473,6 +479,8 @@ sequenceDiagram
   US-->>GS: { rating, gamesPlayed }
 ```
 
+</div>
+
 **Frontières de responsabilité**
 - `auth-service` : JWT RS256, Argon2id, refresh rotation, blacklist Redis
 - `user-service` : enregistrements users, ratings ELO, leaderboard, profils
@@ -484,6 +492,8 @@ layout: default
 ---
 
 # Déploiement multi-réplicas
+
+<div class="overflow-y-auto h-[400px]">
 
 ```mermaid {scale: 0.52}
 graph LR
@@ -522,6 +532,8 @@ graph LR
   JRM & JRN --> RD
 ```
 
+</div>
+
 **Sessions sticky** sur le Game Service (WebSocket) · **Round-robin** sur l'API (stateless) · `auth-service` / `user-service` internes, non exposés par Traefik · Redis : seul état partagé entre réplicas.
 
 ---
@@ -529,6 +541,8 @@ layout: default
 ---
 
 # CI/CD — Pipeline GitHub Actions
+
+<div class="overflow-y-auto h-[380px]">
 
 ```mermaid {scale: 0.6}
 flowchart LR
@@ -547,6 +561,8 @@ flowchart LR
   L & TC & T & B & E --> MERGE
   MERGE --> D --> VPS
 ```
+
+</div>
 
 **Artefacts CI :** rapports de couverture `lcov` uploadés à chaque PR. **Conditions de merge :** lint vert + typecheck vert + tous les tests passants.
 
